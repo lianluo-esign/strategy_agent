@@ -13,10 +13,9 @@ from .constants import (
     REDIS_DEPTH_SNAPSHOT_KEY,
     REDIS_TRADES_WINDOW_KEY,
     REDIS_ANALYSIS_RESULTS_KEY,
-    DEPTH_WINDOW_SIZE,
     TRADES_WINDOW_SIZE_MINUTES
 )
-from .models import DepthSnapshot, MinuteTradeData, MarketAnalysisResult
+from .models import DepthSnapshot, DepthLevel, MinuteTradeData, MarketAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +51,8 @@ class RedisDataStore:
             return False
 
     async def store_depth_snapshot(self, snapshot: DepthSnapshot) -> None:
-        """Store a depth snapshot in Redis."""
+        """Store a depth snapshot in Redis (overwrite mode)."""
         try:
-            key = f"{REDIS_DEPTH_SNAPSHOT_KEY}:{snapshot.timestamp.timestamp()}"
             data = {
                 'symbol': snapshot.symbol,
                 'timestamp': snapshot.timestamp.isoformat(),
@@ -62,11 +60,8 @@ class RedisDataStore:
                 'asks': [[float(level.price), float(level.quantity)] for level in snapshot.asks]
             }
 
-            # Store the snapshot
-            self.redis.lpush(REDIS_DEPTH_SNAPSHOT_KEY, json.dumps(data))
-
-            # Keep only the most recent snapshots
-            self.redis.ltrim(REDIS_DEPTH_SNAPSHOT_KEY, 0, DEPTH_WINDOW_SIZE - 1)
+            # Store/overwrite the snapshot as a single value
+            self.redis.set(REDIS_DEPTH_SNAPSHOT_KEY, json.dumps(data))
 
             logger.debug(f"Stored depth snapshot for {snapshot.symbol} at {snapshot.timestamp}")
 
@@ -75,9 +70,9 @@ class RedisDataStore:
             raise
 
     def get_latest_depth_snapshot(self) -> Optional[DepthSnapshot]:
-        """Get the most recent depth snapshot."""
+        """Get the depth snapshot."""
         try:
-            data_str = self.redis.lindex(REDIS_DEPTH_SNAPSHOT_KEY, 0)
+            data_str = self.redis.get(REDIS_DEPTH_SNAPSHOT_KEY)
             if not data_str:
                 return None
 
@@ -85,12 +80,12 @@ class RedisDataStore:
             return DepthSnapshot(
                 symbol=data['symbol'],
                 timestamp=datetime.fromisoformat(data['timestamp']),
-                bids=[[Decimal(str(price)), Decimal(str(qty))] for price, qty in data['bids']],
-                asks=[[Decimal(str(price)), Decimal(str(qty))] for price, qty in data['asks']]
+                bids=[DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty))) for price, qty in data['bids']],
+                asks=[DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty))) for price, qty in data['asks']]
             )
 
         except Exception as e:
-            logger.error(f"Failed to get latest depth snapshot: {e}")
+            logger.error(f"Failed to get depth snapshot: {e}")
             return None
 
     async def store_minute_trade_data(self, trade_data: MinuteTradeData) -> None:
@@ -185,9 +180,9 @@ class RedisDataStore:
             logger.error(f"Failed to get latest analysis result: {e}")
             return None
 
-    def get_depth_snapshot_count(self) -> int:
-        """Get the number of stored depth snapshots."""
-        return self.redis.llen(REDIS_DEPTH_SNAPSHOT_KEY)
+    def depth_snapshot_exists(self) -> bool:
+        """Check if a depth snapshot exists."""
+        return self.redis.exists(REDIS_DEPTH_SNAPSHOT_KEY) > 0
 
     def get_trade_window_count(self) -> int:
         """Get the number of stored trade data points."""

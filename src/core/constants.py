@@ -13,7 +13,6 @@ BTC_FDUSD_SYMBOL = "BTCFDUSD"
 # Data Collection Constants
 DEPTH_SNAPSHOT_LIMIT = 5000
 TRADES_WINDOW_SIZE_MINUTES = 48 * 60  # 48 hours
-DEPTH_WINDOW_SIZE = 60  # Keep last 60 snapshots
 PRICE_PRECISION = 1.0  # $1 precision for aggregation
 AGGREGATION_INTERVAL_SECONDS = 60
 

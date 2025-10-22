@@ -195,7 +195,7 @@ class AnalyzerAgent:
             'is_running': self.is_running,
             'redis_connected': self.redis_store.test_connection(),
             'last_analysis': datetime.now().isoformat(),
-            'depth_snapshots_count': self.redis_store.get_depth_snapshot_count(),
+            'depth_snapshot_available': self.redis_store.depth_snapshot_exists(),
             'trade_window_count': self.redis_store.get_trade_window_count()
         }
 

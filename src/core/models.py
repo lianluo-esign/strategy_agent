@@ -3,7 +3,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class MinuteTradeData:
             return
 
         # Round price to $1 precision
-        price_level_key = trade.price.quantize(Decimal('1.0'))
+        price_level_key = trade.price.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
         if price_level_key not in self.price_levels:
             self.price_levels[price_level_key] = PriceLevelData(

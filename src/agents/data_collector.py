@@ -228,7 +228,7 @@ class DataCollectorAgent:
             'is_running': self.is_running,
             'websocket_connected': self.websocket_client.is_connected,
             'current_minute_trades': len(self.current_minute_data.price_levels),
-            'depth_snapshots_count': self.redis_store.get_depth_snapshot_count(),
+            'depth_snapshot_available': self.redis_store.depth_snapshot_exists(),
             'trade_window_count': self.redis_store.get_trade_window_count(),
             'last_update': datetime.now().isoformat()
         }
