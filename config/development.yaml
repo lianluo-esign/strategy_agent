@@ -1,0 +1,49 @@
+app:
+  name: "strategy-agent"
+  environment: "development"
+  log_level: "DEBUG"
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  decode_responses: true
+  socket_timeout: 5
+  socket_connect_timeout: 5
+
+binance:
+  rest_api_base: "https://api.binance.com"
+  websocket_base: "wss://stream.binance.com:9443"
+  symbol: "BTCFDUSD"
+  rate_limit_requests_per_minute: 1200
+  timeout: 30
+
+data_collector:
+  depth_snapshot:
+    limit: 5000
+    update_interval_seconds: 60
+    window_size: 60  # Keep last 60 snapshots
+  order_flow:
+    websocket_url: "wss://stream.binance.com:9443/ws/btcfdusd@aggTrade"
+    window_size_minutes: 2880  # 48 hours
+    price_precision: 1.0  # $1 precision for aggregation
+    aggregation_interval_seconds: 60
+
+analyzer:
+  deepseek:
+    api_key: "${DEEPSEEK_API_KEY}"
+    base_url: "https://api.deepseek.com/v1"
+    model: "deepseek-chat"
+    max_tokens: 4000
+    temperature: 0.1
+  analysis:
+    interval_seconds: 60
+    min_order_volume_threshold: 0.01
+    support_resistance_threshold: 0.1
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: "logs/strategy_agent.log"
+  max_file_size_mb: 100
+  backup_count: 5
