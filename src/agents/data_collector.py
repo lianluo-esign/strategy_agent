@@ -138,10 +138,7 @@ class DataCollectorAgent:
 
                 # Wait for next collection with cancellation support
                 try:
-                    await asyncio.wait_for(
-                        asyncio.sleep(interval),
-                        timeout=interval
-                    )
+                    await asyncio.sleep(interval)  # asyncio.sleep is already cancellable
                 except asyncio.CancelledError:
                     logger.info("Depth snapshot collector cancelled during sleep")
                     break
@@ -152,7 +149,7 @@ class DataCollectorAgent:
             except Exception as e:
                 logger.error(f"Depth snapshot collector error: {e}")
                 try:
-                    await asyncio.wait_for(asyncio.sleep(5), timeout=5)
+                    await asyncio.sleep(5)
                 except asyncio.CancelledError:
                     break
 
@@ -171,9 +168,9 @@ class DataCollectorAgent:
                     wait_time = min(2 ** retry_count, 30)  # Exponential backoff
                     logger.warning(f"WebSocket connection failed, retrying in {wait_time}s...")
 
-                    # Use asyncio.wait_for to respect cancellation during retry delay
+                    # Use asyncio.sleep with cancellation support
                     try:
-                        await asyncio.wait_for(asyncio.sleep(wait_time), timeout=wait_time)
+                        await asyncio.sleep(wait_time)  # asyncio.sleep is already cancellable
                     except asyncio.CancelledError:
                         logger.info("WebSocket retry cancelled during sleep")
                         break
@@ -193,7 +190,7 @@ class DataCollectorAgent:
                 retry_count += 1
                 if self.is_running:
                     try:
-                        await asyncio.wait_for(asyncio.sleep(5), timeout=5)
+                        await asyncio.sleep(5)  # asyncio.sleep is already cancellable
                     except asyncio.CancelledError:
                         break
 
@@ -208,10 +205,11 @@ class DataCollectorAgent:
         try:
             # Create a cancellation-aware task for WebSocket listening
             listen_task = asyncio.create_task(self.websocket_client.listen_trades(self._handle_trade))
+            shutdown_task = asyncio.create_task(self.shutdown_event.wait())
 
             # Wait for either the task to complete or shutdown to be requested
             done, pending = await asyncio.wait(
-                [listen_task, self.shutdown_event.wait()],
+                [listen_task, shutdown_task],
                 return_when=asyncio.FIRST_COMPLETED
             )
 
@@ -225,7 +223,7 @@ class DataCollectorAgent:
 
             # Handle completed tasks
             for task in done:
-                if task != listen_task:  # shutdown_event completed
+                if task == shutdown_task:  # shutdown_event completed
                     logger.info("Shutdown requested, stopping WebSocket listener")
                     if not listen_task.done():
                         listen_task.cancel()
@@ -269,7 +267,7 @@ class DataCollectorAgent:
 
                 # Check every second with cancellation support
                 try:
-                    await asyncio.wait_for(asyncio.sleep(1), timeout=1)
+                    await asyncio.sleep(1)  # asyncio.sleep is already cancellable
                 except asyncio.CancelledError:
                     logger.info("Trade aggregator cancelled during sleep")
                     break
@@ -278,9 +276,9 @@ class DataCollectorAgent:
                 logger.info("Trade aggregator cancelled")
                 break
             except Exception as e:
-                logger.error(f"Trade aggregator error: {e}")
+                logger.error(f"Trade aggregator error: {e}", exc_info=True)
                 try:
-                    await asyncio.wait_for(asyncio.sleep(5), timeout=5)
+                    await asyncio.sleep(5)
                 except asyncio.CancelledError:
                     break
 
