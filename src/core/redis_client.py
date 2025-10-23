@@ -1,21 +1,23 @@
 """Redis client for caching market data."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from pathlib import Path
 
+import aiofiles
 import redis
 from redis.asyncio import Redis as AsyncRedis
 
 from .constants import (
+    REDIS_ANALYSIS_RESULTS_KEY,
     REDIS_DEPTH_SNAPSHOT_KEY,
     REDIS_TRADES_WINDOW_KEY,
-    REDIS_ANALYSIS_RESULTS_KEY,
-    TRADES_WINDOW_SIZE_MINUTES
+    TRADES_WINDOW_SIZE_MINUTES,
 )
-from .models import DepthSnapshot, DepthLevel, MinuteTradeData, MarketAnalysisResult
+from .models import DepthLevel, DepthSnapshot, MarketAnalysisResult, MinuteTradeData
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ logger = logging.getLogger(__name__)
 class RedisDataStore:
     """Redis client for storing and retrieving market data."""
 
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0):
+    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, storage_dir: str = "storage"):
         """Initialize Redis connection."""
         self.redis = redis.Redis(
             host=host,
@@ -39,6 +41,8 @@ class RedisDataStore:
             db=db,
             decode_responses=True
         )
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(exist_ok=True)
 
     def test_connection(self) -> bool:
         """Test Redis connection."""
@@ -69,7 +73,7 @@ class RedisDataStore:
             logger.error(f"Failed to store depth snapshot: {e}")
             raise
 
-    def get_latest_depth_snapshot(self) -> Optional[DepthSnapshot]:
+    def get_latest_depth_snapshot(self) -> DepthSnapshot | None:
         """Get the depth snapshot."""
         try:
             data_str = self.redis.get(REDIS_DEPTH_SNAPSHOT_KEY)
@@ -91,14 +95,13 @@ class RedisDataStore:
     async def store_minute_trade_data(self, trade_data: MinuteTradeData) -> None:
         """Store minute trade data in the sliding window."""
         try:
-            key = f"{REDIS_TRADES_WINDOW_KEY}:{trade_data.timestamp.timestamp()}"
             data = trade_data.to_dict()
 
             # Store the data
             self.redis.lpush(REDIS_TRADES_WINDOW_KEY, json.dumps(data))
 
-            # Keep only the most recent data (48 hours)
-            self.redis.ltrim(REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1)
+            # Check if we need to remove expired data and serialize to disk
+            await self._handle_expired_trade_data()
 
             logger.debug(f"Stored minute trade data for {trade_data.timestamp}")
 
@@ -106,7 +109,72 @@ class RedisDataStore:
             logger.error(f"Failed to store minute trade data: {e}")
             raise
 
-    def get_recent_trade_data(self, minutes: int = 60) -> List[MinuteTradeData]:
+    async def _handle_expired_trade_data(self) -> None:
+        """Handle expired trade data by serializing to disk asynchronously."""
+        try:
+            # Get current number of items in the trades window
+            current_count = self.redis.llen(REDIS_TRADES_WINDOW_KEY)
+
+            if current_count > TRADES_WINDOW_SIZE_MINUTES:
+                # Calculate how many items are expired
+                expired_count = current_count - TRADES_WINDOW_SIZE_MINUTES
+
+                # Get the expired items (they are at the end of the list)
+                expired_items = self.redis.lrange(
+                    REDIS_TRADES_WINDOW_KEY,
+                    TRADES_WINDOW_SIZE_MINUTES,
+                    -1
+                )
+
+                # Serialize expired items to disk asynchronously
+                await self._serialize_trade_data_to_files(expired_items)
+
+                # Trim the list to keep only the recent data
+                self.redis.ltrim(REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1)
+
+                logger.info(f"Serialized {expired_count} expired trade data items to disk")
+
+        except Exception as e:
+            logger.error(f"Failed to handle expired trade data: {e}")
+            # Don't raise here to avoid interrupting main flow
+
+    async def _serialize_trade_data_to_files(self, expired_items: list[str]) -> None:
+        """Serialize expired trade data to JSON files asynchronously."""
+        try:
+            # Create concurrent tasks for file writing
+            tasks = [self._write_trade_data_file(item) for item in expired_items]
+
+            # Execute all file writes concurrently
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+        except Exception as e:
+            logger.error(f"Failed to serialize trade data to files: {e}")
+
+    async def _write_trade_data_file(self, data_str: str) -> None:
+        """Write a single trade data item to a JSON file asynchronously."""
+        try:
+            data = json.loads(data_str)
+            timestamp = datetime.fromisoformat(data['timestamp'])
+
+            # Create filename based on timestamp (one file per minute)
+            filename = f"trades_{timestamp.strftime('%Y%m%d_%H%M')}.json"
+            filepath = self.storage_dir / filename
+
+            # Write data to file asynchronously
+            async with aiofiles.open(filepath, 'w') as f:
+                await f.write(json.dumps(data, indent=2, ensure_ascii=False))
+
+            logger.debug(f"Serialized trade data to {filepath}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON data for file serialization: {e}")
+        except OSError as e:
+            logger.error(f"File system error writing trade data: {e}")
+        except Exception as e:
+            logger.error(f"Failed to write trade data file: {e}")
+
+    def get_recent_trade_data(self, minutes: int = 60) -> list[MinuteTradeData]:
         """Get recent trade data for analysis."""
         try:
             data_list = self.redis.lrange(REDIS_TRADES_WINDOW_KEY, 0, minutes - 1)
@@ -151,7 +219,7 @@ class RedisDataStore:
             logger.error(f"Failed to store analysis result: {e}")
             raise
 
-    def get_latest_analysis_result(self) -> Optional[MarketAnalysisResult]:
+    def get_latest_analysis_result(self) -> MarketAnalysisResult | None:
         """Get the most recent analysis result."""
         try:
             # Get all analysis result keys and find the most recent

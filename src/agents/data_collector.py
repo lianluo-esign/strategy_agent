@@ -5,10 +5,9 @@ import logging
 import signal
 import sys
 from datetime import datetime, timedelta
-from typing import Optional
 
-from ..core.redis_client import RedisDataStore
 from ..core.models import MinuteTradeData, Trade
+from ..core.redis_client import RedisDataStore
 from ..utils.binance_client import BinanceAPIClient, BinanceWebSocketClient
 from ..utils.config import Settings
 
@@ -24,7 +23,8 @@ class DataCollectorAgent:
         self.redis_store = RedisDataStore(
             host=settings.redis.host,
             port=settings.redis.port,
-            db=settings.redis.db
+            db=settings.redis.db,
+            storage_dir=settings.redis.storage_dir
         )
         self.api_client = BinanceAPIClient(
             base_url=settings.binance.rest_api_base,

@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
@@ -16,6 +16,7 @@ class RedisConfig(BaseModel):
     decode_responses: bool = True
     socket_timeout: int = 5
     socket_connect_timeout: int = 5
+    storage_dir: str = "storage"
 
 
 class BinanceConfig(BaseModel):
@@ -118,7 +119,7 @@ class Settings(BaseSettings):
         if not config_file.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
         return cls(**config_data)
