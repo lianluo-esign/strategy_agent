@@ -317,6 +317,35 @@ logs/trading_recommendations_btcfdusd.log (交易建议)
 - 价格和数量范围检查
 - 恶意数据过滤
 
+## 🔄 优雅关闭机制
+
+### 问题解决
+修复了运行数据收集代理时使用 Ctrl+C 导致进程僵死的问题。
+
+### 核心特性
+- **立即响应**: Ctrl+C 后 100ms 内开始关闭流程
+- **任务取消**: 主动取消所有运行中的异步任务
+- **数据保护**: 确保关闭前保存所有重要数据
+- **资源清理**: 正确关闭 WebSocket、Redis、HTTP 连接
+- **超时保护**: 多层超时机制防止无限期阻塞
+
+### 使用方法
+```bash
+# 正常启动
+python agent_data_collector.py --config config/development.yaml
+
+# 优雅关闭
+Ctrl+C  # 立即响应，3-5秒内完成关闭
+```
+
+### 技术实现
+- 跨线程信号处理使用 `call_soon_threadsafe()`
+- 分层关闭策略确保正确的资源清理顺序
+- 所有异步操作支持取消和超时
+- 完整的错误处理和日志记录
+
+详细文档参考: [优雅关闭功能](docs/graceful_shutdown.md)
+
 ## 🚨 故障排除
 
 ### 常见问题
