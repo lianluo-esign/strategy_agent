@@ -8,10 +8,9 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from .models import (
-    DepthLevel,
     DepthSnapshot,
     EnhancedMarketAnalysisResult,
     MarketAnalysisResult,
@@ -22,6 +21,7 @@ from .normal_distribution_analyzer import (
     NormalDistributionPeakAnalyzer,
     convert_to_decimal_format,
 )
+from .sklearn_cluster_analyzer import SklearnClusterAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +59,23 @@ class NormalDistributionMarketAnalyzer:
             confidence_level=confidence_level
         )
 
+        # Initialize sklearn cluster analyzer
+        self.cluster_analyzer = SklearnClusterAnalyzer(
+            min_samples=3,
+            eps_multiplier=0.02,
+            max_clusters=8,
+            volume_weight=2.0
+        )
+
         logger.info(
             f"Initialized NormalDistributionMarketAnalyzer with confidence_level={confidence_level}, "
-            f"window={analysis_window_minutes}min"
+            f"window={analysis_window_minutes}min, sklearn clustering enabled"
         )
 
     def analyze_market(
         self,
         snapshot: DepthSnapshot,
-        trade_data_list: List[MinuteTradeData],
+        trade_data_list: list[MinuteTradeData],
         symbol: str,
         enhanced_mode: bool = True,
     ) -> MarketAnalysisResult | EnhancedMarketAnalysisResult:
@@ -112,7 +120,7 @@ class NormalDistributionMarketAnalyzer:
     def _analyze_enhanced(
         self,
         snapshot: DepthSnapshot,
-        trade_data_list: List[MinuteTradeData],
+        trade_data_list: list[MinuteTradeData],
         symbol: str,
     ) -> EnhancedMarketAnalysisResult:
         """
@@ -133,6 +141,9 @@ class NormalDistributionMarketAnalyzer:
 
         # Step 2: Perform normal distribution peak analysis
         nd_analysis = self.peak_analyzer.analyze_order_book(order_book_data)
+
+        # Step 2.5: Perform sklearn clustering analysis
+        clustering_results = self.cluster_analyzer.analyze_order_book_clustering(snapshot)
 
         # Step 3: Convert to decimal format for consistency
         nd_analysis_decimal = convert_to_decimal_format(nd_analysis)
@@ -183,6 +194,13 @@ class NormalDistributionMarketAnalyzer:
             confidence_intervals=self._extract_confidence_intervals(nd_analysis_decimal),
             market_metrics=nd_analysis_decimal.get('market_metrics', {}),
             spread_analysis=nd_analysis_decimal.get('spread_analysis', {}),
+            # New fields for sklearn clustering analysis
+            clustering_results=clustering_results,
+            optimal_clusters=clustering_results.get('optimal_clusters', 0),
+            silhouette_score=clustering_results.get('silhouette_score', 0.0),
+            liquidity_peaks=self._convert_clustering_peaks_to_support_resistance(
+                clustering_results.get('liquidity_peaks', [])
+            ),
         )
 
         logger.info(
@@ -191,12 +209,42 @@ class NormalDistributionMarketAnalyzer:
             f"ask_peak={nd_analysis_decimal.get('peak_analysis', {}).get('asks', {}).get('mean_price')}, "
             f"confidence_level={self.confidence_level}"
         )
+
+        # Log sklearn clustering results
+        logger.info(
+            f"Sklearn clustering analysis completed: "
+            f"optimal_clusters={clustering_results.get('optimal_clusters', 0)}, "
+            f"silhouette_score={clustering_results.get('silhouette_score', 0.0):.3f}, "
+            f"liquidity_peaks={len(clustering_results.get('liquidity_peaks', []))}"
+        )
+
+        # Print clustering results in the specified format
+        if clustering_results.get('optimal_clusters', 0) > 0:
+            print(f"\n=== SKLEARN聚类分析结果 ===")
+            print(f"最优聚类数: {clustering_results['optimal_clusters']}")
+            print(f"轮廓系数: {clustering_results['silhouette_score']:.3f}")
+
+            print(f"\n流动性峰值区域:")
+            for i, peak in enumerate(clustering_results.get('liquidity_peaks', [])):
+                print(f"峰值 {i+1}: ${peak['center_price']:.2f}, "
+                      f"总量: {peak['total_volume']:.0f}, "
+                      f"方向: {peak['dominant_side']}, "
+                      f"纯度: {peak['purity']:.2f}")
+
+            print(f"\n详细聚类统计:")
+            cluster_analysis = clustering_results.get('cluster_analysis', {})
+            for cluster_id, stats in cluster_analysis.items():
+                print(f"聚类 {cluster_id}: {stats['size']}个订单, "
+                      f"价格区间: ${stats['price_range'][0]:.2f}-${stats['price_range'][1]:.2f}, "
+                      f"总挂单量: {stats['total_volume']:.0f}")
+            print("=" * 40)
+
         return result
 
     def _analyze_legacy(
         self,
         snapshot: DepthSnapshot,
-        trade_data_list: List[MinuteTradeData],
+        trade_data_list: list[MinuteTradeData],
         symbol: str,
     ) -> MarketAnalysisResult:
         """
@@ -223,7 +271,7 @@ class NormalDistributionMarketAnalyzer:
             resonance_zones=enhanced_result.resonance_zones,
         )
 
-    def _prepare_order_book_data(self, snapshot: DepthSnapshot) -> Dict[str, List]:
+    def _prepare_order_book_data(self, snapshot: DepthSnapshot) -> dict[str, list]:
         """Prepare order book data for normal distribution analysis.
 
         Args:
@@ -245,23 +293,32 @@ class NormalDistributionMarketAnalyzer:
         return order_book_data
 
     def _aggregate_trade_data(
-        self, trade_data_list: List[MinuteTradeData]
-    ) -> Dict[Decimal, Decimal]:
+        self, trade_data_list: list[MinuteTradeData]
+    ) -> dict[Decimal, Decimal]:
         """Aggregate trade data by 1-dollar precision."""
         aggregated_trades = defaultdict(Decimal)
 
         for minute_data in trade_data_list:
             for price_level_data in minute_data.price_levels.values():
-                price_key = price_level_data.price_level.quantize(Decimal("1"))
-                aggregated_trades[price_key] += price_level_data.total_volume
+                # Handle both PriceLevelData objects and dictionaries (from Redis)
+                if isinstance(price_level_data, dict):
+                    # Data is stored as dictionary from Redis JSON deserialization
+                    price_key = Decimal(str(price_level_data["price_level"])).quantize(Decimal("1"))
+                    total_volume = Decimal(str(price_level_data["total_volume"]))
+                else:
+                    # Data is a PriceLevelData object
+                    price_key = price_level_data.price_level.quantize(Decimal("1"))
+                    total_volume = price_level_data.total_volume
+
+                aggregated_trades[price_key] += total_volume
 
         return dict(aggregated_trades)
 
     def _generate_support_resistance_from_nd(
         self,
-        nd_analysis: Dict[str, Any],
+        nd_analysis: dict[str, Any],
         symbol: str,
-    ) -> Tuple[List[SupportResistanceLevel], List[SupportResistanceLevel]]:
+    ) -> tuple[list[SupportResistanceLevel], list[SupportResistanceLevel]]:
         """Generate support/resistance levels from normal distribution analysis.
 
         Args:
@@ -312,7 +369,7 @@ class NormalDistributionMarketAnalyzer:
 
         return support_levels, resistance_levels
 
-    def _extract_confidence_intervals(self, nd_analysis: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_confidence_intervals(self, nd_analysis: dict[str, Any]) -> dict[str, Any]:
         """Extract confidence intervals from analysis results.
 
         Args:
@@ -345,8 +402,8 @@ class NormalDistributionMarketAnalyzer:
         return confidence_intervals
 
     def _identify_poc_levels(
-        self, aggregated_trades: Dict[Decimal, Decimal]
-    ) -> List[Decimal]:
+        self, aggregated_trades: dict[Decimal, Decimal]
+    ) -> list[Decimal]:
         """Identify Point of Control (POC) levels."""
         if not aggregated_trades:
             return []
@@ -362,9 +419,9 @@ class NormalDistributionMarketAnalyzer:
 
     def _identify_liquidity_vacuum_zones(
         self,
-        aggregated_bids: Dict[Decimal, Decimal],
-        aggregated_asks: Dict[Decimal, Decimal],
-    ) -> List[Decimal]:
+        aggregated_bids: dict[Decimal, Decimal],
+        aggregated_asks: dict[Decimal, Decimal],
+    ) -> list[Decimal]:
         """Identify liquidity vacuum zones (price ranges with low volume)."""
         all_prices = sorted(set(aggregated_bids.keys()) | set(aggregated_asks.keys()))
 
@@ -397,10 +454,10 @@ class NormalDistributionMarketAnalyzer:
 
     def _identify_resonance_zones(
         self,
-        support_levels: List[SupportResistanceLevel],
-        resistance_levels: List[SupportResistanceLevel],
-        aggregated_trades: Dict[Decimal, Decimal],
-    ) -> List[Decimal]:
+        support_levels: list[SupportResistanceLevel],
+        resistance_levels: list[SupportResistanceLevel],
+        aggregated_trades: dict[Decimal, Decimal],
+    ) -> list[Decimal]:
         """Identify resonance zones where support and resistance converge."""
         resonance_zones = []
 
@@ -424,11 +481,11 @@ class NormalDistributionMarketAnalyzer:
 
     def _calculate_depth_statistics(
         self,
-        original_bids: List,
-        original_asks: List,
-        aggregated_bids: Dict[Decimal, Decimal],
-        aggregated_asks: Dict[Decimal, Decimal],
-    ) -> Dict[str, Decimal]:
+        original_bids: list,
+        original_asks: list,
+        aggregated_bids: dict[Decimal, Decimal],
+        aggregated_asks: dict[Decimal, Decimal],
+    ) -> dict[str, Decimal]:
         """Calculate depth statistics for quality assessment."""
         original_bid_volume = sum(bid.quantity for bid in original_bids)
         original_ask_volume = sum(ask.quantity for ask in original_asks)
@@ -463,8 +520,8 @@ class NormalDistributionMarketAnalyzer:
         }
 
     def _calculate_nd_peak_quality(
-        self, nd_analysis: Dict[str, Any], aggregated_trades: Dict[Decimal, Decimal]
-    ) -> Dict[str, float]:
+        self, nd_analysis: dict[str, Any], aggregated_trades: dict[Decimal, Decimal]
+    ) -> dict[str, float]:
         """Calculate quality metrics for normal distribution peak detection."""
         if not nd_analysis or 'peak_analysis' not in nd_analysis:
             return {
@@ -502,6 +559,28 @@ class NormalDistributionMarketAnalyzer:
             "coverage_rate": coverage_rate,
             "confidence_level": self.confidence_level,
         }
+
+    def _convert_clustering_peaks_to_support_resistance(
+        self, liquidity_peaks: list[dict[str, Any]]
+    ) -> list[SupportResistanceLevel]:
+        """Convert sklearn clustering peaks to SupportResistanceLevel objects."""
+        support_resistance_levels = []
+
+        for peak in liquidity_peaks:
+            level_type = "support" if peak["dominant_side"] == "bid" else "resistance"
+
+            support_resistance_level = SupportResistanceLevel(
+                price=Decimal(str(peak["center_price"])),
+                strength=min(peak["purity"], 1.0),  # Ensure strength doesn't exceed 1.0
+                level_type=level_type,
+                volume_at_level=Decimal(str(abs(peak["total_volume"]))),
+                confirmation_count=1,
+                last_confirmed=datetime.now(),
+            )
+
+            support_resistance_levels.append(support_resistance_level)
+
+        return support_resistance_levels
 
 
 # Keep the existing MarketAnalyzer as fallback

@@ -273,6 +273,12 @@ class EnhancedMarketAnalysisResult:
     market_metrics: dict[str, Any] = field(default_factory=dict)
     spread_analysis: dict[str, Any] = field(default_factory=dict)
 
+    # Sklearn clustering analysis results
+    clustering_results: dict[str, Any] = field(default_factory=dict)
+    optimal_clusters: int = 0
+    silhouette_score: float = 0.0
+    liquidity_peaks: list[SupportResistanceLevel] = field(default_factory=list)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
@@ -301,4 +307,9 @@ class EnhancedMarketAnalysisResult:
             "confidence_intervals": self.confidence_intervals,
             "market_metrics": self.market_metrics,
             "spread_analysis": self.spread_analysis,
+            # Sklearn clustering analysis
+            "clustering_results": self.clustering_results,
+            "optimal_clusters": self.optimal_clusters,
+            "silhouette_score": self.silhouette_score,
+            "liquidity_peaks": [peak.to_dict() for peak in self.liquidity_peaks],
         }

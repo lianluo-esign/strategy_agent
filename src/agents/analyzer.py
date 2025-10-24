@@ -19,7 +19,9 @@ RETRY_DELAY_ON_ERROR = 10  # Seconds to wait before retry after error
 
 # Try to import normal distribution analyzer first
 try:
-    from ..core.analyzers_normal import MarketAnalyzer as NormalDistributionMarketAnalyzer
+    from ..core.analyzers_normal import (
+        MarketAnalyzer as NormalDistributionMarketAnalyzer,
+    )
     logger.info("Using normal distribution market analyzer")
     use_normal_distribution = True
 except ImportError:
@@ -104,7 +106,7 @@ class AnalyzerAgent:
                 logger.debug(f"Signal handler for {sig} registered")
             except Exception as e:
                 logger.error(f"Failed to register signal handler for {sig}: {e}")
-                raise RuntimeError(f"Signal handler registration failed: {e}")
+                raise RuntimeError(f"Signal handler registration failed: {e}") from e
 
         # Test Redis connection
         if not self.redis_store.test_connection():
@@ -140,7 +142,7 @@ class AnalyzerAgent:
                     # If wait completed without timeout, shutdown was requested
                     logger.info("Shutdown event triggered, exiting analysis loop")
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Normal timeout, continue to next cycle
                     continue
 
@@ -149,14 +151,14 @@ class AnalyzerAgent:
                 # Wait before retry, but respect shutdown
                 try:
                     await asyncio.wait_for(self.shutdown_event.wait(), timeout=RETRY_DELAY_ON_ERROR)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Normal timeout, continue retry
                     continue
                 # If wait completed, shutdown was requested
                 break
 
     async def _perform_analysis_cycle(self) -> None:
-        """Perform a complete analysis cycle."""
+        """Perform a complete analysis cycle using only depth snapshot data."""
         try:
             # Step 1: Get latest depth snapshot
             snapshot = self.redis_store.get_latest_depth_snapshot()
@@ -164,21 +166,12 @@ class AnalyzerAgent:
                 logger.debug("No depth snapshot available")
                 return
 
-            # Step 2: Get recent trade data (last 3 hours for analysis)
-            trade_data = self.redis_store.get_recent_trade_data(minutes=180)
-            if not trade_data:
-                logger.debug("No trade data available")
-                return
+            logger.info(f"Analyzing depth snapshot: {snapshot.symbol} from {snapshot.timestamp}")
 
-            logger.info(
-                f"Analyzing market data: snapshot from {snapshot.timestamp}, "
-                f"{len(trade_data)} minutes of trade data"
-            )
-
-            # Step 3: Perform enhanced technical analysis
+            # Step 2: Perform analysis using only depth snapshot data (no trade data)
             analysis_result = self.market_analyzer.analyze_market(
                 snapshot=snapshot,
-                trade_data_list=trade_data,
+                trade_data_list=[],  # Empty list - only using depth snapshot
                 symbol=self.settings.binance.symbol,
                 enhanced_mode=True
             )
@@ -261,7 +254,7 @@ class AnalyzerAgent:
             # Wait for tasks to complete with timeout
             try:
                 await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=SHUTDOWN_TASK_TIMEOUT)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Some tasks did not complete within timeout")
 
         # Close connections

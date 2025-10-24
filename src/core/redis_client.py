@@ -92,9 +92,22 @@ class RedisDataStore:
                 return None
 
             data = json.loads(data_str)
+
+            # Handle timestamp parsing with better error handling
+            try:
+                timestamp = datetime.fromisoformat(data["timestamp"])
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Invalid timestamp format in snapshot: {data.get('timestamp', 'missing')}, using current time: {e}")
+                timestamp = datetime.now()
+
+            # Validate timestamp is reasonable (not in 1970s)
+            if timestamp.year < 2000:
+                logger.warning(f"Suspicious timestamp detected: {timestamp}, using current time")
+                timestamp = datetime.now()
+
             return DepthSnapshot(
                 symbol=data["symbol"],
-                timestamp=datetime.fromisoformat(data["timestamp"]),
+                timestamp=timestamp,
                 bids=[
                     DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
                     for price, qty in data["bids"]
@@ -202,9 +215,19 @@ class RedisDataStore:
             for data_str in data_list:
                 try:
                     data = json.loads(data_str)
-                    trade_data = MinuteTradeData(
-                        timestamp=datetime.fromisoformat(data["timestamp"])
-                    )
+
+                    # Handle timestamp parsing with better error handling
+                    try:
+                        timestamp = datetime.fromisoformat(data["timestamp"])
+                        # Validate timestamp is reasonable
+                        if timestamp.year < 2000:
+                            logger.warning(f"Suspicious trade data timestamp detected: {timestamp}, using current time")
+                            timestamp = datetime.now()
+                    except (ValueError, KeyError) as e:
+                        logger.warning(f"Invalid timestamp format in trade data: {data.get('timestamp', 'missing')}, using current time: {e}")
+                        timestamp = datetime.now()
+
+                    trade_data = MinuteTradeData(timestamp=timestamp)
 
                     # Reconstruct price level data
                     for price_str, price_data in data["price_levels"].items():
@@ -223,14 +246,27 @@ class RedisDataStore:
             logger.error(f"Failed to get recent trade data: {e}")
             return []
 
+    def _serialize_decimal(self, obj):
+        """Custom JSON serializer to handle Decimal and numpy objects."""
+        if isinstance(obj, Decimal):
+            return float(obj)
+        elif hasattr(obj, 'tolist'):  # numpy arrays
+            return obj.tolist()
+        elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+            try:
+                return list(obj)
+            except TypeError:
+                pass
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
     async def store_analysis_result(self, result: MarketAnalysisResult) -> None:
         """Store market analysis results."""
         try:
             key = f"{REDIS_ANALYSIS_RESULTS_KEY}:{result.timestamp.timestamp()}"
             data = result.to_dict()
 
-            # Store the result
-            self.redis.setex(key, 3600, json.dumps(data))  # Expire after 1 hour
+            # Store the result with custom Decimal serializer
+            self.redis.setex(key, 3600, json.dumps(data, default=self._serialize_decimal))  # Expire after 1 hour
 
             logger.debug(
                 f"Stored analysis result for {result.symbol} at {result.timestamp}"
@@ -238,7 +274,8 @@ class RedisDataStore:
 
         except Exception as e:
             logger.error(f"Failed to store analysis result: {e}")
-            raise
+            # Don't raise to avoid interrupting analysis cycle
+            pass
 
     def get_latest_analysis_result(self) -> MarketAnalysisResult | None:
         """Get the most recent analysis result."""
