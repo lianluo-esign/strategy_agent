@@ -96,7 +96,7 @@ class PriceZone:
 def detect_normal_distribution_peaks(
     price_volume_data: Dict[Decimal, Decimal],
     min_peak_volume: Decimal = Decimal('5.0'),
-    z_score_threshold: float = 1.5
+    z_score_threshold: float = 1.5,
     min_peak_confidence: float = 0.3
 ) -> List[WavePeak]:
     """
@@ -249,7 +249,7 @@ def detect_volume_based_peaks(
 
 def analyze_wave_formation(
     peaks: List[WavePeak],
-    min_peak_distance: Decimal = Decimal('5.0')
+    min_peak_distance: Decimal = Decimal('5.0'),
     max_price_range: Decimal = Decimal('50.0')
 ) -> List[PriceZone]:
     """

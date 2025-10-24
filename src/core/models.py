@@ -4,8 +4,13 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
+
+# Import classes from other modules for type hints
+if TYPE_CHECKING:
+    from .wave_peak_analyzer import WavePeak, PriceZone
 
 
 @dataclass
@@ -217,9 +222,9 @@ class EnhancedMarketAnalysisResult:
     aggregated_asks: dict[Decimal, Decimal] = field(default_factory=dict)
 
     # Wave peak analysis
-    wave_peaks: list[WavePeak] = field(default_factory=list)
-    support_zones: list[PriceZone] = field(default_factory=list)
-    resistance_zones: list[PriceZone] = field(default_factory=list)
+    wave_peaks: list["WavePeak"] = field(default_factory=list)
+    support_zones: list["PriceZone"] = field(default_factory=list)
+    resistance_zones: list["PriceZone"] = field(default_factory=list)
 
     # Traditional analysis (backward compatibility)
     support_levels: list[SupportResistanceLevel] = field(default_factory=list)
@@ -252,70 +257,3 @@ class EnhancedMarketAnalysisResult:
         }
 
 
-class WavePeak:
-    """Represents a wave peak detected in order book analysis."""
-    center_price: Decimal
-    volume: Decimal
-    price_range_width: Decimal
-    z_score: float
-    confidence: float
-    bid_volume: Decimal = Decimal('0')
-    ask_volume: Decimal = Decimal('0')
-    peak_type: str = 'unknown'
-
-    def to_dict(self) -> dict:
-        """Convert wave peak to dictionary representation."""
-        return {
-            'center_price': float(self.center_price),
-            'volume': float(self.volume),
-            'price_range_width': float(self.price_range_width),
-            'z_score': self.z_score,
-            'confidence': self.confidence,
-            'bid_volume': float(self.bid_volume),
-            'ask_volume': float(self.ask_volume),
-            'peak_type': self.peak_type,
-            'lower_price': float(self.center_price - self.price_range_width / 2),
-            'upper_price': float(self.center_price + self.price_range_width / 2),
-        }
-
-
-class PriceZone:
-    """Represents a price zone with trading characteristics."""
-    lower_price: Decimal
-    upper_price: Decimal
-    zone_type: str  # 'support' or 'resistance'
-    confidence: float
-    total_volume: Decimal
-    bid_ask_ratio: float = 1.0
-    center_price: Decimal
-    width: Decimal
-
-    def __post_init__(self) -> None:
-        """Calculate derived values after initialization."""
-        self.center_price = (self.lower_price + self.upper_price) / Decimal('2')
-        self.width = self.upper_price - self.lower_price
-
-    def to_dict(self) -> dict:
-        """Convert price zone to dictionary representation."""
-        return {
-            'lower_price': float(self.lower_price),
-            'upper_price': float(self.upper_price),
-            'zone_type': self.zone_type,
-            'confidence': self.confidence,
-            'total_volume': float(self.total_volume),
-            'bid_ask_ratio': self.bid_ask_ratio,
-            'center_price': float(self.center_price),
-            'width': float(self.width),
-        }
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary."""
-        return {
-            'timestamp': self.timestamp.isoformat(),
-            'symbol': self.symbol,
-            'action': self.action,
-            'price_range': [float(self.price_range[0]), float(self.price_range[1])],
-            'confidence': self.confidence,
-            'reasoning': self.reasoning,
-            'risk_level': self.risk_level
-        }

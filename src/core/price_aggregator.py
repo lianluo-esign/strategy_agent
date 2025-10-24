@@ -79,10 +79,8 @@ def _round_down_to_dollar(price: Decimal) -> Decimal:
     if not isinstance(price, Decimal):
         raise TypeError(f"Expected Decimal, got {type(price)}")
 
-    # Convert to cents for precise rounding
-    price_cents = price * 100
-    dollars_cents = int(price_cents)  # This truncates (rounds down)
-    return Decimal(dollars_cents) / Decimal('100')
+    # Use integer division to round down to nearest dollar
+    return Decimal(int(price))
 
 
 def calculate_depth_statistics(aggregated_bids: Dict[Decimal, Decimal], aggregated_asks: Dict[Decimal, Decimal]) -> Dict[str, Decimal]:
