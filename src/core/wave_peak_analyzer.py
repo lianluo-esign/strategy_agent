@@ -158,7 +158,7 @@ def detect_normal_distribution_peaks(
             is_local_peak = current_volume > prev_volume and current_volume > next_volume
 
             # Calculate Z-score for statistical significance
-            z_score = abs(float(current_price - mean_price) / std_price) if std_price > 0 else 0
+            z_score = abs(float(current_price - Decimal(str(mean_price))) / std_price) if std_price > 0 else 0
 
             # Calculate confidence based on Z-score
             confidence = min(z_score / z_score_threshold, 1.0) if z_score_threshold > 0 else 1.0
@@ -427,7 +427,7 @@ def validate_peak_detection_quality(
     total_peak_volume = sum(peak.volume for peak in detected_peaks)
 
     # Calculate preservation rate
-    volume_preservation_rate = float(total_peak_volume / (total_original_volume + 0.01)) if total_original_volume > 0 else 0
+    volume_preservation_rate = float(total_peak_volume / (total_original_volume + Decimal('0.01'))) if total_original_volume > 0 else 0
 
     # Calculate compression ratio
     compression_ratio = original_levels / len(detected_peaks) if detected_peaks else 0

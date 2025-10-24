@@ -10,6 +10,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Tuple, Optional
 
+logger = logging.getLogger(__name__)
+
 from .models import (
     DepthSnapshot,
     EnhancedMarketAnalysisResult,
@@ -51,8 +53,6 @@ except ImportError as e:
         WavePeak,
         PriceZone,
     )
-
-logger = logging.getLogger(__name__)
 
 
 class EnhancedMarketAnalyzer:
