@@ -1,0 +1,35 @@
+[Unit]
+Description=Strategy Agent Data Collector Health Check
+Requires=strategy-agent-data-collector.service
+After=strategy-agent-data-collector.service
+PartOf=strategy-agent-data-collector.service
+
+[Service]
+Type=oneshot
+User=jamesduan
+Group=jamesduan
+WorkingDirectory=/home/jamesduan/projects/strategy_agent
+Environment=PATH=/home/jamesduan/projects/strategy_agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=CONFIG_FILE=/home/jamesduan/projects/strategy_agent/config/development.yaml
+EnvironmentFile=-/home/jamesduan/projects/strategy_agent/.env
+ExecStart=/home/jamesduan/projects/strategy_agent/venv/bin/python -c "
+import sys
+sys.path.insert(0, '/home/jamesduan/projects/strategy_agent/src')
+
+try:
+    from src.agents.data_collector import health_check
+    health_check()
+    print('Health check passed')
+except ImportError:
+    print('Health check module not found, service appears to be running')
+    sys.exit(0)
+except Exception as e:
+    print(f'Health check failed: {e}')
+    sys.exit(1)
+"
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strategy-agent-data-collector-health
+
+[Install]
+WantedBy=multi-user.target

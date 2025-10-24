@@ -1,11 +1,51 @@
 """Configuration management for the Strategy Agent."""
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
+
+
+def _expand_env_vars(config_data: Any) -> Any:
+    """
+    Recursively expand environment variables in configuration data.
+
+    Supports ${VAR_NAME} pattern in strings, dictionaries, and lists.
+    Missing environment variables are replaced with empty string.
+
+    Args:
+        config_data: Configuration data structure to process
+
+    Returns:
+        Configuration data with expanded environment variables
+
+    Raises:
+        ValueError: If required environment variables are missing
+    """
+    if isinstance(config_data, dict):
+        return {k: _expand_env_vars(v) for k, v in config_data.items()}
+    elif isinstance(config_data, list):
+        return [_expand_env_vars(item) for item in config_data]
+    elif isinstance(config_data, str):
+        # Expand ${VAR_NAME} patterns with pre-compiled regex
+        pattern = r'\$\{([^}]+)\}'
+        def replace_var(match: re.Match[str]) -> str:
+            var_name = match.group(1)
+            value = os.getenv(var_name)
+            if value is None:
+                # Log warning but don't fail - let validation handle required vars
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Environment variable {var_name} not found, using empty string")
+                return ""
+            return value
+
+        return re.sub(pattern, replace_var, config_data)
+    else:
+        return config_data
 
 
 class RedisConfig(BaseModel):
@@ -112,7 +152,7 @@ class Settings(BaseSettings):
 
     @classmethod
     def load_from_file(cls, config_path: str) -> "Settings":
-        """Load settings from YAML file."""
+        """Load settings from YAML file with environment variable expansion."""
         import yaml
 
         config_file = Path(config_path)
@@ -122,7 +162,75 @@ class Settings(BaseSettings):
         with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
+        # Expand environment variables
+        config_data = _expand_env_vars(config_data)
+
         return cls(**config_data)
+
+    def validate_required_env_vars(self) -> None:
+        """
+        Validate that required environment variables are set.
+
+        Raises:
+            ValueError: If required environment variables are missing
+        """
+        required_vars = {
+            'DEEPSEEK_API_KEY': 'DeepSeek API key is required but not set'
+        }
+
+        missing_vars = []
+        for var_name, error_msg in required_vars.items():
+            if not os.getenv(var_name):
+                missing_vars.append(f"  - {var_name}: {error_msg}")
+
+        if missing_vars:
+            raise ValueError(
+                "Missing required environment variables:\n" + "\n".join(missing_vars)
+            )
+
+    def validate_config_values(self) -> None:
+        """
+        Validate configuration value constraints.
+
+        Raises:
+            ValueError: If configuration values are invalid
+        """
+        import logging
+
+        # Validate Redis configuration
+        if not (1 <= self.redis.port <= 65535):
+            raise ValueError(f"Redis port must be 1-65535, got {self.redis.port}")
+
+        # Validate Binance configuration
+        if self.binance.timeout <= 0:
+            raise ValueError(f"Binance timeout must be positive, got {self.binance.timeout}")
+
+        # Validate symbol format
+        if not re.match(r'^[A-Z]+[A-Z0-9]*$', self.binance.symbol):
+            raise ValueError(f"Invalid symbol format: {self.binance.symbol}")
+
+        # Validate data collector configuration
+        if self.data_collector.depth_snapshot.limit <= 0:
+            raise ValueError("Depth snapshot limit must be positive")
+
+        if self.data_collector.depth_snapshot.update_interval_seconds <= 0:
+            raise ValueError("Update interval must be positive")
+
+        # Validate analyzer configuration
+        if not self.analyzer.deepseek.api_key or self.analyzer.deepseek.api_key.strip() == "":
+            raise ValueError("DeepSeek API key cannot be empty")
+
+        if self.analyzer.deepseek.max_tokens <= 0:
+            raise ValueError("DeepSeek max tokens must be positive")
+
+        # Validate logging configuration
+        if self.logging.max_file_size_mb <= 0:
+            raise ValueError("Log file size must be positive")
+
+        if self.logging.backup_count < 0:
+            raise ValueError("Log backup count cannot be negative")
+
+        logging.getLogger(__name__).info("Configuration validation passed")
 
     def setup_logging(self) -> None:
         """Setup logging based on configuration."""

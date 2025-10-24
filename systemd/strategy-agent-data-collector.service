@@ -1,0 +1,58 @@
+[Unit]
+Description=Strategy Agent Data Collector Service
+Documentation=https://github.com/strategy-agent/docs
+After=network.target
+Wants=network.target
+ConditionPathExists=/home/jamesduan/projects/strategy_agent/agent_data_collector.py
+
+[Service]
+Type=simple
+User=jamesduan
+Group=jamesduan
+WorkingDirectory=/home/jamesduan/projects/strategy_agent
+Environment=PATH=/home/jamesduan/projects/strategy_agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=CONFIG_FILE=/home/jamesduan/projects/strategy_agent/config/development.yaml
+EnvironmentFile=-/home/jamesduan/projects/strategy_agent/.env
+ExecStart=/home/jamesduan/projects/strategy_agent/venv/bin/python agent_data_collector.py
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Process priority and memory management
+Nice=0
+OOMScoreAdjust=-100
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/jamesduan/projects/strategy_agent/logs /home/jamesduan/projects/strategy_agent/storage
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RemoveIPC=true
+RestrictRealtime=true
+
+# Resource limits (soft:hard format)
+LimitNOFILE=65536:65536
+LimitNPROC=4096:4096
+MemoryMax=2G
+CPUQuota=80%
+
+# I/O priority settings
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strategy-agent-data-collector
+LogLevelMax=info
+
+[Install]
+WantedBy=multi-user.target

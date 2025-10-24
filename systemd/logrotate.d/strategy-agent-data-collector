@@ -1,0 +1,14 @@
+/home/jamesduan/projects/strategy_agent/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 jamesduan jamesduan
+    maxsize 100M
+    minsize 1M
+    postrotate
+        systemctl reload strategy-agent-data-collector.service || true
+    endscript
+}

@@ -2,6 +2,15 @@ app:
   name: "strategy-agent"
   environment: "development"
   log_level: "DEBUG"
+  data_retention_days: 30
+  max_workers: 4
+  batch_size: 1000
+
+# Trading Configuration (for future use)
+trading:
+  enabled: false
+  api_key_example: "your_exchange_api_key"
+  api_secret_example: "your_exchange_api_secret"
 
 redis:
   host: "localhost"
@@ -31,7 +40,7 @@ data_collector:
 
 analyzer:
   deepseek:
-    api_key: "${DEEPSEEK_API_KEY}"
+    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"
     base_url: "https://api.deepseek.com/v1"
     model: "deepseek-chat"
     max_tokens: 4000
