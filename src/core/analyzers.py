@@ -7,10 +7,45 @@ from decimal import Decimal
 
 from .models import (
     DepthSnapshot,
+    EnhancedMarketAnalysisResult,
     MarketAnalysisResult,
     MinuteTradeData,
     SupportResistanceLevel,
 )
+
+# Import new modules
+try:
+    from .price_aggregator import (
+        aggregate_depth_by_one_dollar,
+        calculate_depth_statistics,
+        identify_liquidity_clusters,
+        convert_to_depth_levels,
+        validate_aggregation_quality,
+    )
+    from .wave_peak_analyzer import (
+        detect_combined_peaks,
+        analyze_wave_formation,
+        validate_peak_detection_quality,
+        WavePeak,
+        PriceZone,
+    )
+except ImportError as e:
+    logger.warning(f"Could not import enhanced analyzer modules: {e}")
+    # Fallback imports
+    from .price_aggregator import (
+        aggregate_depth_by_one_dollar,
+        calculate_depth_statistics,
+    identify_liquidity_clusters,
+        convert_to_depth_levels,
+        validate_aggregation_quality,
+    )
+    from .wave_peak_analyzer import (
+        detect_combined_peaks,
+        analyze_wave_formation,
+        validate_peak_detection_quality,
+        WavePeak,
+        PriceZone,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -369,18 +404,21 @@ class MarketAnalyzer:
     def __init__(
         self,
         min_volume_threshold: float = 0.1,
-        analysis_window_minutes: int = 180
+        analysis_window_minutes: int = 180,
+        enhanced_mode: bool = False
     ):
         """Initialize the market analyzer."""
         self.depth_analyzer = DepthSnapshotAnalyzer(min_volume_threshold)
         self.order_flow_analyzer = OrderFlowAnalyzer(analysis_window_minutes)
+        self.enhanced_mode = enhanced_mode
 
     def analyze_market(
         self,
         snapshot: DepthSnapshot | None,
         trade_data_list: list[MinuteTradeData],
-        symbol: str = "BTCFDUSD"
-    ) -> MarketAnalysisResult:
+        symbol: str = "BTCFDUSD",
+        enhanced_mode: bool = True
+    ) -> MarketAnalysisResult | EnhancedMarketAnalysisResult:
         """Perform comprehensive market analysis."""
         if not snapshot and not trade_data_list:
             return MarketAnalysisResult(
@@ -389,37 +427,115 @@ class MarketAnalyzer:
             )
 
         try:
-            # Initialize result
-            result = MarketAnalysisResult(
-                timestamp=datetime.now(),
-                symbol=symbol
-            )
+            # Initialize enhanced result if in enhanced mode
+            if enhanced_mode:
+                result = EnhancedMarketAnalysisResult(
+                    timestamp=datetime.now(),
+                    symbol=symbol
+                )
+            else:
+                result = MarketAnalysisResult(
+                    timestamp=datetime.now(),
+                    symbol=symbol
+                )
 
-            # Step 1: Depth snapshot analysis (static support/resistance)
+            # Step 1: Aggregate depth snapshot by 1-dollar precision
+            if snapshot:
+                logger.info("Aggregating depth snapshot by 1-dollar precision")
+                aggregated_bids, aggregated_asks = aggregate_depth_by_one_dollar(snapshot.bids, snapshot.asks)
+
+                # Calculate aggregation statistics
+                depth_statistics = calculate_depth_statistics(aggregated_bids, aggregated_asks)
+                aggregation_quality = validate_aggregation_quality(
+                    snapshot.bids, snapshot.asks, aggregated_bids, aggregated_asks
+                )
+
+                logger.debug(f"Depth aggregation quality: {aggregation_quality}")
+
+                if enhanced_mode:
+                    result.aggregated_bids = aggregated_bids
+                    result.aggregated_asks = aggregated_asks
+                    result.depth_statistics = depth_statistics
+
+            # Step 2: Detect wave peaks using combined methods
+            if snapshot and enhanced_mode:
+                logger.info("Detecting wave peaks using statistical analysis")
+
+                # Detect peaks using combined statistical and volume-based methods
+                wave_peaks = detect_combined_peaks(
+                    price_volume_data={**aggregated_bids, **aggregated_asks},
+                    statistical_params={
+                        'min_peak_volume': 5.0,
+                        'z_score_threshold': 1.5,
+                        'min_peak_confidence': 0.3
+                    },
+                    volume_params={
+                        'min_relative_volume': 2.0,
+                        'min_absolume': 10.0
+                    }
+                )
+
+                result.wave_peaks = wave_peaks
+
+                # Analyze wave formation to create price zones
+                if wave_peaks:
+                    logger.info("Analyzing wave formation for price zones")
+                    support_zones, resistance_zones = analyze_wave_formation(wave_peaks, {**aggregated_bids, **aggregated_asks})
+
+                    result.support_zones = support_zones
+                    result.resistance_zones = resistance_zones
+                else:
+                    result.support_zones = []
+                    result.resistance_zones = []
+
+            # Step 3: Traditional depth analysis (backward compatibility)
             if snapshot:
                 result.support_levels, result.resistance_levels = self.depth_analyzer.analyze_support_resistance(snapshot)
                 result.liquidity_vacuum_zones = self.depth_analyzer.identify_liquidity_vacuum_zones(snapshot)
 
-            # Step 2: Order flow analysis (dynamic confirmation)
+            # Step 4: Order flow analysis (dynamic confirmation)
             if trade_data_list and (result.support_levels or result.resistance_levels):
                 confirmed_support, confirmed_resistance, poc_levels = self.order_flow_analyzer.analyze_order_flow(
                     trade_data_list, result.support_levels, result.resistance_levels
                 )
 
                 # Use confirmed levels if available, otherwise fall back to original
-                result.support_levels = confirmed_support if confirmed_support else result.support_levels
-                result.resistance_levels = confirmed_resistance if confirmed_resistance else result.resistance_levels
-                result.poc_levels = poc_levels
+                if enhanced_mode:
+                    result.support_levels = confirmed_support if confirmed_support else result.support_levels
+                    result.resistance_levels = confirmed_resistance if confirmed_resistance else result.resistance_levels
+                    result.poc_levels = poc_levels
+                else:
+                    result.support_levels = confirmed_support if confirmed_support else result.support_levels
+                    result.resistance_levels = confirmed_resistance if confirmed_resistance else result.resistance_levels
+                    result.poc_levels = poc_levels
 
-            # Step 3: Find resonance zones (where multiple signals align)
+            # Step 5: Find resonance zones (where multiple signals align)
             result.resonance_zones = self._find_resonance_zones(result)
 
-            logger.info(
-                f"Market analysis completed: "
-                f"{len(result.support_levels)} supports, "
-                f"{len(result.resistance_levels)} resistances, "
-                f"{len(result.resonance_zones)} resonance zones"
-            )
+            # Step 6: Validate peak detection quality
+            if enhanced_mode and hasattr(result, 'wave_peaks'):
+                original_levels = len(snapshot.bids) + len(snapshot.asks) if snapshot else 0
+                peak_detection_quality = validate_peak_detection_quality(
+                    original_levels, result.wave_peaks, {**aggregated_bids, **aggregated_asks}
+                )
+                result.peak_detection_quality = peak_detection_quality
+
+            # Enhanced logging
+            if enhanced_mode:
+                logger.info(
+                    f"Enhanced market analysis completed: "
+                    f"snapshot from {snapshot.timestamp}, "
+                    f"{len(result.wave_peaks)} wave peaks detected, "
+                    f"{len(result.support_zones)} support zones, "
+                    f"{len(result.resistance_zones)} resistance zones"
+                )
+            else:
+                logger.info(
+                    f"Market analysis completed: "
+                    f"{len(result.support_levels)} supports, "
+                    f"{len(result.resistance_levels)} resistances, "
+                    f"{len(result.resonance_zones)} resonance zones"
+                )
 
             return result
 

@@ -6,7 +6,14 @@ import signal
 import sys
 from datetime import datetime
 
-from ..core.analyzers import MarketAnalyzer
+# Try to import enhanced analyzer first
+try:
+    from ..core.analyzers_enhanced import MarketAnalyzer as EnhancedMarketAnalyzer
+    logger.info("Using enhanced market analyzer with wave peak detection")
+except ImportError:
+    from ..core.analyzers import MarketAnalyzer
+    logger.warning("Enhanced analyzer not available, falling back to basic analyzer")
+    EnhancedMarketAnalyzer = MarketAnalyzer
 from ..core.models import MarketAnalysisResult, TradingRecommendation
 from ..core.redis_client import RedisDataStore
 from ..utils.ai_client import DeepSeekClient
@@ -108,11 +115,12 @@ class AnalyzerAgent:
                 f"{len(trade_data)} minutes of trade data"
             )
 
-            # Step 3: Perform technical analysis
+            # Step 3: Perform enhanced technical analysis
             analysis_result = self.market_analyzer.analyze_market(
                 snapshot=snapshot,
                 trade_data_list=trade_data,
-                symbol=self.settings.binance.symbol
+                symbol=self.settings.binance.symbol,
+                enhanced_mode=True
             )
 
             # Step 4: Get AI-driven recommendation

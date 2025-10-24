@@ -205,6 +205,109 @@ class TradingRecommendation:
     reasoning: str
     risk_level: str  # 'low', 'medium', 'high'
 
+
+@dataclass
+class EnhancedMarketAnalysisResult:
+    """Enhanced market analysis result with wave peak detection."""
+    timestamp: datetime
+    symbol: str
+
+    # 1-dollar precision aggregated data
+    aggregated_bids: dict[Decimal, Decimal] = field(default_factory=dict)
+    aggregated_asks: dict[Decimal, Decimal] = field(default_factory=dict)
+
+    # Wave peak analysis
+    wave_peaks: list[WavePeak] = field(default_factory=list)
+    support_zones: list[PriceZone] = field(default_factory=list)
+    resistance_zones: list[PriceZone] = field(default_factory=list)
+
+    # Traditional analysis (backward compatibility)
+    support_levels: list[SupportResistanceLevel] = field(default_factory=list)
+    resistance_levels: list[SupportResistanceLevel] = field(default_factory=list)
+    poc_levels: list[Decimal] = field(default_factory=list)
+    liquidity_vacuum_zones: list[Decimal] = field(default_factory=list)
+    resonance_zones: list[Decimal] = field(default_factory=list)
+
+    # Statistics and quality metrics
+    depth_statistics: dict[str, Decimal] = field(default_factory=dict)
+    peak_detection_quality: dict[str, float] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            'timestamp': self.timestamp.isoformat(),
+            'symbol': self.symbol,
+            'aggregated_bids': {str(k): float(v) for k, v in self.aggregated_bids.items()},
+            'aggregated_asks': {str(k): float(v) for k, v in self.aggregated_asks.items()},
+            'wave_peaks': [peak.to_dict() for peak in self.wave_peaks],
+            'support_zones': [zone.to_dict() for zone in self.support_zones],
+            'resistance_zones': [zone.to_dict() for zone in self.resistance_zones],
+            'support_levels': [level.to_dict() for level in self.support_levels],
+            'resistance_levels': [level.to_dict() for level in self.resistance_levels],
+            'poc_levels': [float(poc) for poc in self.poc_levels],
+            'liquidity_vacuum_zones': [float(zone) for zone in self.liquidity_vacuum_zones],
+            'resonance_zones': [float(zone) for zone in self.resonance_zones],
+            'depth_statistics': {k: float(v) for k, v in self.depth_statistics.items()},
+            'peak_detection_quality': self.peak_detection_quality,
+        }
+
+
+class WavePeak:
+    """Represents a wave peak detected in order book analysis."""
+    center_price: Decimal
+    volume: Decimal
+    price_range_width: Decimal
+    z_score: float
+    confidence: float
+    bid_volume: Decimal = Decimal('0')
+    ask_volume: Decimal = Decimal('0')
+    peak_type: str = 'unknown'
+
+    def to_dict(self) -> dict:
+        """Convert wave peak to dictionary representation."""
+        return {
+            'center_price': float(self.center_price),
+            'volume': float(self.volume),
+            'price_range_width': float(self.price_range_width),
+            'z_score': self.z_score,
+            'confidence': self.confidence,
+            'bid_volume': float(self.bid_volume),
+            'ask_volume': float(self.ask_volume),
+            'peak_type': self.peak_type,
+            'lower_price': float(self.center_price - self.price_range_width / 2),
+            'upper_price': float(self.center_price + self.price_range_width / 2),
+        }
+
+
+class PriceZone:
+    """Represents a price zone with trading characteristics."""
+    lower_price: Decimal
+    upper_price: Decimal
+    zone_type: str  # 'support' or 'resistance'
+    confidence: float
+    total_volume: Decimal
+    bid_ask_ratio: float = 1.0
+    center_price: Decimal
+    width: Decimal
+
+    def __post_init__(self) -> None:
+        """Calculate derived values after initialization."""
+        self.center_price = (self.lower_price + self.upper_price) / Decimal('2')
+        self.width = self.upper_price - self.lower_price
+
+    def to_dict(self) -> dict:
+        """Convert price zone to dictionary representation."""
+        return {
+            'lower_price': float(self.lower_price),
+            'upper_price': float(self.upper_price),
+            'zone_type': self.zone_type,
+            'confidence': self.confidence,
+            'total_volume': float(self.total_volume),
+            'bid_ask_ratio': self.bid_ask_ratio,
+            'center_price': float(self.center_price),
+            'width': float(self.width),
+        }
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
