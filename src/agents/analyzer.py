@@ -13,6 +13,10 @@ from ..utils.config import Settings
 
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+SHUTDOWN_TASK_TIMEOUT = 5.0  # Timeout for task cancellation during shutdown
+RETRY_DELAY_ON_ERROR = 10  # Seconds to wait before retry after error
+
 # Try to import normal distribution analyzer first
 try:
     from ..core.analyzers_normal import MarketAnalyzer as NormalDistributionMarketAnalyzer
@@ -74,12 +78,12 @@ class AnalyzerAgent:
 
     def setup_signal_handlers(self) -> None:
         """Setup asyncio-compatible signal handlers."""
-        # These will be set in the main async context
+        # Initialize shutdown state
         self._shutdown_requested = False
 
-    async def _handle_signal(self) -> None:
-        """Handle shutdown signals in async context."""
-        logger.info("Received shutdown signal, initiating graceful shutdown...")
+    def _signal_handler(self) -> None:
+        """Handle shutdown signals - direct synchronous handler."""
+        logger.info("Signal received, triggering shutdown...")
         self._shutdown_requested = True
         self.is_running = False
         self.shutdown_event.set()
@@ -94,20 +98,13 @@ class AnalyzerAgent:
         # Add signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
 
-        def signal_handler():
-            logger.info("Signal received, triggering shutdown...")
-            self._shutdown_requested = True
-            self.is_running = False
-            self.shutdown_event.set()
-            # Schedule shutdown task
-            asyncio.create_task(self._handle_signal())
-
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
-                loop.add_signal_handler(sig, signal_handler)
+                loop.add_signal_handler(sig, self._signal_handler)
                 logger.debug(f"Signal handler for {sig} registered")
             except Exception as e:
                 logger.error(f"Failed to register signal handler for {sig}: {e}")
+                raise RuntimeError(f"Signal handler registration failed: {e}")
 
         # Test Redis connection
         if not self.redis_store.test_connection():
@@ -134,11 +131,6 @@ class AnalyzerAgent:
                 logger.debug("Starting market analysis cycle")
                 await self._perform_analysis_cycle()
 
-                # Check for shutdown before sleeping
-                if self._shutdown_requested:
-                    logger.info("Shutdown requested, exiting analysis loop")
-                    break
-
                 # Wait for next cycle with cancellation support
                 try:
                     await asyncio.wait_for(
@@ -151,24 +143,17 @@ class AnalyzerAgent:
                 except asyncio.TimeoutError:
                     # Normal timeout, continue to next cycle
                     continue
-                except asyncio.CancelledError:
-                    logger.info("Analysis loop cancelled, shutting down...")
-                    break
 
             except Exception as e:
                 logger.error(f"Analysis cycle error: {e}")
-                if self._shutdown_requested:
-                    logger.info("Shutdown requested during error handling, exiting")
-                    break
-                # Short delay before retry if not shutting down
+                # Wait before retry, but respect shutdown
                 try:
-                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=10)
+                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=RETRY_DELAY_ON_ERROR)
                 except asyncio.TimeoutError:
                     # Normal timeout, continue retry
                     continue
-                except asyncio.CancelledError:
-                    logger.info("Retry wait cancelled, shutting down...")
-                    break
+                # If wait completed, shutdown was requested
+                break
 
     async def _perform_analysis_cycle(self) -> None:
         """Perform a complete analysis cycle."""
@@ -275,7 +260,7 @@ class AnalyzerAgent:
 
             # Wait for tasks to complete with timeout
             try:
-                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5.0)
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=SHUTDOWN_TASK_TIMEOUT)
             except asyncio.TimeoutError:
                 logger.warning("Some tasks did not complete within timeout")
 
