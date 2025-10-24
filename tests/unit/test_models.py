@@ -12,6 +12,7 @@ from src.core.models import (
     SupportResistanceLevel,
     Trade,
     TradingRecommendation,
+    EnhancedMarketAnalysisResult,
 )
 
 
@@ -322,7 +323,7 @@ class TestMinuteTradeData:
         # Add trades with fractional prices
         trade1 = Trade(
             symbol='BTCFDUSD',
-            price=Decimal('50000.75'),
+            price=Decimal('50000.49'),  # Will round down to 50000
             quantity=Decimal('0.1'),
             is_buyer_maker=False,
             timestamp=timestamp,
@@ -331,7 +332,7 @@ class TestMinuteTradeData:
 
         trade2 = Trade(
             symbol='BTCFDUSD',
-            price=Decimal('50000.25'),
+            price=Decimal('50000.25'),  # Will round down to 50000
             quantity=Decimal('0.1'),
             is_buyer_maker=False,
             timestamp=timestamp,
@@ -343,8 +344,8 @@ class TestMinuteTradeData:
 
         # Both should be rounded to 50000
         assert len(data.price_levels) == 1
-        assert Decimal('50000.00') in data.price_levels
-        assert data.price_levels[Decimal('50000.00')].total_volume == Decimal('0.2')
+        assert Decimal('50000') in data.price_levels
+        assert data.price_levels[Decimal('50000')].total_volume == Decimal('0.2')
 
 
 class TestSupportResistanceLevel:
@@ -476,3 +477,161 @@ class TestTradingRecommendation:
         assert result['confidence'] == 0.8
         assert result['reasoning'] == 'Strong support at $50,000 with high volume'
         assert result['risk_level'] == 'LOW'
+
+
+class TestEnhancedMarketAnalysisResult:
+    """Test EnhancedMarketAnalysisResult model."""
+
+    def test_enhanced_result_creation(self):
+        """Test enhanced market analysis result creation."""
+        timestamp = datetime.now()
+        result = EnhancedMarketAnalysisResult(
+            timestamp=timestamp,
+            symbol='BTCFDUSD',
+            aggregated_bids={Decimal('50000'): Decimal('1.5')},
+            aggregated_asks={Decimal('50100'): Decimal('2.0')},
+            normal_distribution_peaks={'bids': {'mean_price': 50000.5}},
+            confidence_intervals={'bid': [50000.0, 50100.0]},
+            market_metrics={'total_volume': 3.5},
+            spread_analysis={'best_bid': 50000.0, 'best_ask': 50100.0},
+            depth_statistics={'total_depth': Decimal('1000.0')},
+            peak_detection_quality={'score': 0.85}
+        )
+
+        assert result.timestamp == timestamp
+        assert result.symbol == 'BTCFDUSD'
+        assert result.aggregated_bids[Decimal('50000')] == Decimal('1.5')
+        assert result.aggregated_asks[Decimal('50100')] == Decimal('2.0')
+        assert result.normal_distribution_peaks['bids']['mean_price'] == 50000.5
+
+    def test_enhanced_result_to_dict(self):
+        """Test converting enhanced result to dictionary."""
+        timestamp = datetime.now()
+        result = EnhancedMarketAnalysisResult(
+            timestamp=timestamp,
+            symbol='BTCFDUSD',
+            aggregated_bids={Decimal('50000'): Decimal('1.5')},
+            aggregated_asks={Decimal('50100'): Decimal('2.0')},
+            poc_levels=[Decimal('50000.0')],
+            normal_distribution_peaks={'bids': {'mean_price': 50000.5}},
+            confidence_intervals={'bid': [50000.0, 50100.0]},
+            market_metrics={'total_volume': 3.5},
+            spread_analysis={'best_bid': 50000.0, 'best_ask': 50100.0},
+            depth_statistics={'total_depth': Decimal('1000.0')},
+            peak_detection_quality={'score': 0.85}
+        )
+
+        dict_result = result.to_dict()
+
+        assert dict_result['timestamp'] == timestamp.isoformat()
+        assert dict_result['symbol'] == 'BTCFDUSD'
+        assert dict_result['aggregated_bids']['50000'] == 1.5
+        assert dict_result['aggregated_asks']['50100'] == 2.0
+        assert dict_result['poc_levels'] == [50000.0]
+        assert dict_result['normal_distribution_peaks']['bids']['mean_price'] == 50000.5
+        assert dict_result['confidence_intervals']['bid'] == [50000.0, 50100.0]
+        assert dict_result['market_metrics']['total_volume'] == 3.5
+        assert dict_result['spread_analysis']['best_bid'] == 50000.0
+        assert dict_result['depth_statistics']['total_depth'] == 1000.0
+        assert dict_result['peak_detection_quality']['score'] == 0.85
+
+
+class TestModelEdgeCases:
+    """Test edge cases in model methods."""
+
+    def test_depth_snapshot_get_price_levels_methods(self):
+        """Test getting bid/ask price levels methods."""
+        bids = [DepthLevel(Decimal('50000'), Decimal('1.0'))]
+        asks = [DepthLevel(Decimal('50100'), Decimal('1.0'))]
+
+        snapshot = DepthSnapshot(
+            symbol='BTCFDUSD',
+            timestamp=datetime.now(),
+            bids=bids,
+            asks=asks
+        )
+
+        # Test get_bid_price_levels
+        bid_levels = snapshot.get_bid_price_levels()
+        assert bid_levels == [Decimal('50000')]
+
+        # Test get_ask_price_levels
+        ask_levels = snapshot.get_ask_price_levels()
+        assert ask_levels == [Decimal('50100')]
+
+    def test_minute_trade_data_cleanup_low_volume_levels(self):
+        """Test cleanup of low volume levels."""
+        timestamp = datetime.now()
+        data = MinuteTradeData(timestamp=timestamp)
+
+        # Add price levels with different volumes
+        data.price_levels[Decimal('50000')] = PriceLevelData(
+            price_level=Decimal('50000'),
+            total_volume=Decimal('2.0')  # Above threshold
+        )
+        data.price_levels[Decimal('50100')] = PriceLevelData(
+            price_level=Decimal('50100'),
+            total_volume=Decimal('0.0005')  # Below threshold
+        )
+
+        data.cleanup_low_volume_levels(min_volume_threshold=Decimal('0.001'))
+
+        assert len(data.price_levels) == 1
+        assert Decimal('50000') in data.price_levels
+        assert Decimal('50100') not in data.price_levels
+
+    def test_minute_trade_data_to_dict(self):
+        """Test MinuteTradeData to_dict method."""
+        timestamp = datetime.now()
+        data = MinuteTradeData(timestamp=timestamp)
+
+        # Add a price level
+        price_level = PriceLevelData(
+            price_level=Decimal('50000'),
+            total_volume=Decimal('1.5')
+        )
+        data.price_levels[Decimal('50000')] = price_level
+
+        result = data.to_dict()
+
+        assert result['timestamp'] == timestamp.isoformat()
+        assert 'price_levels' in result
+        assert '50000' in result['price_levels']
+
+    def test_trade_post_init_with_different_types(self):
+        """Test Trade __post_init__ with different input types."""
+        # Test with string inputs
+        trade1 = Trade(
+            symbol='BTCFDUSD',
+            price='50000.50',
+            quantity='0.1',
+            is_buyer_maker=False,
+            timestamp=datetime.now(),
+            trade_id='12345'
+        )
+        assert isinstance(trade1.price, Decimal)
+        assert isinstance(trade1.quantity, Decimal)
+
+        # Test with float inputs
+        trade2 = Trade(
+            symbol='BTCFDUSD',
+            price=50000.50,
+            quantity=0.1,
+            is_buyer_maker=False,
+            timestamp=datetime.now(),
+            trade_id='12346'
+        )
+        assert isinstance(trade2.price, Decimal)
+        assert isinstance(trade2.quantity, Decimal)
+
+    def test_depth_level_post_init_with_different_types(self):
+        """Test DepthLevel __post_init__ with different input types."""
+        # Test with string inputs
+        level1 = DepthLevel(price='50000.50', quantity='1.5')
+        assert isinstance(level1.price, Decimal)
+        assert isinstance(level1.quantity, Decimal)
+
+        # Test with float inputs
+        level2 = DepthLevel(price=50000.50, quantity=1.5)
+        assert isinstance(level2.price, Decimal)
+        assert isinstance(level2.quantity, Decimal)

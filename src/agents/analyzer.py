@@ -13,7 +13,16 @@ from ..utils.config import Settings
 
 logger = logging.getLogger(__name__)
 
-# Try to import enhanced analyzer first
+# Try to import normal distribution analyzer first
+try:
+    from ..core.analyzers_normal import MarketAnalyzer as NormalDistributionMarketAnalyzer
+    logger.info("Using normal distribution market analyzer")
+    use_normal_distribution = True
+except ImportError:
+    use_normal_distribution = False
+    logger.warning("Normal distribution analyzer not available")
+
+# Fall back to enhanced analyzer
 try:
     from ..core.analyzers_enhanced import MarketAnalyzer as EnhancedMarketAnalyzer
     logger.info("Using enhanced market analyzer with wave peak detection")
@@ -36,10 +45,21 @@ class AnalyzerAgent:
             port=settings.redis.port,
             db=settings.redis.db
         )
-        self.market_analyzer = MarketAnalyzer(
-            min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
-            analysis_window_minutes=180  # 3 hours
-        )
+
+        # Use normal distribution analyzer if available
+        if use_normal_distribution:
+            self.market_analyzer = NormalDistributionMarketAnalyzer(
+                min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
+                analysis_window_minutes=180,  # 3 hours
+                enhanced_mode=True,
+                use_normal_distribution=True,
+                confidence_level=getattr(settings.analyzer, 'confidence_level', 0.95)
+            )
+        else:
+            self.market_analyzer = EnhancedMarketAnalyzer(
+                min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
+                analysis_window_minutes=180  # 3 hours
+            )
         self.ai_client = DeepSeekClient(
             api_key=settings.analyzer.deepseek.api_key,
             base_url=settings.analyzer.deepseek.base_url,

@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -267,6 +267,12 @@ class EnhancedMarketAnalysisResult:
     depth_statistics: dict[str, Decimal] = field(default_factory=dict)
     peak_detection_quality: dict[str, float] = field(default_factory=dict)
 
+    # Normal distribution analysis results
+    normal_distribution_peaks: dict[str, Any] = field(default_factory=dict)
+    confidence_intervals: dict[str, Any] = field(default_factory=dict)
+    market_metrics: dict[str, Any] = field(default_factory=dict)
+    spread_analysis: dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
@@ -290,4 +296,9 @@ class EnhancedMarketAnalysisResult:
             "resonance_zones": [float(zone) for zone in self.resonance_zones],
             "depth_statistics": {k: float(v) for k, v in self.depth_statistics.items()},
             "peak_detection_quality": self.peak_detection_quality,
+            # Normal distribution analysis
+            "normal_distribution_peaks": self.normal_distribution_peaks,
+            "confidence_intervals": self.confidence_intervals,
+            "market_metrics": self.market_metrics,
+            "spread_analysis": self.spread_analysis,
         }
