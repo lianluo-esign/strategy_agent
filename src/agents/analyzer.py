@@ -72,19 +72,42 @@ class AnalyzerAgent:
         self.is_running = False
         self.shutdown_event = asyncio.Event()
 
-        # Setup signal handlers
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+    def setup_signal_handlers(self) -> None:
+        """Setup asyncio-compatible signal handlers."""
+        # These will be set in the main async context
+        self._shutdown_requested = False
 
-    def _signal_handler(self, signum, frame) -> None:
-        """Handle shutdown signals."""
-        logger.info(f"Received signal {signum}, initiating shutdown...")
+    async def _handle_signal(self) -> None:
+        """Handle shutdown signals in async context."""
+        logger.info("Received shutdown signal, initiating graceful shutdown...")
+        self._shutdown_requested = True
         self.is_running = False
         self.shutdown_event.set()
 
     async def start(self) -> None:
         """Start the analysis process."""
         logger.info("Starting Market Analyzer Agent")
+
+        # Setup signal handlers in async context
+        self.setup_signal_handlers()
+
+        # Add signal handlers for graceful shutdown
+        loop = asyncio.get_running_loop()
+
+        def signal_handler():
+            logger.info("Signal received, triggering shutdown...")
+            self._shutdown_requested = True
+            self.is_running = False
+            self.shutdown_event.set()
+            # Schedule shutdown task
+            asyncio.create_task(self._handle_signal())
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, signal_handler)
+                logger.debug(f"Signal handler for {sig} registered")
+            except Exception as e:
+                logger.error(f"Failed to register signal handler for {sig}: {e}")
 
         # Test Redis connection
         if not self.redis_store.test_connection():
@@ -95,6 +118,8 @@ class AnalyzerAgent:
         try:
             self.is_running = True
             await self._analysis_loop()
+        except asyncio.CancelledError:
+            logger.info("Analysis loop cancelled")
         except Exception as e:
             logger.error(f"Analyzer agent error: {e}")
         finally:
@@ -109,12 +134,41 @@ class AnalyzerAgent:
                 logger.debug("Starting market analysis cycle")
                 await self._perform_analysis_cycle()
 
-                # Wait for next cycle
-                await asyncio.sleep(interval)
+                # Check for shutdown before sleeping
+                if self._shutdown_requested:
+                    logger.info("Shutdown requested, exiting analysis loop")
+                    break
+
+                # Wait for next cycle with cancellation support
+                try:
+                    await asyncio.wait_for(
+                        self.shutdown_event.wait(),
+                        timeout=interval
+                    )
+                    # If wait completed without timeout, shutdown was requested
+                    logger.info("Shutdown event triggered, exiting analysis loop")
+                    break
+                except asyncio.TimeoutError:
+                    # Normal timeout, continue to next cycle
+                    continue
+                except asyncio.CancelledError:
+                    logger.info("Analysis loop cancelled, shutting down...")
+                    break
 
             except Exception as e:
                 logger.error(f"Analysis cycle error: {e}")
-                await asyncio.sleep(10)  # Short delay before retry
+                if self._shutdown_requested:
+                    logger.info("Shutdown requested during error handling, exiting")
+                    break
+                # Short delay before retry if not shutting down
+                try:
+                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=10)
+                except asyncio.TimeoutError:
+                    # Normal timeout, continue retry
+                    continue
+                except asyncio.CancelledError:
+                    logger.info("Retry wait cancelled, shutting down...")
+                    break
 
     async def _perform_analysis_cycle(self) -> None:
         """Perform a complete analysis cycle."""
@@ -210,10 +264,33 @@ class AnalyzerAgent:
         logger.info("Shutting down Market Analyzer Agent")
 
         self.is_running = False
+        self._shutdown_requested = True
+
+        # Cancel all pending tasks
+        tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} pending tasks...")
+            for task in tasks:
+                task.cancel()
+
+            # Wait for tasks to complete with timeout
+            try:
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Some tasks did not complete within timeout")
 
         # Close connections
-        await self.ai_client.close()
-        await self.redis_store.close()
+        try:
+            await self.ai_client.close()
+            logger.info("AI client closed")
+        except Exception as e:
+            logger.error(f"Error closing AI client: {e}")
+
+        try:
+            await self.redis_store.close()
+            logger.info("Redis connection closed")
+        except Exception as e:
+            logger.error(f"Error closing Redis connection: {e}")
 
         logger.info("Market Analyzer Agent shutdown complete")
 
@@ -254,11 +331,17 @@ async def main() -> None:
 
     try:
         await agent.start()
+        logger.info("Agent startup completed successfully")
     except KeyboardInterrupt:
-        logger.info("Interrupted by user")
+        logger.info("Interrupted by user - initiating shutdown")
+        # Graceful shutdown is handled by signal handlers
+    except asyncio.CancelledError:
+        logger.info("Tasks cancelled - shutting down")
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)
+    finally:
+        logger.info("Main function exiting")
 
 
 if __name__ == "__main__":
