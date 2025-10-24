@@ -5,18 +5,17 @@ and support/resistance levels in order book data using machine learning approach
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
+from decimal import Decimal
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from decimal import Decimal
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-from datetime import datetime
 
-from .models import DepthLevel, DepthSnapshot
+from .models import DepthSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class SklearnClusterAnalyzer:
         eps_multiplier: float = 0.01,
         max_clusters: int = 10,
         volume_weight: float = 2.0,
-    ):
+    ) -> None:
         """
         Initialize the sklearn cluster analyzer.
 
@@ -40,6 +39,16 @@ class SklearnClusterAnalyzer:
             max_clusters: Maximum number of clusters to test with K-means
             volume_weight: Weight factor for volume in clustering features
         """
+        # Input validation
+        if min_samples < 1:
+            raise ValueError("min_samples must be at least 1")
+        if eps_multiplier <= 0:
+            raise ValueError("eps_multiplier must be positive")
+        if max_clusters < 2:
+            raise ValueError("max_clusters must be at least 2")
+        if volume_weight <= 0:
+            raise ValueError("volume_weight must be positive")
+
         self.min_samples = min_samples
         self.eps_multiplier = eps_multiplier
         self.max_clusters = max_clusters
@@ -52,7 +61,7 @@ class SklearnClusterAnalyzer:
 
     def analyze_order_book_clustering(
         self, snapshot: DepthSnapshot
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Perform comprehensive clustering analysis on order book data.
 
@@ -115,13 +124,13 @@ class SklearnClusterAnalyzer:
 
     def _prepare_clustering_data(
         self, snapshot: DepthSnapshot
-    ) -> Tuple[np.ndarray, Dict[Tuple[float, int], Decimal], StandardScaler]:
+    ) -> tuple[np.ndarray, dict[tuple[float, int], Decimal], StandardScaler]:
         """Prepare order book data for clustering analysis."""
         data_points = []
         price_volume_map = {}
 
         # Process bids
-        for i, bid in enumerate(snapshot.bids):
+        for bid in snapshot.bids:
             # Feature engineering: [price, volume_weighted, side_indicator]
             price = float(bid.price)
             volume = float(bid.quantity)
@@ -131,7 +140,7 @@ class SklearnClusterAnalyzer:
             price_volume_map[(price, 0)] = bid.quantity
 
         # Process asks
-        for i, ask in enumerate(snapshot.asks):
+        for ask in snapshot.asks:
             price = float(ask.price)
             volume = float(ask.quantity)
             volume_weighted = volume * self.volume_weight
@@ -151,7 +160,7 @@ class SklearnClusterAnalyzer:
 
     def _find_optimal_clusters_kmeans(
         self, data: np.ndarray
-    ) -> Tuple[int, List[float]]:
+    ) -> tuple[int, list[float]]:
         """Find optimal number of clusters using elbow method."""
         if len(data) < 4:
             return min(2, len(data) // 2), []
@@ -178,10 +187,10 @@ class SklearnClusterAnalyzer:
 
         return optimal_k, wcss
 
-    def _find_elbow_point(self, k_range: List[int], wcss: List[float]) -> int:
+    def _find_elbow_point(self, k_range: list[int], wcss: list[float]) -> int:
         """Find the elbow point in WCSS curve."""
-        if len(wcss) < 3:
-            return k_range[0]
+        if len(wcss) < 3 or not k_range:
+            return k_range[0] if k_range else 2
 
         # Calculate second derivatives
         second_derivatives = []
@@ -192,13 +201,15 @@ class SklearnClusterAnalyzer:
         if not second_derivatives:
             return k_range[0]
 
-        # Find maximum second derivative (elbow point)
-        elbow_idx = np.argmax(second_derivatives) + 1
-        return k_range[min(elbow_idx, len(k_range) - 1)]
+        # Find maximum second derivative (elbow point) with bounds checking
+        elbow_idx = min(int(np.argmax(second_derivatives)) + 1, len(k_range) - 1)
+        if 0 <= elbow_idx < len(k_range):
+            return k_range[elbow_idx]
+        return k_range[0]
 
     def _perform_dbscan_clustering(
         self, data: np.ndarray, optimal_k: int, scaler: StandardScaler
-    ) -> Tuple[np.ndarray, np.ndarray, Dict[int, Dict[str, Any]]]:
+    ) -> tuple[np.ndarray, np.ndarray, dict[int, dict[str, Any]]]:
         """Perform DBSCAN clustering with adaptive parameters."""
         # Calculate adaptive epsilon based on data density and optimal K
         data_range = np.max(data[:, 0]) - np.min(data[:, 0])
@@ -253,8 +264,8 @@ class SklearnClusterAnalyzer:
 
     def _generate_cluster_statistics(
         self, data: np.ndarray, labels: np.ndarray, scaler: StandardScaler
-    ) -> Dict[int, Dict[str, Any]]:
-        """Generate detailed statistics for each cluster."""
+    ) -> dict[int, dict[str, Any]]:
+        """Generate detailed statistics for each cluster with positive volume only."""
         cluster_stats = {}
         unique_labels = set(labels)
 
@@ -276,17 +287,21 @@ class SklearnClusterAnalyzer:
             volumes = cluster_points[:, 1]  # Volumes are already scaled appropriately
             sides = cluster_points[:, 2]
 
+            # Ensure positive volumes only (absolute values for total/avg)
+            total_volume = float(np.sum(np.abs(volumes)))
+            avg_volume = float(np.mean(np.abs(volumes))) if len(volumes) > 0 else 0.0
+
             stats = {
                 "size": size,
                 "avg_price": float(np.mean(prices)),
                 "price_range": (float(np.min(prices)), float(np.max(prices))),
-                "total_volume": float(np.sum(volumes)),
-                "avg_volume": float(np.mean(volumes)),
+                "total_volume": total_volume,
+                "avg_volume": avg_volume,
                 "bid_ratio": float(np.sum(sides == 0) / size),  # Ratio of bid points
                 "ask_ratio": float(np.sum(sides == 1) / size),  # Ratio of ask points
                 "dominant_side": "bid" if np.sum(sides == 0) > np.sum(sides == 1) else "ask",
                 "price_std": float(np.std(prices)),
-                "volume_std": float(np.std(volumes)),
+                "volume_std": float(np.std(np.abs(volumes))) if len(volumes) > 0 else 0.0,
             }
 
             cluster_stats[label] = stats
@@ -314,16 +329,21 @@ class SklearnClusterAnalyzer:
         data: np.ndarray,
         labels: np.ndarray,
         centers: np.ndarray,
-        cluster_stats: Dict[int, Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        """Identify liquidity peaks from clustering results."""
+        cluster_stats: dict[int, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Identify liquidity peaks from clustering results with positive volumes."""
         liquidity_peaks = []
 
         for cluster_id, stats in cluster_stats.items():
             # Calculate peak purity (how concentrated the cluster is)
-            purity = 1.0 - (stats["price_std"] / (stats["price_range"][1] - stats["price_range"][0] + 0.001))
-            purity = max(0.0, min(1.0, purity))
+            price_range_width = stats["price_range"][1] - stats["price_range"][0]
+            if price_range_width > 0:
+                purity = 1.0 - (stats["price_std"] / price_range_width)
+                purity = max(0.0, min(1.0, purity))
+            else:
+                purity = 1.0  # Single price level cluster has perfect purity
 
+            # Use positive volume (already absolute in stats)
             peak = {
                 "cluster_id": cluster_id,
                 "center_price": stats["avg_price"],
@@ -334,6 +354,7 @@ class SklearnClusterAnalyzer:
                 "price_range": stats["price_range"],
                 "bid_ratio": stats["bid_ratio"],
                 "ask_ratio": stats["ask_ratio"],
+                "avg_volume": stats["avg_volume"],
             }
 
             liquidity_peaks.append(peak)
@@ -347,12 +368,12 @@ class SklearnClusterAnalyzer:
         self,
         data: np.ndarray,
         labels: np.ndarray,
-        cluster_stats: Dict[int, Dict[str, Any]],
-    ) -> Dict[int, Dict[str, Any]]:
+        cluster_stats: dict[int, dict[str, Any]],
+    ) -> dict[int, dict[str, Any]]:
         """Generate detailed analysis for each cluster."""
         return cluster_stats
 
-    def _create_empty_result(self) -> Dict[str, Any]:
+    def _create_empty_result(self) -> dict[str, Any]:
         """Create empty result when clustering is not possible."""
         return {
             "optimal_clusters": 0,
@@ -370,14 +391,14 @@ class SklearnClusterAnalyzer:
 class ClusterVisualizer:
     """Visualizer for clustering analysis results."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.fig, self.axes = plt.subplots(2, 2, figsize=(16, 12))
         try:
             plt.style.use('seaborn-v0_8')
         except OSError:
             plt.style.use('default')
 
-    def plot_clustering_results(self, analysis_results: Dict[str, Any], save_path: str = None) -> None:
+    def plot_clustering_results(self, analysis_results: dict[str, Any], save_path: str | None = None) -> None:
         """Plot comprehensive clustering analysis results."""
         clustering_data = analysis_results['clustering_data']
         labels = analysis_results['labels']
@@ -390,7 +411,21 @@ class ClusterVisualizer:
 
         # Color mapping
         unique_labels = np.unique(labels)
-        colors = plt.cm.Set3(np.linspace(0, 1, len(unique_labels)))
+        try:
+            colors = plt.cm.Set3(np.linspace(0, 1, len(unique_labels)))
+        except (AttributeError, TypeError):
+            # Fallback if Set3 is not available
+            import matplotlib.cm as cm
+            try:
+                colormap = cm.get_cmap('Set3')
+                colors = colormap(np.linspace(0, 1, len(unique_labels)))
+            except (AttributeError, TypeError):
+                try:
+                    colormap = cm.get_cmap('tab10')
+                    colors = colormap(np.linspace(0, 1, len(unique_labels)))
+                except (AttributeError, TypeError):
+                    # Final fallback - use basic colors
+                    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_labels)))
 
         # 1. Clustering scatter plot
         self._plot_cluster_scatter(clustering_data, labels, centers, unique_labels, colors)
@@ -489,7 +524,7 @@ class ClusterVisualizer:
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax.grid(True, alpha=0.3)
 
-    def _plot_liquidity_peaks(self, liquidity_peaks: List[Dict[str, Any]]) -> None:
+    def _plot_liquidity_peaks(self, liquidity_peaks: list[dict[str, Any]]) -> None:
         """Plot liquidity peaks bar chart."""
         ax = self.axes[0, 1]
 
@@ -512,7 +547,7 @@ class ClusterVisualizer:
         ax.set_xticklabels([f'Peak {i+1}' for i in range(len(peak_prices))])
 
         # Add value labels on bars
-        for bar, volume in zip(bars, peak_volumes):
+        for bar, volume in zip(bars, peak_volumes, strict=True):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{volume:.1f}', ha='center', va='bottom')
@@ -523,7 +558,7 @@ class ClusterVisualizer:
                          Patch(facecolor='red', alpha=0.7, label='Ask Dominant')]
         ax.legend(handles=legend_elements)
 
-    def _plot_elbow_method(self, analysis_results: Dict[str, Any]) -> None:
+    def _plot_elbow_method(self, analysis_results: dict[str, Any]) -> None:
         """Plot elbow method for optimal K selection."""
         ax = self.axes[1, 0]
 
@@ -557,7 +592,7 @@ class ClusterVisualizer:
         ax.grid(True, alpha=0.3)
 
     def _plot_cluster_statistics_table(
-        self, cluster_analysis: Dict[int, Dict[str, Any]]
+        self, cluster_analysis: dict[int, dict[str, Any]]
     ) -> None:
         """Plot cluster statistics as a table."""
         ax = self.axes[1, 1]
@@ -613,21 +648,120 @@ class ClusterVisualizer:
         ax.axis('off')
 
 
-def print_clustering_results(results: Dict[str, Any]) -> None:
-    """Print clustering analysis results in the specified format."""
+def print_clustering_results(results: dict[str, Any]) -> None:
+    """Print clustering analysis results in the optimized format."""
+    _print_summary_metrics(results)
+    _print_liquidity_peaks(results)
+    _print_detailed_cluster_analysis(results)
+    _print_market_structure_analysis(results)
+
+
+def _print_summary_metrics(results: dict[str, Any]) -> None:
+    """Print summary clustering metrics."""
     print("聚类分析结果:")
     print(f"最优聚类数: {results['optimal_clusters']}")
     print(f"轮廓系数: {results['silhouette_score']:.3f}")
 
-    print("\n流动性峰值区域:")
-    for i, peak in enumerate(results['liquidity_peaks']):
-        print(f"峰值 {i+1}: ${peak['center_price']:.2f}, "
-              f"总量: {peak['total_volume']:.0f}, "
-              f"方向: {peak['dominant_side']}, "
-              f"纯度: {peak['purity']:.2f}")
 
-    print("\n详细聚类统计:")
-    for cluster_id, stats in results['cluster_analysis'].items():
-        print(f"聚类 {cluster_id}: {stats['size']}个订单, "
-              f"价格区间: ${stats['price_range'][0]:.2f}-${stats['price_range'][1]:.2f}, "
-              f"总挂单量: {stats['total_volume']:.0f}")
+def _print_liquidity_peaks(results: dict[str, Any]) -> None:
+    """Print liquidity peaks organized by side."""
+    peaks = results.get('liquidity_peaks', [])
+    ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
+    bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
+
+    # Sort peaks by price (descending)
+    ask_peaks.sort(key=lambda x: x['center_price'], reverse=True)
+    bid_peaks.sort(key=lambda x: x['center_price'], reverse=True)
+
+    print("\n=== 流动性峰值区域 ===")
+
+    # Display ask peaks (resistance levels) - higher prices first
+    if ask_peaks:
+        print("\n🔻 卖盘阻力区域 (Ask Dominant):")
+        for i, peak in enumerate(ask_peaks):
+            print(f"  阻力 {i+1}: ${peak['center_price']:,.2f} | "
+                  f"挂单量: {abs(peak['total_volume']):,.0f} | "
+                  f"纯度: {peak['purity']:.2f}")
+
+    # Display bid peaks (support levels) - lower prices
+    if bid_peaks:
+        print("\n🟢 买盘支撑区域 (Bid Dominant):")
+        for i, peak in enumerate(bid_peaks):
+            print(f"  支撑 {i+1}: ${peak['center_price']:,.2f} | "
+                  f"挂单量: {abs(peak['total_volume']):,.0f} | "
+                  f"纯度: {peak['purity']:.2f}")
+
+
+def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
+    """Print detailed cluster analysis by direction."""
+    cluster_analysis = results.get('cluster_analysis', {})
+    ask_clusters = {}
+    bid_clusters = {}
+
+    # Separate clusters by dominant side
+    for cluster_id, stats in cluster_analysis.items():
+        if stats.get('dominant_side') == 'ask':
+            ask_clusters[cluster_id] = stats
+        else:
+            bid_clusters[cluster_id] = stats
+
+    print("\n=== 详细聚类分析 ===")
+
+    # Display ask clusters first
+    if ask_clusters:
+        print(f"\n🔻 卖盘聚类分析 ({len(ask_clusters)}个聚类):")
+        ask_clusters_sorted = sorted(ask_clusters.items(),
+                                  key=lambda x: x[1]['avg_price'], reverse=True)
+
+        for cluster_id, stats in ask_clusters_sorted:
+            price_range = stats['price_range']
+            total_volume = abs(stats['total_volume'])
+            avg_volume = abs(stats.get('avg_volume', 0))
+
+            print(f"  卖盘聚类 {cluster_id}:")
+            print(f"    价格区间: ${price_range[1]:,.2f} - ${price_range[0]:,.2f}")
+            print(f"    总挂单量: {total_volume:,.0f} | 平均量: {avg_volume:.2f}")
+            print(f"    订单数量: {stats['size']} | 纯度评分: {stats.get('purity', 0):.2f}")
+
+    # Display bid clusters
+    if bid_clusters:
+        print(f"\n🟢 买盘聚类分析 ({len(bid_clusters)}个聚类):")
+        bid_clusters_sorted = sorted(bid_clusters.items(),
+                                  key=lambda x: x[1]['avg_price'], reverse=True)
+
+        for cluster_id, stats in bid_clusters_sorted:
+            price_range = stats['price_range']
+            total_volume = abs(stats['total_volume'])
+            avg_volume = abs(stats.get('avg_volume', 0))
+
+            print(f"  买盘聚类 {cluster_id}:")
+            print(f"    价格区间: ${price_range[0]:,.2f} - ${price_range[1]:,.2f}")
+            print(f"    总挂单量: {total_volume:,.0f} | 平均量: {avg_volume:.2f}")
+            print(f"    订单数量: {stats['size']} | 纯度评分: {stats.get('purity', 0):.2f}")
+
+
+def _print_market_structure_analysis(results: dict[str, Any]) -> None:
+    """Print market structure analysis and sentiment."""
+    peaks = results.get('liquidity_peaks', [])
+    ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
+    bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
+
+    print("\n=== 市场结构分析 ===")
+    total_ask_volume = sum(abs(p['total_volume']) for p in ask_peaks)
+    total_bid_volume = sum(abs(p['total_volume']) for p in bid_peaks)
+    total_volume = total_ask_volume + total_bid_volume
+
+    if total_volume > 0:
+        print(f"卖盘总量: {total_ask_volume:,.0f} ({total_ask_volume/total_volume*100:.1f}%)")
+        print(f"买盘总量: {total_bid_volume:,.0f} ({total_bid_volume/total_volume*100:.1f}%)")
+        print(f"买卖比例: 1:{total_bid_volume/max(total_ask_volume, 1):.2f}")
+
+        if total_ask_volume > total_bid_volume * 1.2:
+            print("📊 市场情绪: 卖压明显，价格下行风险较高")
+        elif total_bid_volume > total_ask_volume * 1.2:
+            print("📊 市场情绪: 买盘积极，价格上行潜力较大")
+        else:
+            print("📊 市场情绪: 买卖相对平衡，价格震荡整理")
+    else:
+        print("📊 市场情绪: 数据不足，无法分析")
+
