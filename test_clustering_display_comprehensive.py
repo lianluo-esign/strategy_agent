@@ -312,16 +312,16 @@ class TestSklearnClusteringDisplay:
         assert "最优聚类数: 3" in output
         assert "轮廓系数: 0.650" in output
         assert "=== 流动性峰值区域 ===" in output
-        assert "=== 详细聚类分析 ===" in output
+        assert "=== 详细聚类统计 ===" in output
         assert "=== 市场结构分析 ===" in output
 
         # Check for ask and bid peaks with visual indicators
         assert "🔻 卖盘阻力区域" in output
         assert "🟢 买盘支撑区域" in output
 
-        # Check for price formatting (should have proper formatting)
-        assert "$70,150.00" in output
-        assert "$69,950.00" in output
+        # Check for price formatting (should have 1-dollar precision)
+        assert "$70,150" in output
+        assert "$69,950" in output
 
         # Check for volume display (should be positive)
         assert "25" in output or "26" in output  # Volume values

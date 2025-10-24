@@ -124,29 +124,43 @@ class SklearnClusterAnalyzer:
 
     def _prepare_clustering_data(
         self, snapshot: DepthSnapshot
-    ) -> tuple[np.ndarray, dict[tuple[float, int], Decimal], StandardScaler]:
-        """Prepare order book data for clustering analysis."""
+    ) -> tuple[np.ndarray, dict[tuple[int, int], Decimal], StandardScaler]:
+        """Prepare order book data for clustering analysis with 1-dollar precision."""
         data_points = []
         price_volume_map = {}
 
-        # Process bids
+        # Aggregate data by 1-dollar price levels
+        bid_price_aggregates = {}
+        ask_price_aggregates = {}
+
+        # Process bids with 1-dollar precision aggregation
         for bid in snapshot.bids:
-            # Feature engineering: [price, volume_weighted, side_indicator]
-            price = float(bid.price)
+            price_int = int(float(bid.price))  # Round to nearest dollar
             volume = float(bid.quantity)
-            volume_weighted = volume * self.volume_weight
 
-            data_points.append([price, volume_weighted, 0])  # 0 for bid side
-            price_volume_map[(price, 0)] = bid.quantity
+            if price_int not in bid_price_aggregates:
+                bid_price_aggregates[price_int] = 0.0
+            bid_price_aggregates[price_int] += volume
 
-        # Process asks
+        # Process asks with 1-dollar precision aggregation
         for ask in snapshot.asks:
-            price = float(ask.price)
+            price_int = int(float(ask.price))  # Round to nearest dollar
             volume = float(ask.quantity)
-            volume_weighted = volume * self.volume_weight
 
+            if price_int not in ask_price_aggregates:
+                ask_price_aggregates[price_int] = 0.0
+            ask_price_aggregates[price_int] += volume
+
+        # Create aggregated data points
+        for price, volume in bid_price_aggregates.items():
+            volume_weighted = volume * self.volume_weight
+            data_points.append([price, volume_weighted, 0])  # 0 for bid side
+            price_volume_map[(price, 0)] = Decimal(str(volume))
+
+        for price, volume in ask_price_aggregates.items():
+            volume_weighted = volume * self.volume_weight
             data_points.append([price, volume_weighted, 1])  # 1 for ask side
-            price_volume_map[(price, 1)] = ask.quantity
+            price_volume_map[(price, 1)] = Decimal(str(volume))
 
         clustering_data = np.array(data_points)
 
@@ -154,7 +168,7 @@ class SklearnClusterAnalyzer:
         scaler = StandardScaler()
         clustering_data[:, :2] = scaler.fit_transform(clustering_data[:, :2])
 
-        logger.debug(f"Prepared {len(clustering_data)} data points for clustering")
+        logger.debug(f"Prepared {len(clustering_data)} data points for clustering with 1-dollar precision")
 
         return clustering_data, price_volume_map, scaler
 
@@ -664,12 +678,23 @@ def _print_summary_metrics(results: dict[str, Any]) -> None:
 
 
 def _print_liquidity_peaks(results: dict[str, Any]) -> None:
-    """Print liquidity peaks organized by side."""
+    """Print liquidity peaks organized by side with proper price sorting."""
     peaks = results.get('liquidity_peaks', [])
+
+    if not peaks:
+        print("\n=== 流动性峰值区域 ===")
+        print("未发现流动性峰值")
+        return
+
+    # Round prices to nearest dollar for 1-dollar precision
+    for peak in peaks:
+        peak['center_price'] = round(peak['center_price'])
+
+    # Separate peaks by side
     ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
     bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
 
-    # Sort peaks by price (descending)
+    # Sort each group by price (descending)
     ask_peaks.sort(key=lambda x: x['center_price'], reverse=True)
     bid_peaks.sort(key=lambda x: x['center_price'], reverse=True)
 
@@ -679,33 +704,37 @@ def _print_liquidity_peaks(results: dict[str, Any]) -> None:
     if ask_peaks:
         print("\n🔻 卖盘阻力区域 (Ask Dominant):")
         for i, peak in enumerate(ask_peaks):
-            print(f"  阻力 {i+1}: ${peak['center_price']:,.2f} | "
+            print(f"  阻力 {i+1}: ${peak['center_price']:,.0f} | "
                   f"挂单量: {abs(peak['total_volume']):,.0f} | "
                   f"纯度: {peak['purity']:.2f}")
 
-    # Display bid peaks (support levels) - lower prices
+    # Display bid peaks (support levels) - sorted descending
     if bid_peaks:
         print("\n🟢 买盘支撑区域 (Bid Dominant):")
         for i, peak in enumerate(bid_peaks):
-            print(f"  支撑 {i+1}: ${peak['center_price']:,.2f} | "
+            print(f"  支撑 {i+1}: ${peak['center_price']:,.0f} | "
                   f"挂单量: {abs(peak['total_volume']):,.0f} | "
                   f"纯度: {peak['purity']:.2f}")
 
 
 def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
-    """Print detailed cluster analysis by direction."""
+    """Print detailed cluster analysis by direction with 1-dollar precision."""
     cluster_analysis = results.get('cluster_analysis', {})
     ask_clusters = {}
     bid_clusters = {}
 
     # Separate clusters by dominant side
     for cluster_id, stats in cluster_analysis.items():
+        # Round prices to nearest dollar for 1-dollar precision
+        stats['avg_price'] = round(stats['avg_price'])
+        stats['price_range'] = (round(stats['price_range'][0]), round(stats['price_range'][1]))
+
         if stats.get('dominant_side') == 'ask':
             ask_clusters[cluster_id] = stats
         else:
             bid_clusters[cluster_id] = stats
 
-    print("\n=== 详细聚类分析 ===")
+    print("\n=== 详细聚类统计 ===")
 
     # Display ask clusters first
     if ask_clusters:
@@ -718,10 +747,7 @@ def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
             total_volume = abs(stats['total_volume'])
             avg_volume = abs(stats.get('avg_volume', 0))
 
-            print(f"  卖盘聚类 {cluster_id}:")
-            print(f"    价格区间: ${price_range[1]:,.2f} - ${price_range[0]:,.2f}")
-            print(f"    总挂单量: {total_volume:,.0f} | 平均量: {avg_volume:.2f}")
-            print(f"    订单数量: {stats['size']} | 纯度评分: {stats.get('purity', 0):.2f}")
+            print(f"  聚类 {cluster_id}: {stats['size']}个订单, 价格区间: ${price_range[1]:,.0f}-${price_range[0]:,.0f}, 总挂单量: {total_volume:,.0f}")
 
     # Display bid clusters
     if bid_clusters:
@@ -734,10 +760,7 @@ def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
             total_volume = abs(stats['total_volume'])
             avg_volume = abs(stats.get('avg_volume', 0))
 
-            print(f"  买盘聚类 {cluster_id}:")
-            print(f"    价格区间: ${price_range[0]:,.2f} - ${price_range[1]:,.2f}")
-            print(f"    总挂单量: {total_volume:,.0f} | 平均量: {avg_volume:.2f}")
-            print(f"    订单数量: {stats['size']} | 纯度评分: {stats.get('purity', 0):.2f}")
+            print(f"  聚类 {cluster_id}: {stats['size']}个订单, 价格区间: ${price_range[0]:,.0f}-${price_range[1]:,.0f}, 总挂单量: {total_volume:,.0f}")
 
 
 def _print_market_structure_analysis(results: dict[str, Any]) -> None:
