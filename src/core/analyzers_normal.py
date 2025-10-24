@@ -218,26 +218,11 @@ class NormalDistributionMarketAnalyzer:
             f"liquidity_peaks={len(clustering_results.get('liquidity_peaks', []))}"
         )
 
-        # Print clustering results in the specified format
+        # Print clustering results in the optimized format
         if clustering_results.get('optimal_clusters', 0) > 0:
-            print(f"\n=== SKLEARN聚类分析结果 ===")
-            print(f"最优聚类数: {clustering_results['optimal_clusters']}")
-            print(f"轮廓系数: {clustering_results['silhouette_score']:.3f}")
-
-            print(f"\n流动性峰值区域:")
-            for i, peak in enumerate(clustering_results.get('liquidity_peaks', [])):
-                print(f"峰值 {i+1}: ${peak['center_price']:.2f}, "
-                      f"总量: {peak['total_volume']:.0f}, "
-                      f"方向: {peak['dominant_side']}, "
-                      f"纯度: {peak['purity']:.2f}")
-
-            print(f"\n详细聚类统计:")
-            cluster_analysis = clustering_results.get('cluster_analysis', {})
-            for cluster_id, stats in cluster_analysis.items():
-                print(f"聚类 {cluster_id}: {stats['size']}个订单, "
-                      f"价格区间: ${stats['price_range'][0]:.2f}-${stats['price_range'][1]:.2f}, "
-                      f"总挂单量: {stats['total_volume']:.0f}")
-            print("=" * 40)
+            # Use the optimized display function from sklearn_cluster_analyzer
+            from .sklearn_cluster_analyzer import print_clustering_results
+            print_clustering_results(clustering_results)
 
         return result
 
