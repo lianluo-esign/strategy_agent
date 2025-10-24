@@ -2,17 +2,18 @@
 
 import asyncio
 import json
-import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from src.core.redis_client import RedisDataStore
-from src.core.models import MinuteTradeData, PriceLevelData, Trade
+import pytest
+
 from src.agents.data_collector import DataCollectorAgent
-from src.utils.config import Settings
 from src.core.constants import TRADES_WINDOW_SIZE_MINUTES
+from src.core.models import MinuteTradeData, PriceLevelData
+from src.core.redis_client import RedisDataStore
+from src.utils.config import Settings
 
 
 class TestTradePersistenceIntegration:
@@ -110,7 +111,7 @@ class TestTradePersistenceIntegration:
         assert expected_filepath.exists()
 
         # Verify file contents
-        with open(expected_filepath, 'r') as f:
+        with open(expected_filepath) as f:
             file_data = json.load(f)
 
         assert 'timestamp' in file_data
@@ -192,8 +193,7 @@ class TestTradePersistenceIntegration:
         redis_store.redis.lrange.return_value = [json.dumps(expired_data.to_dict())]
 
         # Mock file writing to raise an exception
-        import aiofiles
-        with patch('aiofiles.open', side_effect=IOError("Disk full")):
+        with patch('aiofiles.open', side_effect=OSError("Disk full")):
             # Should still complete without raising exception
             await redis_store.store_minute_trade_data(sample_minute_trade_data)
 
@@ -299,7 +299,7 @@ class TestTradePersistenceIntegration:
         assert expected_filepath.exists()
 
         # Verify file contents
-        with open(expected_filepath, 'r') as f:
+        with open(expected_filepath) as f:
             file_data = json.load(f)
 
         assert len(file_data['price_levels']) == 100

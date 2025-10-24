@@ -2,15 +2,14 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from .models import (
     DepthSnapshot,
+    MarketAnalysisResult,
     MinuteTradeData,
     SupportResistanceLevel,
-    MarketAnalysisResult
 )
 
 logger = logging.getLogger(__name__)
@@ -156,7 +155,7 @@ class DepthSnapshotAnalyzer:
     def identify_liquidity_vacuum_zones(
         self,
         snapshot: DepthSnapshot,
-        price_range: Optional[tuple[Decimal, Decimal]] = None
+        price_range: tuple[Decimal, Decimal] | None = None
     ) -> list[Decimal]:
         """Identify price ranges with low liquidity (vacuum zones)."""
         if price_range is None:
@@ -378,7 +377,7 @@ class MarketAnalyzer:
 
     def analyze_market(
         self,
-        snapshot: Optional[DepthSnapshot],
+        snapshot: DepthSnapshot | None,
         trade_data_list: list[MinuteTradeData],
         symbol: str = "BTCFDUSD"
     ) -> MarketAnalysisResult:

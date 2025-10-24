@@ -4,7 +4,6 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -49,7 +48,7 @@ class DeepSeekClient:
         self,
         analysis_result: MarketAnalysisResult,
         symbol: str = "BTCFDUSD"
-    ) -> Optional[TradingRecommendation]:
+    ) -> TradingRecommendation | None:
         """Analyze market data using DeepSeek AI."""
         try:
             # Prepare system prompt
@@ -208,7 +207,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
 
         return prompt
 
-    def _format_levels(self, levels: List) -> str:
+    def _format_levels(self, levels: list) -> str:
         """Format support/resistance levels for prompt."""
         if not levels:
             return "None identified"
@@ -223,7 +222,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
             )
         return "\n".join(formatted)
 
-    def _process_ai_response(self, response: Dict, symbol: str) -> TradingRecommendation:
+    def _process_ai_response(self, response: dict, symbol: str) -> TradingRecommendation:
         """Process AI response and extract trading recommendation."""
         try:
             message = response["choices"][0]["message"]
@@ -268,7 +267,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
                 risk_level="HIGH"
             )
 
-    def _process_tool_calls(self, tool_calls: List[Dict]) -> Dict:
+    def _process_tool_calls(self, tool_calls: list[dict]) -> dict:
         """Process tool calls from AI response."""
         results = {}
 

@@ -1,11 +1,9 @@
 """Binance API client for market data collection."""
 
-import asyncio
 import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 import aiohttp
 import requests
@@ -17,11 +15,10 @@ from ..core.constants import (
     BINANCE_WEBSOCKET_BASE,
     BTC_FDUSD_SYMBOL,
     DEPTH_SNAPSHOT_LIMIT,
+    ERROR_WEBSOCKET_CONNECTION,
     WEBSOCKET_TRADE_STREAM,
-    ERROR_BINANCE_API,
-    ERROR_WEBSOCKET_CONNECTION
 )
-from ..core.models import DepthSnapshot, DepthLevel, Trade
+from ..core.models import DepthLevel, DepthSnapshot, Trade
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +54,7 @@ class BinanceAPIClient:
         if self._async_session and not self._async_session.closed:
             await self._async_session.close()
 
-    async def get_depth_snapshot(self, symbol: str = BTC_FDUSD_SYMBOL, limit: int = DEPTH_SNAPSHOT_LIMIT) -> Optional[DepthSnapshot]:
+    async def get_depth_snapshot(self, symbol: str = BTC_FDUSD_SYMBOL, limit: int = DEPTH_SNAPSHOT_LIMIT) -> DepthSnapshot | None:
         """Get order book depth snapshot."""
         try:
             url = f"{self.base_url}/api/v3/depth"
@@ -82,7 +79,7 @@ class BinanceAPIClient:
             logger.error(f"Failed to get depth snapshot: {e}")
             return None
 
-    def _parse_depth_snapshot(self, data: Dict, symbol: str) -> DepthSnapshot:
+    def _parse_depth_snapshot(self, data: dict, symbol: str) -> DepthSnapshot:
         """Parse depth snapshot from API response."""
         timestamp = datetime.fromtimestamp(data['lastUpdateId'] / 1000)
 
@@ -165,7 +162,7 @@ class BinanceWebSocketClient:
             logger.error(f"WebSocket error: {e}")
             self.is_connected = False
 
-    def _parse_trade_message(self, data: Dict) -> Optional[Trade]:
+    def _parse_trade_message(self, data: dict) -> Trade | None:
         """Parse trade message from WebSocket."""
         try:
             # Validate required fields

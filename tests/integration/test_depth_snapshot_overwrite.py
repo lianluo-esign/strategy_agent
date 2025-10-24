@@ -1,14 +1,14 @@
 """Tests for depth snapshot overwrite functionality."""
 
-import asyncio
-import pytest
 import json
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
+import pytest
+
+from src.core.models import DepthLevel, DepthSnapshot
 from src.core.redis_client import RedisDataStore
-from src.core.models import DepthSnapshot, DepthLevel
 
 
 @pytest.mark.asyncio

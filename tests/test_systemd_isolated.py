@@ -1,9 +1,9 @@
 """Isolated tests for systemd service configuration (no project dependencies)."""
 
 import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 import pytest
 
 
@@ -18,7 +18,7 @@ class TestSystemdConfigIsolated:
     @pytest.fixture
     def service_content(self, service_file_path):
         """Read service file content."""
-        with open(service_file_path, 'r') as f:
+        with open(service_file_path) as f:
             return f.read()
 
     def test_service_file_exists(self, service_file_path):
@@ -112,7 +112,7 @@ class TestSystemdConfigIsolated:
         """Test that timer file exists."""
         timer_path = Path(__file__).parent.parent / "systemd" / "strategy-agent-data-collector.timer"
         if timer_path.exists():
-            with open(timer_path, 'r') as f:
+            with open(timer_path) as f:
                 timer_content = f.read()
             assert "[Timer]" in timer_content, "Timer file should have [Timer] section"
             assert "[Unit]" in timer_content, "Timer file should have [Unit] section"
@@ -122,7 +122,7 @@ class TestSystemdConfigIsolated:
         """Test that logrotate configuration exists."""
         logrotate_path = Path(__file__).parent.parent / "systemd" / "logrotate.d" / "strategy-agent-data-collector"
         if logrotate_path.exists():
-            with open(logrotate_path, 'r') as f:
+            with open(logrotate_path) as f:
                 logrotate_content = f.read()
             assert "daily" in logrotate_content, "Should rotate daily"
             assert "rotate" in logrotate_content, "Should specify rotation count"

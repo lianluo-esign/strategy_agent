@@ -5,7 +5,7 @@ import logging
 import signal
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from ..core.models import MinuteTradeData, Trade
 from ..core.redis_client import RedisDataStore
@@ -107,6 +107,10 @@ class DataCollectorAgent:
     async def _initialize_depth_snapshot(self) -> None:
         """Initialize with a depth snapshot."""
         logger.info("Fetching initial depth snapshot")
+        logger.debug(
+            f"Depth snapshot config: limit={self.settings.data_collector.depth_snapshot.limit}, "
+            f"update_interval={self.settings.data_collector.depth_snapshot.update_interval_seconds}s"
+        )
         snapshot = await self.api_client.get_depth_snapshot(
             symbol=self.settings.binance.symbol,
             limit=self.settings.data_collector.depth_snapshot.limit

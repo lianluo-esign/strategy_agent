@@ -1,21 +1,15 @@
 """Unit tests for market analyzers."""
 
-import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from src.core.analyzers import (
-    DepthSnapshotAnalyzer,
-    OrderFlowAnalyzer,
-    MarketAnalyzer
-)
+from src.core.analyzers import DepthSnapshotAnalyzer, MarketAnalyzer, OrderFlowAnalyzer
 from src.core.models import (
-    DepthSnapshot,
     DepthLevel,
+    DepthSnapshot,
     MinuteTradeData,
-    Trade,
+    PriceLevelData,
     SupportResistanceLevel,
-    PriceLevelData
 )
 
 

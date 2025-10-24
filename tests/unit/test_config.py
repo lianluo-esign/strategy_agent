@@ -9,13 +9,13 @@ import pytest
 import yaml
 
 from utils.config import (
-    Settings,
-    _expand_env_vars,
-    RedisConfig,
+    AppConfig,
     BinanceConfig,
     DeepSeekConfig,
-    AppConfig,
     LoggingConfig,
+    RedisConfig,
+    Settings,
+    _expand_env_vars,
 )
 
 

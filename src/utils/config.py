@@ -69,10 +69,13 @@ class BinanceConfig(BaseModel):
 
 
 class DepthSnapshotConfig(BaseModel):
-    """Depth snapshot collection configuration."""
+    """Depth snapshot collection configuration.
+
+    Note: window_size has been removed as depth_snapshot_5000 now uses
+    single-key overwrite mechanism instead of sliding window.
+    """
     limit: int = 5000
     update_interval_seconds: int = 60
-    window_size: int = 60
 
 
 class OrderFlowConfig(BaseModel):

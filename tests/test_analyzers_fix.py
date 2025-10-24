@@ -1,22 +1,18 @@
 """Tests for analyzer type fixes."""
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 from src.core.analyzers import (
-    _to_decimal,
-    _safe_decimal_division,
     DepthSnapshotAnalyzer,
+    MarketAnalyzer,
     OrderFlowAnalyzer,
-    MarketAnalyzer
+    _safe_decimal_division,
+    _to_decimal,
 )
-from src.core.models import (
-    DepthSnapshot,
-    DepthLevel,
-    MinuteTradeData,
-    PriceLevelData
-)
+from src.core.models import DepthLevel, DepthSnapshot, MinuteTradeData
 
 
 class TestAnalyzerFixes:

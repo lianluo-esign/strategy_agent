@@ -1,18 +1,17 @@
 """Unit tests for data models."""
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from src.core.models import (
     DepthLevel,
     DepthSnapshot,
-    Trade,
-    PriceLevelData,
-    MinuteTradeData,
-    SupportResistanceLevel,
     MarketAnalysisResult,
-    TradingRecommendation
+    MinuteTradeData,
+    PriceLevelData,
+    SupportResistanceLevel,
+    Trade,
+    TradingRecommendation,
 )
 
 

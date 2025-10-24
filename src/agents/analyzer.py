@@ -5,11 +5,10 @@ import logging
 import signal
 import sys
 from datetime import datetime
-from typing import Optional
 
 from ..core.analyzers import MarketAnalyzer
-from ..core.redis_client import RedisDataStore
 from ..core.models import MarketAnalysisResult, TradingRecommendation
+from ..core.redis_client import RedisDataStore
 from ..utils.ai_client import DeepSeekClient
 from ..utils.config import Settings
 

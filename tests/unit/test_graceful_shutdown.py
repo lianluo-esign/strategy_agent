@@ -2,8 +2,9 @@
 
 import asyncio
 import signal
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.data_collector import DataCollectorAgent
 from src.utils.config import Settings
@@ -161,8 +162,9 @@ class TestGracefulShutdown:
     async def test_shutdown_saves_remaining_data(self, data_collector, mock_settings):
         """Test that shutdown saves remaining aggregated data."""
         # Mock some aggregated data
-        from src.core.models import MinuteTradeData, PriceLevelData
         from decimal import Decimal
+
+        from src.core.models import PriceLevelData
 
         data_collector.current_minute_data.price_levels[Decimal("60000")] = PriceLevelData(
             price_level=Decimal("60000"),

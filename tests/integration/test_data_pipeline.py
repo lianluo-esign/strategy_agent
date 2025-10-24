@@ -1,17 +1,16 @@
 """Integration tests for the complete data pipeline."""
 
-import asyncio
-import pytest
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
-from src.core.redis_client import RedisDataStore
-from src.core.models import DepthSnapshot, DepthLevel, Trade, MinuteTradeData
-from src.agents.data_collector import DataCollectorAgent
+import pytest
+
 from src.agents.analyzer import AnalyzerAgent
-from src.utils.config import Settings
+from src.agents.data_collector import DataCollectorAgent
+from src.core.models import DepthLevel, DepthSnapshot, MinuteTradeData, Trade
+from src.core.redis_client import RedisDataStore
 
 
 @pytest.mark.asyncio

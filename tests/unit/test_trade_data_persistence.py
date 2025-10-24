@@ -2,15 +2,16 @@
 
 import asyncio
 import json
-import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.core.redis_client import RedisDataStore
-from src.core.models import MinuteTradeData, PriceLevelData
+import pytest
+
 from src.core.constants import REDIS_TRADES_WINDOW_KEY, TRADES_WINDOW_SIZE_MINUTES
+from src.core.models import MinuteTradeData, PriceLevelData
+from src.core.redis_client import RedisDataStore
 
 
 class TestTradeDataPersistence:
@@ -136,8 +137,6 @@ class TestTradeDataPersistence:
     @pytest.mark.asyncio
     async def test_write_trade_data_file(self, redis_store, sample_trade_data_dict):
         """Test writing a single trade data file."""
-        import aiofiles
-        from decimal import Decimal
 
         # Mock aiofiles.open with proper async context manager
         mock_file = AsyncMock()
@@ -169,8 +168,7 @@ class TestTradeDataPersistence:
     async def test_write_trade_data_file_error_handling(self, redis_store, sample_trade_data_dict):
         """Test error handling when writing trade data file."""
         # Mock aiofiles.open to raise an exception
-        import aiofiles
-        with patch('aiofiles.open', side_effect=IOError("Disk full")):
+        with patch('aiofiles.open', side_effect=OSError("Disk full")):
             # Should not raise exception, just log error
             await redis_store._write_trade_data_file(json.dumps(sample_trade_data_dict))
             # Method should complete without raising
@@ -249,8 +247,8 @@ class TestTradeDataPersistence:
 
     def test_storage_dir_creation(self):
         """Test that storage directory is created during initialization."""
-        import tempfile
         import shutil
+        import tempfile
 
         # Create a temporary directory
         temp_dir = Path(tempfile.mkdtemp())
@@ -276,7 +274,6 @@ class TestTradeDataPersistence:
     @pytest.mark.asyncio
     async def test_concurrent_file_writing(self, redis_store, sample_trade_data_dict):
         """Test that multiple files can be written concurrently."""
-        import asyncio
 
         # Create multiple trade data items with different timestamps
         items = []

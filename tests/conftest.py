@@ -1,16 +1,17 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+import pytest
+
 from src.core.models import (
-    DepthSnapshot,
     DepthLevel,
-    Trade,
+    DepthSnapshot,
     MinuteTradeData,
-    SupportResistanceLevel
+    SupportResistanceLevel,
+    Trade,
 )
 
 
@@ -150,8 +151,7 @@ def sample_support_resistance_levels():
 @pytest.fixture
 def mock_redis():
     """Create a mock Redis client for testing."""
-    import redis
-    from unittest.mock import Mock, MagicMock
+    from unittest.mock import Mock
 
     mock_client = Mock()
     mock_client.ping.return_value = True

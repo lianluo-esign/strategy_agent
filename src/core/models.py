@@ -3,8 +3,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Optional
+from decimal import ROUND_HALF_UP, Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -28,22 +27,22 @@ class DepthSnapshot:
     """Represents a complete order book depth snapshot."""
     symbol: str
     timestamp: datetime
-    bids: List[DepthLevel] = field(default_factory=list)
-    asks: List[DepthLevel] = field(default_factory=list)
+    bids: list[DepthLevel] = field(default_factory=list)
+    asks: list[DepthLevel] = field(default_factory=list)
 
-    def get_bid_price_levels(self) -> List[Decimal]:
+    def get_bid_price_levels(self) -> list[Decimal]:
         """Get all bid price levels."""
         return [level.price for level in self.bids]
 
-    def get_ask_price_levels(self) -> List[Decimal]:
+    def get_ask_price_levels(self) -> list[Decimal]:
         """Get all ask price levels."""
         return [level.price for level in self.asks]
 
-    def get_best_bid(self) -> Optional[Decimal]:
+    def get_best_bid(self) -> Decimal | None:
         """Get the best bid price."""
         return max(self.get_bid_price_levels()) if self.bids else None
 
-    def get_best_ask(self) -> Optional[Decimal]:
+    def get_best_ask(self) -> Decimal | None:
         """Get the best ask price."""
         return min(self.get_ask_price_levels()) if self.asks else None
 
@@ -90,7 +89,7 @@ class PriceLevelData:
 
         self.delta = self.buy_volume - self.sell_volume
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for Redis storage."""
         return {
             'price_level': float(self.price_level),
@@ -106,7 +105,7 @@ class PriceLevelData:
 class MinuteTradeData:
     """Aggregated trade data for a one-minute interval."""
     timestamp: datetime
-    price_levels: Dict[Decimal, PriceLevelData] = field(default_factory=dict)
+    price_levels: dict[Decimal, PriceLevelData] = field(default_factory=dict)
     max_price_levels: int = 1000  # Memory limit for price levels
 
     def add_trade(self, trade: Trade) -> None:
@@ -139,7 +138,7 @@ class MinuteTradeData:
         if to_remove:
             logger.debug(f"Cleaned up {len(to_remove)} low-volume price levels")
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for Redis storage."""
         return {
             'timestamp': self.timestamp.isoformat(),
@@ -157,9 +156,9 @@ class SupportResistanceLevel:
     level_type: str  # 'support' or 'resistance'
     volume_at_level: Decimal
     confirmation_count: int = 0
-    last_confirmed: Optional[datetime] = None
+    last_confirmed: datetime | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             'price': float(self.price),
@@ -176,13 +175,13 @@ class MarketAnalysisResult:
     """Results from market analysis."""
     timestamp: datetime
     symbol: str
-    support_levels: List[SupportResistanceLevel] = field(default_factory=list)
-    resistance_levels: List[SupportResistanceLevel] = field(default_factory=list)
-    poc_levels: List[Decimal] = field(default_factory=list)  # Point of Control levels
-    liquidity_vacuum_zones: List[Decimal] = field(default_factory=list)
-    resonance_zones: List[Decimal] = field(default_factory=list)  # High-probability zones
+    support_levels: list[SupportResistanceLevel] = field(default_factory=list)
+    resistance_levels: list[SupportResistanceLevel] = field(default_factory=list)
+    poc_levels: list[Decimal] = field(default_factory=list)  # Point of Control levels
+    liquidity_vacuum_zones: list[Decimal] = field(default_factory=list)
+    resonance_zones: list[Decimal] = field(default_factory=list)  # High-probability zones
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             'timestamp': self.timestamp.isoformat(),
@@ -206,7 +205,7 @@ class TradingRecommendation:
     reasoning: str
     risk_level: str  # 'low', 'medium', 'high'
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             'timestamp': self.timestamp.isoformat(),
