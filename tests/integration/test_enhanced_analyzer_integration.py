@@ -4,25 +4,21 @@ Tests the complete end-to-end functionality of the enhanced analyzer
 with Redis data store and AI client integration.
 """
 
-import pytest
-import asyncio
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict
+
+import pytest
 
 from src.core.analyzers_enhanced import EnhancedMarketAnalyzer
-from src.core.analyzers import MarketAnalyzer
 from src.core.models import (
-    DepthSnapshot,
     DepthLevel,
-    MinuteTradeData,
-    Trade,
+    DepthSnapshot,
     EnhancedMarketAnalysisResult,
     MarketAnalysisResult,
+    MinuteTradeData,
+    Trade,
 )
 from src.core.redis_client import RedisDataStore
-from src.utils.ai_client import DeepSeekClient
-from src.utils.config import Settings
 
 
 class TestEnhancedAnalyzerIntegration:
@@ -55,7 +51,7 @@ class TestEnhancedAnalyzerIntegration:
         )
 
     @pytest.fixture
-    def sample_market_data(self) -> tuple[DepthSnapshot, List[MinuteTradeData]]:
+    def sample_market_data(self) -> tuple[DepthSnapshot, list[MinuteTradeData]]:
         """Create comprehensive sample market data."""
         # Create realistic depth snapshot
         bids = [
@@ -528,8 +524,9 @@ class TestEnhancedAnalyzerErrorHandling:
     def test_memory_efficiency_with_repeated_analysis(self, analyzer):
         """Test memory efficiency during repeated analysis operations."""
         import gc
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss

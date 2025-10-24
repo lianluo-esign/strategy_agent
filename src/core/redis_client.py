@@ -25,7 +25,13 @@ logger = logging.getLogger(__name__)
 class RedisDataStore:
     """Redis client for storing and retrieving market data."""
 
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, storage_dir: str = "storage"):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 6379,
+        db: int = 0,
+        storage_dir: str = "storage",
+    ):
         """Initialize Redis connection."""
         self.redis = redis.Redis(
             host=host,
@@ -33,13 +39,10 @@ class RedisDataStore:
             db=db,
             decode_responses=True,
             socket_timeout=5,
-            socket_connect_timeout=5
+            socket_connect_timeout=5,
         )
         self.async_redis = AsyncRedis(
-            host=host,
-            port=port,
-            db=db,
-            decode_responses=True
+            host=host, port=port, db=db, decode_responses=True
         )
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(exist_ok=True)
@@ -58,16 +61,24 @@ class RedisDataStore:
         """Store a depth snapshot in Redis (overwrite mode)."""
         try:
             data = {
-                'symbol': snapshot.symbol,
-                'timestamp': snapshot.timestamp.isoformat(),
-                'bids': [[float(level.price), float(level.quantity)] for level in snapshot.bids],
-                'asks': [[float(level.price), float(level.quantity)] for level in snapshot.asks]
+                "symbol": snapshot.symbol,
+                "timestamp": snapshot.timestamp.isoformat(),
+                "bids": [
+                    [float(level.price), float(level.quantity)]
+                    for level in snapshot.bids
+                ],
+                "asks": [
+                    [float(level.price), float(level.quantity)]
+                    for level in snapshot.asks
+                ],
             }
 
             # Store/overwrite the snapshot as a single value
             self.redis.set(REDIS_DEPTH_SNAPSHOT_KEY, json.dumps(data))
 
-            logger.debug(f"Stored depth snapshot for {snapshot.symbol} at {snapshot.timestamp}")
+            logger.debug(
+                f"Stored depth snapshot for {snapshot.symbol} at {snapshot.timestamp}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to store depth snapshot: {e}")
@@ -82,10 +93,16 @@ class RedisDataStore:
 
             data = json.loads(data_str)
             return DepthSnapshot(
-                symbol=data['symbol'],
-                timestamp=datetime.fromisoformat(data['timestamp']),
-                bids=[DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty))) for price, qty in data['bids']],
-                asks=[DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty))) for price, qty in data['asks']]
+                symbol=data["symbol"],
+                timestamp=datetime.fromisoformat(data["timestamp"]),
+                bids=[
+                    DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
+                    for price, qty in data["bids"]
+                ],
+                asks=[
+                    DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
+                    for price, qty in data["asks"]
+                ],
             )
 
         except Exception as e:
@@ -121,18 +138,20 @@ class RedisDataStore:
 
                 # Get the expired items (they are at the end of the list)
                 expired_items = self.redis.lrange(
-                    REDIS_TRADES_WINDOW_KEY,
-                    TRADES_WINDOW_SIZE_MINUTES,
-                    -1
+                    REDIS_TRADES_WINDOW_KEY, TRADES_WINDOW_SIZE_MINUTES, -1
                 )
 
                 # Serialize expired items to disk asynchronously
                 await self._serialize_trade_data_to_files(expired_items)
 
                 # Trim the list to keep only the recent data
-                self.redis.ltrim(REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1)
+                self.redis.ltrim(
+                    REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1
+                )
 
-                logger.info(f"Serialized {expired_count} expired trade data items to disk")
+                logger.info(
+                    f"Serialized {expired_count} expired trade data items to disk"
+                )
 
         except Exception as e:
             logger.error(f"Failed to handle expired trade data: {e}")
@@ -155,14 +174,14 @@ class RedisDataStore:
         """Write a single trade data item to a JSON file asynchronously."""
         try:
             data = json.loads(data_str)
-            timestamp = datetime.fromisoformat(data['timestamp'])
+            timestamp = datetime.fromisoformat(data["timestamp"])
 
             # Create filename based on timestamp (one file per minute)
             filename = f"trades_{timestamp.strftime('%Y%m%d_%H%M')}.json"
             filepath = self.storage_dir / filename
 
             # Write data to file asynchronously
-            async with aiofiles.open(filepath, 'w') as f:
+            async with aiofiles.open(filepath, "w") as f:
                 await f.write(json.dumps(data, indent=2, ensure_ascii=False))
 
             logger.debug(f"Serialized trade data to {filepath}")
@@ -184,11 +203,11 @@ class RedisDataStore:
                 try:
                     data = json.loads(data_str)
                     trade_data = MinuteTradeData(
-                        timestamp=datetime.fromisoformat(data['timestamp'])
+                        timestamp=datetime.fromisoformat(data["timestamp"])
                     )
 
                     # Reconstruct price level data
-                    for price_str, price_data in data['price_levels'].items():
+                    for price_str, price_data in data["price_levels"].items():
                         price_level = Decimal(price_str)
                         trade_data.price_levels[price_level] = price_data
 
@@ -213,7 +232,9 @@ class RedisDataStore:
             # Store the result
             self.redis.setex(key, 3600, json.dumps(data))  # Expire after 1 hour
 
-            logger.debug(f"Stored analysis result for {result.symbol} at {result.timestamp}")
+            logger.debug(
+                f"Stored analysis result for {result.symbol} at {result.timestamp}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to store analysis result: {e}")
@@ -228,7 +249,7 @@ class RedisDataStore:
                 return None
 
             # Sort keys by timestamp (extracted from key name)
-            latest_key = max(keys, key=lambda k: float(k.split(':')[-1]))
+            latest_key = max(keys, key=lambda k: float(k.split(":")[-1]))
             data_str = self.redis.get(latest_key)
 
             if not data_str:
@@ -237,8 +258,8 @@ class RedisDataStore:
             data = json.loads(data_str)
             # Reconstruct MarketAnalysisResult from data
             result = MarketAnalysisResult(
-                timestamp=datetime.fromisoformat(data['timestamp']),
-                symbol=data['symbol']
+                timestamp=datetime.fromisoformat(data["timestamp"]),
+                symbol=data["symbol"],
             )
 
             # Add other fields as needed
@@ -276,13 +297,13 @@ class RedisDataStore:
     async def close(self) -> None:
         """Close Redis connections."""
         try:
-            if hasattr(self.async_redis, 'aclose'):
+            if hasattr(self.async_redis, "aclose"):
                 await self.async_redis.aclose()
         except Exception as e:
             logger.warning(f"Error closing async Redis connection: {e}")
 
         try:
-            if hasattr(self.redis, 'close'):
+            if hasattr(self.redis, "close"):
                 self.redis.close()
         except Exception as e:
             logger.warning(f"Error closing Redis connection: {e}")

@@ -6,6 +6,13 @@ import signal
 import sys
 from datetime import datetime
 
+from ..core.models import MarketAnalysisResult, TradingRecommendation
+from ..core.redis_client import RedisDataStore
+from ..utils.ai_client import DeepSeekClient
+from ..utils.config import Settings
+
+logger = logging.getLogger(__name__)
+
 # Try to import enhanced analyzer first
 try:
     from ..core.analyzers_enhanced import MarketAnalyzer as EnhancedMarketAnalyzer
@@ -14,12 +21,6 @@ except ImportError:
     from ..core.analyzers import MarketAnalyzer
     logger.warning("Enhanced analyzer not available, falling back to basic analyzer")
     EnhancedMarketAnalyzer = MarketAnalyzer
-from ..core.models import MarketAnalysisResult, TradingRecommendation
-from ..core.redis_client import RedisDataStore
-from ..utils.ai_client import DeepSeekClient
-from ..utils.config import Settings
-
-logger = logging.getLogger(__name__)
 
 
 class AnalyzerAgent:

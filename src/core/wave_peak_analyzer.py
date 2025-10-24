@@ -6,11 +6,7 @@ methods to identify significant price levels in order book data.
 
 import logging
 import math
-from collections import defaultdict
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
-
-from .models import DepthLevel
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +21,9 @@ class WavePeak:
         price_range_width: Decimal,
         z_score: float,
         confidence: float,
-        bid_volume: Decimal = Decimal('0'),
-        ask_volume: Decimal = Decimal('0'),
-        peak_type: str = 'unknown'
+        bid_volume: Decimal = Decimal("0"),
+        ask_volume: Decimal = Decimal("0"),
+        peak_type: str = "unknown",
     ):
         """Initialize wave peak information."""
         self.center_price = center_price
@@ -50,16 +46,16 @@ class WavePeak:
     def to_dict(self) -> dict:
         """Convert wave peak to dictionary representation."""
         return {
-            'center_price': float(self.center_price),
-            'volume': float(self.volume),
-            'price_range_width': float(self.price_range_width),
-            'z_score': self.z_score,
-            'confidence': self.confidence,
-            'bid_volume': float(self.bid_volume),
-            'ask_volume': float(self.ask_volume),
-            'peak_type': self.peak_type,
-            'lower_price': float(self.center_price - self.price_range_width / 2),
-            'upper_price': float(self.center_price + self.price_range_width / 2),
+            "center_price": float(self.center_price),
+            "volume": float(self.volume),
+            "price_range_width": float(self.price_range_width),
+            "z_score": self.z_score,
+            "confidence": self.confidence,
+            "bid_volume": float(self.bid_volume),
+            "ask_volume": float(self.ask_volume),
+            "peak_type": self.peak_type,
+            "lower_price": float(self.center_price - self.price_range_width / 2),
+            "upper_price": float(self.center_price + self.price_range_width / 2),
         }
 
 
@@ -73,7 +69,7 @@ class PriceZone:
         zone_type: str,
         confidence: float,
         total_volume: Decimal,
-        bid_ask_ratio: float = 1.0
+        bid_ask_ratio: float = 1.0,
     ):
         """Initialize price zone information."""
         self.lower_price = lower_price
@@ -82,7 +78,7 @@ class PriceZone:
         self.confidence = confidence
         self.total_volume = total_volume
         self.bid_ask_ratio = bid_ask_ratio
-        self.center_price = (lower_price + upper_price) / Decimal('2')
+        self.center_price = (lower_price + upper_price) / Decimal("2")
         self.width = upper_price - lower_price
 
     def __repr__(self) -> str:
@@ -94,11 +90,11 @@ class PriceZone:
 
 
 def detect_normal_distribution_peaks(
-    price_volume_data: Dict[Decimal, Decimal],
-    min_peak_volume: Decimal = Decimal('5.0'),
+    price_volume_data: dict[Decimal, Decimal],
+    min_peak_volume: Decimal = Decimal("5.0"),
     z_score_threshold: float = 1.5,
-    min_peak_confidence: float = 0.3
-) -> List[WavePeak]:
+    min_peak_confidence: float = 0.3,
+) -> list[WavePeak]:
     """
     Detect wave peaks using normal distribution analysis.
 
@@ -113,10 +109,63 @@ def detect_normal_distribution_peaks(
 
     Returns:
         List of WavePeak objects ordered by volume (descending)
+
+    Raises:
+        TypeError: If inputs are not in expected format
+        ValueError: If parameters contain invalid values
     """
+    # Input validation
+    if not isinstance(price_volume_data, dict):
+        raise TypeError(
+            f"price_volume_data must be a dict, got {type(price_volume_data).__name__}"
+        )
+
     if not price_volume_data:
         logger.warning("Empty price volume data provided to peak detection")
         return []
+
+    if not isinstance(min_peak_volume, Decimal):
+        raise TypeError(
+            f"min_peak_volume must be a Decimal, got {type(min_peak_volume).__name__}"
+        )
+
+    if min_peak_volume <= 0:
+        raise ValueError(f"min_peak_volume must be positive, got {min_peak_volume}")
+
+    if not isinstance(z_score_threshold, (int, float)):
+        raise TypeError(
+            f"z_score_threshold must be numeric, got {type(z_score_threshold).__name__}"
+        )
+
+    if z_score_threshold <= 0:
+        raise ValueError(f"z_score_threshold must be positive, got {z_score_threshold}")
+
+    if not isinstance(min_peak_confidence, (int, float)):
+        raise TypeError(
+            f"min_peak_confidence must be numeric, got {type(min_peak_confidence).__name__}"
+        )
+
+    if not (0 <= min_peak_confidence <= 1):
+        raise ValueError(
+            f"min_peak_confidence must be between 0 and 1, got {min_peak_confidence}"
+        )
+
+    # Validate data types in price_volume_data
+    for price, volume in price_volume_data.items():
+        if not isinstance(price, Decimal):
+            raise TypeError(
+                f"price must be Decimal, got {type(price).__name__} at key {price}"
+            )
+        if not isinstance(volume, Decimal):
+            raise TypeError(
+                f"volume must be Decimal, got {type(volume).__name__} for price {price}"
+            )
+        if price <= 0:
+            raise ValueError(f"price must be positive, got {price}")
+        if volume < 0:
+            raise ValueError(
+                f"volume cannot be negative, got {volume} for price {price}"
+            )
 
     logger.info(f"Detecting peaks in {len(price_volume_data)} price levels")
 
@@ -149,19 +198,25 @@ def detect_normal_distribution_peaks(
             current_price = Decimal(str(prices[i]))
             current_volume = Decimal(str(volumes[i]))
 
-            prev_price = Decimal(str(prices[i-1]))
-            prev_volume = Decimal(str(volumes[i-1]))
-            next_price = Decimal(str(prices[i+1]))
-            next_volume = Decimal(str(volumes[i+1]))
+            prev_volume = Decimal(str(volumes[i - 1]))
+            next_volume = Decimal(str(volumes[i + 1]))
 
             # Check if current point is a local maximum
-            is_local_peak = current_volume > prev_volume and current_volume > next_volume
+            is_local_peak = (
+                current_volume > prev_volume and current_volume > next_volume
+            )
 
             # Calculate Z-score for statistical significance
-            z_score = abs(float(current_price - Decimal(str(mean_price))) / std_price) if std_price > 0 else 0
+            z_score = (
+                abs(float(current_price - Decimal(str(mean_price))) / std_price)
+                if std_price > 0
+                else 0
+            )
 
             # Calculate confidence based on Z-score
-            confidence = min(z_score / z_score_threshold, 1.0) if z_score_threshold > 0 else 1.0
+            confidence = (
+                min(z_score / z_score_threshold, 1.0) if z_score_threshold > 0 else 1.0
+            )
             confidence = max(confidence, min_peak_confidence)
 
             if is_local_peak and confidence >= min_peak_confidence:
@@ -174,7 +229,7 @@ def detect_normal_distribution_peaks(
                     price_range_width=price_range_width,
                     z_score=z_score,
                     confidence=confidence,
-                    peak_type='statistical_peak'
+                    peak_type="statistical_peak",
                 )
                 peaks.append(peak)
                 logger.debug(f"Peak detected: {peak}")
@@ -191,10 +246,10 @@ def detect_normal_distribution_peaks(
 
 
 def detect_volume_based_peaks(
-    price_volume_data: Dict[Decimal, Decimal],
+    price_volume_data: dict[Decimal, Decimal],
     min_relative_volume: float = 2.0,
-    min_absolume: Decimal = Decimal('10.0')
-) -> List[WavePeak]:
+    min_absolume: Decimal = Decimal("10.0"),
+) -> list[WavePeak]:
     """
     Detect peaks based on volume concentration analysis.
 
@@ -217,16 +272,27 @@ def detect_volume_based_peaks(
 
     for i in range(1, len(sorted_items) - 1):
         current_price, current_volume = sorted_items[i]
-        prev_price, prev_volume = sorted_items[i-1]
-        next_price, next_volume = sorted_items[i+1]
+        prev_price, prev_volume = sorted_items[i - 1]
+        next_price, next_volume = sorted_items[i + 1]
 
         # Check volume significance
         avg_neighbor_volume = (prev_volume + next_volume) / 2
-        relative_volume_ratio = float(current_volume / avg_neighbor_volume) if avg_neighbor_volume > 0 else 0
+        relative_volume_ratio = (
+            float(current_volume / avg_neighbor_volume)
+            if avg_neighbor_volume > 0
+            else 0
+        )
 
-        if current_volume >= min_absolume and relative_volume_ratio >= min_relative_volume:
+        if (
+            current_volume >= min_absolume
+            and relative_volume_ratio >= min_relative_volume
+        ):
             # Estimate price range width based on local density
-            price_spread = abs(next_price - prev_price) / 2 if i < len(sorted_items) - 1 else abs(current_price - prev_price)
+            price_spread = (
+                abs(next_price - prev_price) / 2
+                if i < len(sorted_items) - 1
+                else abs(current_price - prev_price)
+            )
             price_range_width = Decimal(str(price_spread * 4))  # Estimate range width
 
             # Calculate confidence based on volume significance
@@ -238,7 +304,7 @@ def detect_volume_based_peaks(
                 price_range_width=price_range_width,
                 z_score=0.0,  # Not calculated for volume-based detection
                 confidence=confidence,
-                peak_type='volume_concentration'
+                peak_type="volume_concentration",
             )
             peaks.append(peak)
 
@@ -248,10 +314,10 @@ def detect_volume_based_peaks(
 
 
 def analyze_wave_formation(
-    peaks: List[WavePeak],
-    min_peak_distance: Decimal = Decimal('5.0'),
-    max_price_range: Decimal = Decimal('50.0')
-) -> List[PriceZone]:
+    peaks: list[WavePeak],
+    min_peak_distance: Decimal = Decimal("5.0"),
+    max_price_range: Decimal = Decimal("50.0"),
+) -> list[PriceZone]:
     """
     Analyze wave peaks to identify price zones and wave formation.
 
@@ -295,15 +361,21 @@ def analyze_wave_formation(
         if len(zone_peaks) >= 2:
             min_price = min(peak.center_price for peak in zone_peaks)
             max_price = max(peak.center_price for peak in zone_peaks)
-            avg_confidence = sum(peak.confidence for peak in zone_peaks) / len(zone_peaks)
+            avg_confidence = sum(peak.confidence for peak in zone_peaks) / len(
+                zone_peaks
+            )
             avg_volume = zone_volume / len(zone_peaks)
 
             # Determine zone type based on volume distribution
             bid_volume = sum(peak.bid_volume for peak in zone_peaks)
             ask_volume = sum(peak.ask_volume for peak in zone_peaks)
-            bid_ask_ratio = float(bid_volume / (ask_volume + Decimal('0.01'))) if ask_volume > 0 else 1.0
+            bid_ask_ratio = (
+                float(bid_volume / (ask_volume + Decimal("0.01")))
+                if ask_volume > 0
+                else 1.0
+            )
 
-            zone_type = 'resistance' if ask_volume > bid_volume else 'support'
+            zone_type = "resistance" if ask_volume > bid_volume else "support"
 
             zone = PriceZone(
                 lower_price=min_price,
@@ -311,11 +383,13 @@ def analyze_wave_formation(
                 zone_type=zone_type,
                 confidence=avg_confidence,
                 total_volume=avg_volume,
-                bid_ask_ratio=bid_ask_ratio
+                bid_ask_ratio=bid_ask_ratio,
             )
             zones.append(zone)
 
-            logger.debug(f"Created {zone_type} zone: {zone.lower_price}-{zone.upper_price}")
+            logger.debug(
+                f"Created {zone_type} zone: {zone.lower_price}-{zone.upper_price}"
+            )
 
         i += 1
 
@@ -326,7 +400,9 @@ def analyze_wave_formation(
     return zones
 
 
-def _calculate_weighted_statistics(prices: List[float], volumes: List[float]) -> Tuple[float, float]:
+def _calculate_weighted_statistics(
+    prices: list[float], volumes: list[float]
+) -> tuple[float, float]:
     """
     Calculate weighted mean and standard deviation.
 
@@ -346,20 +422,27 @@ def _calculate_weighted_statistics(prices: List[float], volumes: List[float]) ->
         return 0.0, 0.0
 
     # Calculate weighted mean
-    weighted_mean = sum(p * v for p, v in zip(prices, volumes)) / total_volume
+    weighted_mean = (
+        sum(p * v for p, v in zip(prices, volumes, strict=True)) / total_volume
+    )
 
     # Calculate weighted variance and standard deviation
-    weighted_variance = sum(v * ((p - weighted_mean) ** 2) for p, v in zip(prices, volumes)) / total_volume
+    weighted_variance = (
+        sum(
+            v * ((p - weighted_mean) ** 2) for p, v in zip(prices, volumes, strict=True)
+        )
+        / total_volume
+    )
     weighted_std = math.sqrt(weighted_variance)
 
     return weighted_mean, weighted_std
 
 
 def detect_combined_peaks(
-    price_volume_data: Dict[Decimal, Decimal],
-    statistical_params: Optional[Dict] = None,
-    volume_params: Optional[Dict] = None
-) -> List[WavePeak]:
+    price_volume_data: dict[Decimal, Decimal],
+    statistical_params: dict[str, float] | None = None,
+    volume_params: dict[str, float] | None = None,
+) -> list[WavePeak]:
     """
     Detect peaks using combined statistical and volume-based methods.
 
@@ -374,19 +457,18 @@ def detect_combined_peaks(
     # Use default parameters if not provided
     if statistical_params is None:
         statistical_params = {
-            'min_peak_volume': 5.0,
-            'z_score_threshold': 1.5,
-            'min_peak_confidence': 0.3
+            "min_peak_volume": Decimal("5.0"),
+            "z_score_threshold": 1.5,
+            "min_peak_confidence": 0.3,
         }
 
     if volume_params is None:
-        volume_params = {
-            'min_relative_volume': 2.0,
-            'min_absolume': 10.0
-        }
+        volume_params = {"min_relative_volume": 2.0, "min_absolume": Decimal("10.0")}
 
     # Detect peaks using both methods
-    statistical_peaks = detect_normal_distribution_peaks(price_volume_data, **statistical_params)
+    statistical_peaks = detect_normal_distribution_peaks(
+        price_volume_data, **statistical_params
+    )
     volume_peaks = detect_volume_based_peaks(price_volume_data, **volume_params)
 
     # Combine and deduplicate peaks (within 2% price range)
@@ -402,16 +484,18 @@ def detect_combined_peaks(
     # Sort by volume and confidence
     all_peaks.sort(key=lambda x: (x.volume, x.confidence), reverse=True)
 
-    logger.info(f"Combined peak detection: {len(statistical_peaks)} statistical, {len(volume_peaks)} volume-based, {len(all_peaks)} unique peaks")
+    logger.info(
+        f"Combined peak detection: {len(statistical_peaks)} statistical, {len(volume_peaks)} volume-based, {len(all_peaks)} unique peaks"
+    )
 
     return all_peaks
 
 
 def validate_peak_detection_quality(
     original_levels: int,
-    detected_peaks: List[WavePeak],
-    price_volume_data: Dict[Decimal, Decimal]
-) -> Dict[str, float]:
+    detected_peaks: list[WavePeak],
+    price_volume_data: dict[Decimal, Decimal],
+) -> dict[str, float]:
     """
     Validate the quality of peak detection results.
 
@@ -427,25 +511,37 @@ def validate_peak_detection_quality(
     total_peak_volume = sum(peak.volume for peak in detected_peaks)
 
     # Calculate preservation rate
-    volume_preservation_rate = float(total_peak_volume / (total_original_volume + Decimal('0.01'))) if total_original_volume > 0 else 0
+    volume_preservation_rate = (
+        float(total_peak_volume / (total_original_volume + Decimal("0.01")))
+        if total_original_volume > 0
+        else 0
+    )
 
     # Calculate compression ratio
     compression_ratio = original_levels / len(detected_peaks) if detected_peaks else 0
 
     # Calculate average confidence
-    avg_confidence = sum(peak.confidence for peak in detected_peaks) / len(detected_peaks) if detected_peaks else 0
+    avg_confidence = (
+        sum(peak.confidence for peak in detected_peaks) / len(detected_peaks)
+        if detected_peaks
+        else 0
+    )
 
     # Calculate coverage (how many significant levels were captured)
-    significant_volume_levels = len([v for v in price_volume_data.values() if v >= 5.0])
-    coverage_rate = len(detected_peaks) / significant_volume_levels if significant_volume_levels > 0 else 0
+    significant_volume_levels = len([v for v in price_volume_data.values() if v >= Decimal("5.0")])
+    coverage_rate = (
+        len(detected_peaks) / significant_volume_levels
+        if significant_volume_levels > 0
+        else 0
+    )
 
     quality_metrics = {
-        'volume_preservation_rate': volume_preservation_rate,
-        'compression_ratio': compression_ratio,
-        'avg_confidence': avg_confidence,
-        'coverage_rate': coverage_rate,
-        'peak_count': len(detected_peaks),
-        'significant_levels_count': significant_volume_levels,
+        "volume_preservation_rate": volume_preservation_rate,
+        "compression_ratio": compression_ratio,
+        "avg_confidence": avg_confidence,
+        "coverage_rate": coverage_rate,
+        "peak_count": len(detected_peaks),
+        "significant_levels_count": significant_volume_levels,
     }
 
     logger.info(f"Peak detection quality: {quality_metrics}")

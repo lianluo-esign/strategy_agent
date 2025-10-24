@@ -81,7 +81,7 @@ class BinanceAPIClient:
 
     def _parse_depth_snapshot(self, data: dict, symbol: str) -> DepthSnapshot:
         """Parse depth snapshot from API response."""
-        timestamp = datetime.fromtimestamp(data['lastUpdateId'] / 1000)
+        timestamp = datetime.now()  # Use current time since Binance depth API doesn't provide timestamp
 
         bids = [DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
                 for price, qty in data['bids']]

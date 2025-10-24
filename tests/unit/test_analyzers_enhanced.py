@@ -3,22 +3,22 @@
 Tests the enhanced market analyzer with 1-dollar precision aggregation and wave peak detection.
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Dict
+
+import pytest
 
 from src.core.analyzers_enhanced import EnhancedMarketAnalyzer
 from src.core.models import (
-    DepthSnapshot,
     DepthLevel,
-    MinuteTradeData,
-    Trade,
-    MarketAnalysisResult,
+    DepthSnapshot,
     EnhancedMarketAnalysisResult,
-    WavePeak,
+    MarketAnalysisResult,
+    MinuteTradeData,
     PriceZone,
     SupportResistanceLevel,
+    Trade,
+    WavePeak,
 )
 
 
@@ -60,7 +60,7 @@ class TestEnhancedMarketAnalyzer:
         )
 
     @pytest.fixture
-    def sample_trade_data(self) -> List[MinuteTradeData]:
+    def sample_trade_data(self) -> list[MinuteTradeData]:
         """Create sample trade data for testing."""
         trade_data_list = []
 
@@ -496,8 +496,9 @@ class TestEnhancedAnalyzerEdgeCases:
     def test_analysis_memory_usage(self, analyzer):
         """Test that analysis doesn't leak memory."""
         import gc
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss

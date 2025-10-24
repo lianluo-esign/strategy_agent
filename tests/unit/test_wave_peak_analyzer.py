@@ -3,20 +3,19 @@
 Tests the statistical wave peak detection algorithms and price zone analysis.
 """
 
-import pytest
-import math
 from decimal import Decimal
-from typing import List, Dict
+
+import pytest
 
 from src.core.wave_peak_analyzer import (
-    WavePeak,
     PriceZone,
-    detect_normal_distribution_peaks,
-    detect_volume_based_peaks,
+    WavePeak,
+    _calculate_weighted_statistics,
     analyze_wave_formation,
     detect_combined_peaks,
+    detect_normal_distribution_peaks,
+    detect_volume_based_peaks,
     validate_peak_detection_quality,
-    _calculate_weighted_statistics,
 )
 
 
@@ -153,7 +152,7 @@ class TestDetectNormalDistributionPeaks:
     """Test cases for normal distribution peak detection."""
 
     @pytest.fixture
-    def sample_price_volume_data(self) -> Dict[Decimal, Decimal]:
+    def sample_price_volume_data(self) -> dict[Decimal, Decimal]:
         """Create sample price-volume data with clear peaks."""
         return {
             Decimal('95'): Decimal('5.0'),   # Low volume
@@ -235,7 +234,7 @@ class TestDetectVolumeBasedPeaks:
     """Test cases for volume-based peak detection."""
 
     @pytest.fixture
-    def volume_spike_data(self) -> Dict[Decimal, Decimal]:
+    def volume_spike_data(self) -> dict[Decimal, Decimal]:
         """Create data with clear volume spikes."""
         return {
             Decimal('100'): Decimal('5.0'),   # Low volume
@@ -304,7 +303,7 @@ class TestAnalyzeWaveFormation:
     """Test cases for wave formation analysis."""
 
     @pytest.fixture
-    def sample_peaks(self) -> List[WavePeak]:
+    def sample_peaks(self) -> list[WavePeak]:
         """Create sample wave peaks for formation analysis."""
         return [
             WavePeak(Decimal('100.0'), Decimal('50.0'), Decimal('2.0'), 1.5, 0.8),
@@ -368,7 +367,7 @@ class TestDetectCombinedPeaks:
     """Test cases for combined peak detection."""
 
     @pytest.fixture
-    def complex_price_volume_data(self) -> Dict[Decimal, Decimal]:
+    def complex_price_volume_data(self) -> dict[Decimal, Decimal]:
         """Create complex data suitable for both detection methods."""
         return {
             Decimal('90'): Decimal('5.0'),

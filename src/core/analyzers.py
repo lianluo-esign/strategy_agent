@@ -13,21 +13,19 @@ from .models import (
     SupportResistanceLevel,
 )
 
+logger = logging.getLogger(__name__)
+
 # Import new modules
 try:
     from .price_aggregator import (
         aggregate_depth_by_one_dollar,
         calculate_depth_statistics,
-        identify_liquidity_clusters,
-        convert_to_depth_levels,
         validate_aggregation_quality,
     )
     from .wave_peak_analyzer import (
-        detect_combined_peaks,
         analyze_wave_formation,
+        detect_combined_peaks,
         validate_peak_detection_quality,
-        WavePeak,
-        PriceZone,
     )
 except ImportError as e:
     logger.warning(f"Could not import enhanced analyzer modules: {e}")
@@ -35,19 +33,8 @@ except ImportError as e:
     from .price_aggregator import (
         aggregate_depth_by_one_dollar,
         calculate_depth_statistics,
-    identify_liquidity_clusters,
-        convert_to_depth_levels,
         validate_aggregation_quality,
     )
-    from .wave_peak_analyzer import (
-        detect_combined_peaks,
-        analyze_wave_formation,
-        validate_peak_detection_quality,
-        WavePeak,
-        PriceZone,
-    )
-
-logger = logging.getLogger(__name__)
 
 
 def _to_decimal(value: int | float | str | Decimal) -> Decimal:
@@ -73,8 +60,7 @@ def _to_decimal(value: int | float | str | Decimal) -> Decimal:
 
 
 def _safe_decimal_division(
-    numerator: Decimal,
-    denominator: Decimal | int | float
+    numerator: Decimal, denominator: Decimal | int | float
 ) -> Decimal:
     """Safely divide Decimal by a numeric denominator.
 
@@ -101,15 +87,15 @@ def _safe_decimal_division(
 class DepthSnapshotAnalyzer:
     """Analyzes depth snapshots to identify support and resistance levels."""
 
-    def __init__(self, min_volume_threshold: float = 0.1, price_zone_size: float = 0.50):
+    def __init__(
+        self, min_volume_threshold: float = 0.1, price_zone_size: float = 0.50
+    ):
         """Initialize the depth analyzer."""
         self.min_volume_threshold = min_volume_threshold
         self.price_zone_size = Decimal(str(price_zone_size))
 
     def analyze_support_resistance(
-        self,
-        snapshot: DepthSnapshot,
-        lookback_levels: int = 100
+        self, snapshot: DepthSnapshot, lookback_levels: int = 100
     ) -> tuple[list[SupportResistanceLevel], list[SupportResistanceLevel]]:
         """Analyze depth snapshot to identify support and resistance levels."""
         support_levels = []
@@ -119,23 +105,20 @@ class DepthSnapshotAnalyzer:
         if len(snapshot.bids) > 0:
             bid_levels = snapshot.bids[:lookback_levels]  # Top N bid levels
             support_levels = self._find_significant_levels(
-                bid_levels, 'support', snapshot.symbol
+                bid_levels, "support", snapshot.symbol
             )
 
         # Analyze ask side (resistance)
         if len(snapshot.asks) > 0:
             ask_levels = snapshot.asks[:lookback_levels]  # Top N ask levels
             resistance_levels = self._find_significant_levels(
-                ask_levels, 'resistance', snapshot.symbol
+                ask_levels, "resistance", snapshot.symbol
             )
 
         return support_levels, resistance_levels
 
     def _find_significant_levels(
-        self,
-        levels: list,
-        level_type: str,
-        symbol: str
+        self, levels: list, level_type: str, symbol: str
     ) -> list[SupportResistanceLevel]:
         """Find significant support/resistance levels from order book data."""
         significant_levels = []
@@ -157,7 +140,9 @@ class DepthSnapshotAnalyzer:
                 continue
 
             # Calculate strength based on volume concentration
-            strength = min(float(zone_volume / total_volume) * 10, 1.0)  # Normalize to 0-1
+            strength = min(
+                float(zone_volume / total_volume) * 10, 1.0
+            )  # Normalize to 0-1
 
             if strength > 0.1:  # Only include levels with meaningful strength
                 level = SupportResistanceLevel(
@@ -166,16 +151,14 @@ class DepthSnapshotAnalyzer:
                     level_type=level_type,
                     volume_at_level=zone_volume,
                     confirmation_count=1,  # Initial confirmation
-                    last_confirmed=datetime.now()
+                    last_confirmed=datetime.now(),
                 )
                 significant_levels.append(level)
 
         return sorted(significant_levels, key=lambda x: x.strength, reverse=True)
 
     def _group_by_price_zones(
-        self,
-        levels: list,
-        zone_size: Decimal
+        self, levels: list, zone_size: Decimal
     ) -> dict[Decimal, list]:
         """Group order book levels by price zones."""
         zones = defaultdict(list)
@@ -190,7 +173,7 @@ class DepthSnapshotAnalyzer:
     def identify_liquidity_vacuum_zones(
         self,
         snapshot: DepthSnapshot,
-        price_range: tuple[Decimal, Decimal] | None = None
+        price_range: tuple[Decimal, Decimal] | None = None,
     ) -> list[Decimal]:
         """Identify price ranges with low liquidity (vacuum zones)."""
         if price_range is None:
@@ -207,8 +190,10 @@ class DepthSnapshotAnalyzer:
         if not all_levels:
             return vacuum_zones
 
-        avg_volume = sum(level.quantity for level in all_levels) / Decimal(str(len(all_levels)))
-        low_volume_threshold = avg_volume * Decimal('0.1')  # 10% of average volume
+        avg_volume = sum(level.quantity for level in all_levels) / Decimal(
+            str(len(all_levels))
+        )
+        low_volume_threshold = avg_volume * Decimal("0.1")  # 10% of average volume
 
         # Scan for low volume areas
         # This is a simplified implementation - in practice, you'd want more sophisticated detection
@@ -218,10 +203,14 @@ class DepthSnapshotAnalyzer:
 
             # Check price gap and low volume
             price_gap = abs(next_level.price - current_level.price)
-            if price_gap > Decimal('1.0'):  # $1+ gap
-                avg_gap_volume = (current_level.quantity + next_level.quantity) / Decimal('2')
+            if price_gap > Decimal("1.0"):  # $1+ gap
+                avg_gap_volume = (
+                    current_level.quantity + next_level.quantity
+                ) / Decimal("2")
                 if avg_gap_volume < low_volume_threshold:
-                    vacuum_zones.append((current_level.price + next_level.price) / Decimal('2'))
+                    vacuum_zones.append(
+                        (current_level.price + next_level.price) / Decimal("2")
+                    )
 
         return vacuum_zones
 
@@ -237,8 +226,10 @@ class OrderFlowAnalyzer:
         self,
         trade_data_list: list[MinuteTradeData],
         support_levels: list[SupportResistanceLevel],
-        resistance_levels: list[SupportResistanceLevel]
-    ) -> tuple[list[SupportResistanceLevel], list[SupportResistanceLevel], list[Decimal]]:
+        resistance_levels: list[SupportResistanceLevel],
+    ) -> tuple[
+        list[SupportResistanceLevel], list[SupportResistanceLevel], list[Decimal]
+    ]:
         """Analyze order flow to confirm levels and find POCs."""
         if not trade_data_list:
             return support_levels, resistance_levels, []
@@ -248,10 +239,10 @@ class OrderFlowAnalyzer:
 
         # Confirm support/resistance levels with order flow
         confirmed_support = self._confirm_levels_with_order_flow(
-            support_levels, trade_data_list, 'support'
+            support_levels, trade_data_list, "support"
         )
         confirmed_resistance = self._confirm_levels_with_order_flow(
-            resistance_levels, trade_data_list, 'resistance'
+            resistance_levels, trade_data_list, "resistance"
         )
 
         return confirmed_support, confirmed_resistance, poc_levels
@@ -263,11 +254,14 @@ class OrderFlowAnalyzer:
 
         try:
             for minute_data in trade_data_list:
-                if not hasattr(minute_data, 'price_levels') or not minute_data.price_levels:
+                if (
+                    not hasattr(minute_data, "price_levels")
+                    or not minute_data.price_levels
+                ):
                     continue
 
                 for price_level, level_data in minute_data.price_levels.items():
-                    if not hasattr(level_data, 'total_volume'):
+                    if not hasattr(level_data, "total_volume"):
                         continue
                     # Ensure both price and volume are Decimal
                     price_decimal = _to_decimal(price_level)
@@ -282,7 +276,7 @@ class OrderFlowAnalyzer:
             sorted_levels = sorted(
                 price_volume_map.items(),
                 key=lambda x: float(x[1]),  # Convert to float for comparison
-                reverse=True
+                reverse=True,
             )
 
             top_count = max(1, len(sorted_levels) // 10)  # Top 10%
@@ -298,7 +292,7 @@ class OrderFlowAnalyzer:
         self,
         levels: list[SupportResistanceLevel],
         trade_data_list: list[MinuteTradeData],
-        level_type: str
+        level_type: str,
     ) -> list[SupportResistanceLevel]:
         """Confirm support/resistance levels using order flow data."""
         confirmed_levels = []
@@ -315,7 +309,7 @@ class OrderFlowAnalyzer:
                     level_type=level.level_type,
                     volume_at_level=level.volume_at_level,
                     confirmation_count=level.confirmation_count + 1,
-                    last_confirmed=datetime.now()
+                    last_confirmed=datetime.now(),
                 )
                 confirmed_levels.append(confirmed_level)
 
@@ -325,19 +319,20 @@ class OrderFlowAnalyzer:
         self,
         level: SupportResistanceLevel,
         trade_data_list: list[MinuteTradeData],
-        level_type: str
+        level_type: str,
     ) -> float:
         """Calculate how well order flow confirms a support/resistance level."""
         confirmation_score = 0.0
         relevant_data_count = 0
 
         # Define price tolerance around the level
-        tolerance = Decimal('2.0')  # $2 tolerance
+        tolerance = Decimal("2.0")  # $2 tolerance
 
         for minute_data in trade_data_list:
             # Check if there's trading activity near this level
             nearby_prices = [
-                price for price in minute_data.price_levels.keys()
+                price
+                for price in minute_data.price_levels.keys()
                 if abs(price - level.price) <= tolerance
             ]
 
@@ -352,14 +347,16 @@ class OrderFlowAnalyzer:
 
                 # Handle different data structures (dict vs object)
                 try:
-                    if hasattr(price_data, 'delta'):
+                    if hasattr(price_data, "delta"):
                         delta = price_data.delta
                         total_volume = price_data.total_volume
                     elif isinstance(price_data, dict):
-                        delta = _to_decimal(price_data.get('delta', 0))
-                        total_volume = _to_decimal(price_data.get('total_volume', 0.01))
+                        delta = _to_decimal(price_data.get("delta", 0))
+                        total_volume = _to_decimal(price_data.get("total_volume", 0.01))
                     else:
-                        logger.warning(f"Unexpected price_data type: {type(price_data)}")
+                        logger.warning(
+                            f"Unexpected price_data type: {type(price_data)}"
+                        )
                         continue
 
                     if total_volume <= 0:
@@ -368,14 +365,14 @@ class OrderFlowAnalyzer:
                     # Calculate confirmation contribution (convert to float)
                     confirmation_value = float(abs(delta) / total_volume)
 
-                    if level_type == 'support':
+                    if level_type == "support":
                         # Support should show buying pressure when price approaches
                         if delta > 0:  # More buying than selling
                             level_confirmation += confirmation_value
                         else:
                             level_confirmation -= confirmation_value
 
-                    elif level_type == 'resistance':
+                    elif level_type == "resistance":
                         # Resistance should show selling pressure when price approaches
                         if delta < 0:  # More selling than buying
                             level_confirmation += confirmation_value
@@ -405,7 +402,7 @@ class MarketAnalyzer:
         self,
         min_volume_threshold: float = 0.1,
         analysis_window_minutes: int = 180,
-        enhanced_mode: bool = False
+        enhanced_mode: bool = False,
     ):
         """Initialize the market analyzer."""
         self.depth_analyzer = DepthSnapshotAnalyzer(min_volume_threshold)
@@ -417,35 +414,32 @@ class MarketAnalyzer:
         snapshot: DepthSnapshot | None,
         trade_data_list: list[MinuteTradeData],
         symbol: str = "BTCFDUSD",
-        enhanced_mode: bool = True
+        enhanced_mode: bool = True,
     ) -> MarketAnalysisResult | EnhancedMarketAnalysisResult:
         """Perform comprehensive market analysis."""
         if not snapshot and not trade_data_list:
-            return MarketAnalysisResult(
-                timestamp=datetime.now(),
-                symbol=symbol
-            )
+            return MarketAnalysisResult(timestamp=datetime.now(), symbol=symbol)
 
         try:
             # Initialize enhanced result if in enhanced mode
             if enhanced_mode:
                 result = EnhancedMarketAnalysisResult(
-                    timestamp=datetime.now(),
-                    symbol=symbol
+                    timestamp=datetime.now(), symbol=symbol
                 )
             else:
-                result = MarketAnalysisResult(
-                    timestamp=datetime.now(),
-                    symbol=symbol
-                )
+                result = MarketAnalysisResult(timestamp=datetime.now(), symbol=symbol)
 
             # Step 1: Aggregate depth snapshot by 1-dollar precision
             if snapshot:
                 logger.info("Aggregating depth snapshot by 1-dollar precision")
-                aggregated_bids, aggregated_asks = aggregate_depth_by_one_dollar(snapshot.bids, snapshot.asks)
+                aggregated_bids, aggregated_asks = aggregate_depth_by_one_dollar(
+                    snapshot.bids, snapshot.asks
+                )
 
                 # Calculate aggregation statistics
-                depth_statistics = calculate_depth_statistics(aggregated_bids, aggregated_asks)
+                depth_statistics = calculate_depth_statistics(
+                    aggregated_bids, aggregated_asks
+                )
                 aggregation_quality = validate_aggregation_quality(
                     snapshot.bids, snapshot.asks, aggregated_bids, aggregated_asks
                 )
@@ -465,14 +459,11 @@ class MarketAnalyzer:
                 wave_peaks = detect_combined_peaks(
                     price_volume_data={**aggregated_bids, **aggregated_asks},
                     statistical_params={
-                        'min_peak_volume': 5.0,
-                        'z_score_threshold': 1.5,
-                        'min_peak_confidence': 0.3
+                        "min_peak_volume": Decimal("5.0"),
+                        "z_score_threshold": 1.5,
+                        "min_peak_confidence": 0.3,
                     },
-                    volume_params={
-                        'min_relative_volume': 2.0,
-                        'min_absolume': 10.0
-                    }
+                    volume_params={"min_relative_volume": 2.0, "min_absolume": Decimal("10.0")},
                 )
 
                 result.wave_peaks = wave_peaks
@@ -480,7 +471,11 @@ class MarketAnalyzer:
                 # Analyze wave formation to create price zones
                 if wave_peaks:
                     logger.info("Analyzing wave formation for price zones")
-                    support_zones, resistance_zones = analyze_wave_formation(wave_peaks, {**aggregated_bids, **aggregated_asks})
+                    zones = analyze_wave_formation(wave_peaks)
+
+                    # Split zones into support and resistance
+                    support_zones = [zone for zone in zones if zone.zone_type == "support"]
+                    resistance_zones = [zone for zone in zones if zone.zone_type == "resistance"]
 
                     result.support_zones = support_zones
                     result.resistance_zones = resistance_zones
@@ -490,33 +485,59 @@ class MarketAnalyzer:
 
             # Step 3: Traditional depth analysis (backward compatibility)
             if snapshot:
-                result.support_levels, result.resistance_levels = self.depth_analyzer.analyze_support_resistance(snapshot)
-                result.liquidity_vacuum_zones = self.depth_analyzer.identify_liquidity_vacuum_zones(snapshot)
+                result.support_levels, result.resistance_levels = (
+                    self.depth_analyzer.analyze_support_resistance(snapshot)
+                )
+                result.liquidity_vacuum_zones = (
+                    self.depth_analyzer.identify_liquidity_vacuum_zones(snapshot)
+                )
 
             # Step 4: Order flow analysis (dynamic confirmation)
             if trade_data_list and (result.support_levels or result.resistance_levels):
-                confirmed_support, confirmed_resistance, poc_levels = self.order_flow_analyzer.analyze_order_flow(
-                    trade_data_list, result.support_levels, result.resistance_levels
+                confirmed_support, confirmed_resistance, poc_levels = (
+                    self.order_flow_analyzer.analyze_order_flow(
+                        trade_data_list, result.support_levels, result.resistance_levels
+                    )
                 )
 
                 # Use confirmed levels if available, otherwise fall back to original
                 if enhanced_mode:
-                    result.support_levels = confirmed_support if confirmed_support else result.support_levels
-                    result.resistance_levels = confirmed_resistance if confirmed_resistance else result.resistance_levels
+                    result.support_levels = (
+                        confirmed_support
+                        if confirmed_support
+                        else result.support_levels
+                    )
+                    result.resistance_levels = (
+                        confirmed_resistance
+                        if confirmed_resistance
+                        else result.resistance_levels
+                    )
                     result.poc_levels = poc_levels
                 else:
-                    result.support_levels = confirmed_support if confirmed_support else result.support_levels
-                    result.resistance_levels = confirmed_resistance if confirmed_resistance else result.resistance_levels
+                    result.support_levels = (
+                        confirmed_support
+                        if confirmed_support
+                        else result.support_levels
+                    )
+                    result.resistance_levels = (
+                        confirmed_resistance
+                        if confirmed_resistance
+                        else result.resistance_levels
+                    )
                     result.poc_levels = poc_levels
 
             # Step 5: Find resonance zones (where multiple signals align)
             result.resonance_zones = self._find_resonance_zones(result)
 
             # Step 6: Validate peak detection quality
-            if enhanced_mode and hasattr(result, 'wave_peaks'):
-                original_levels = len(snapshot.bids) + len(snapshot.asks) if snapshot else 0
+            if enhanced_mode and hasattr(result, "wave_peaks"):
+                original_levels = (
+                    len(snapshot.bids) + len(snapshot.asks) if snapshot else 0
+                )
                 peak_detection_quality = validate_peak_detection_quality(
-                    original_levels, result.wave_peaks, {**aggregated_bids, **aggregated_asks}
+                    original_levels,
+                    result.wave_peaks,
+                    {**aggregated_bids, **aggregated_asks},
                 )
                 result.peak_detection_quality = peak_detection_quality
 
@@ -549,7 +570,7 @@ class MarketAnalyzer:
                 resistance_levels=[],
                 resonance_zones=[],
                 liquidity_vacuum_zones=[],
-                poc_levels=[]
+                poc_levels=[],
             )
 
     def _find_resonance_zones(self, result: MarketAnalysisResult) -> list[Decimal]:

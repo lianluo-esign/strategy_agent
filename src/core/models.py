@@ -10,12 +10,13 @@ logger = logging.getLogger(__name__)
 
 # Import classes from other modules for type hints
 if TYPE_CHECKING:
-    from .wave_peak_analyzer import WavePeak, PriceZone
+    from .wave_peak_analyzer import PriceZone, WavePeak
 
 
 @dataclass
 class DepthLevel:
     """Represents a single level in the order book depth."""
+
     price: Decimal
     quantity: Decimal
 
@@ -30,6 +31,7 @@ class DepthLevel:
 @dataclass
 class DepthSnapshot:
     """Represents a complete order book depth snapshot."""
+
     symbol: str
     timestamp: datetime
     bids: list[DepthLevel] = field(default_factory=list)
@@ -55,6 +57,7 @@ class DepthSnapshot:
 @dataclass
 class Trade:
     """Represents a single trade event."""
+
     symbol: str
     price: Decimal
     quantity: Decimal
@@ -73,11 +76,12 @@ class Trade:
 @dataclass
 class PriceLevelData:
     """Aggregated trade data for a specific price level."""
+
     price_level: Decimal
-    buy_volume: Decimal = Decimal('0')
-    sell_volume: Decimal = Decimal('0')
-    total_volume: Decimal = Decimal('0')
-    delta: Decimal = Decimal('0')  # buy_volume - sell_volume
+    buy_volume: Decimal = Decimal("0")
+    sell_volume: Decimal = Decimal("0")
+    total_volume: Decimal = Decimal("0")
+    delta: Decimal = Decimal("0")  # buy_volume - sell_volume
     trade_count: int = 0
 
     def add_trade(self, trade: Trade) -> None:
@@ -97,18 +101,19 @@ class PriceLevelData:
     def to_dict(self) -> dict:
         """Convert to dictionary for Redis storage."""
         return {
-            'price_level': float(self.price_level),
-            'buy_volume': float(self.buy_volume),
-            'sell_volume': float(self.sell_volume),
-            'total_volume': float(self.total_volume),
-            'delta': float(self.delta),
-            'trade_count': self.trade_count
+            "price_level": float(self.price_level),
+            "buy_volume": float(self.buy_volume),
+            "sell_volume": float(self.sell_volume),
+            "total_volume": float(self.total_volume),
+            "delta": float(self.delta),
+            "trade_count": self.trade_count,
         }
 
 
 @dataclass
 class MinuteTradeData:
     """Aggregated trade data for a one-minute interval."""
+
     timestamp: datetime
     price_levels: dict[Decimal, PriceLevelData] = field(default_factory=dict)
     max_price_levels: int = 1000  # Memory limit for price levels
@@ -117,11 +122,13 @@ class MinuteTradeData:
         """Add a trade to the appropriate price level."""
         # Check memory limit
         if len(self.price_levels) >= self.max_price_levels:
-            logger.warning(f"Maximum price levels ({self.max_price_levels}) reached, skipping trade")
+            logger.warning(
+                f"Maximum price levels ({self.max_price_levels}) reached, skipping trade"
+            )
             return
 
         # Round price to $1 precision
-        price_level_key = trade.price.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        price_level_key = trade.price.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
         if price_level_key not in self.price_levels:
             self.price_levels[price_level_key] = PriceLevelData(
@@ -130,10 +137,13 @@ class MinuteTradeData:
 
         self.price_levels[price_level_key].add_trade(trade)
 
-    def cleanup_low_volume_levels(self, min_volume_threshold: Decimal = Decimal('0.001')) -> None:
+    def cleanup_low_volume_levels(
+        self, min_volume_threshold: Decimal = Decimal("0.001")
+    ) -> None:
         """Remove price levels with very low volume to save memory."""
         to_remove = [
-            price for price, data in self.price_levels.items()
+            price
+            for price, data in self.price_levels.items()
             if data.total_volume < min_volume_threshold
         ]
 
@@ -146,16 +156,15 @@ class MinuteTradeData:
     def to_dict(self) -> dict:
         """Convert to dictionary for Redis storage."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'price_levels': {
-                str(k): v.to_dict() for k, v in self.price_levels.items()
-            }
+            "timestamp": self.timestamp.isoformat(),
+            "price_levels": {str(k): v.to_dict() for k, v in self.price_levels.items()},
         }
 
 
 @dataclass
 class SupportResistanceLevel:
     """Represents a support or resistance level."""
+
     price: Decimal
     strength: float  # 0.0 to 1.0
     level_type: str  # 'support' or 'resistance'
@@ -166,42 +175,50 @@ class SupportResistanceLevel:
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
-            'price': float(self.price),
-            'strength': self.strength,
-            'level_type': self.level_type,
-            'volume_at_level': float(self.volume_at_level),
-            'confirmation_count': self.confirmation_count,
-            'last_confirmed': self.last_confirmed.isoformat() if self.last_confirmed else None
+            "price": float(self.price),
+            "strength": self.strength,
+            "level_type": self.level_type,
+            "volume_at_level": float(self.volume_at_level),
+            "confirmation_count": self.confirmation_count,
+            "last_confirmed": self.last_confirmed.isoformat()
+            if self.last_confirmed
+            else None,
         }
 
 
 @dataclass
 class MarketAnalysisResult:
     """Results from market analysis."""
+
     timestamp: datetime
     symbol: str
     support_levels: list[SupportResistanceLevel] = field(default_factory=list)
     resistance_levels: list[SupportResistanceLevel] = field(default_factory=list)
     poc_levels: list[Decimal] = field(default_factory=list)  # Point of Control levels
     liquidity_vacuum_zones: list[Decimal] = field(default_factory=list)
-    resonance_zones: list[Decimal] = field(default_factory=list)  # High-probability zones
+    resonance_zones: list[Decimal] = field(
+        default_factory=list
+    )  # High-probability zones
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'symbol': self.symbol,
-            'support_levels': [level.to_dict() for level in self.support_levels],
-            'resistance_levels': [level.to_dict() for level in self.resistance_levels],
-            'poc_levels': [float(poc) for poc in self.poc_levels],
-            'liquidity_vacuum_zones': [float(zone) for zone in self.liquidity_vacuum_zones],
-            'resonance_zones': [float(zone) for zone in self.resonance_zones]
+            "timestamp": self.timestamp.isoformat(),
+            "symbol": self.symbol,
+            "support_levels": [level.to_dict() for level in self.support_levels],
+            "resistance_levels": [level.to_dict() for level in self.resistance_levels],
+            "poc_levels": [float(poc) for poc in self.poc_levels],
+            "liquidity_vacuum_zones": [
+                float(zone) for zone in self.liquidity_vacuum_zones
+            ],
+            "resonance_zones": [float(zone) for zone in self.resonance_zones],
         }
 
 
 @dataclass
 class TradingRecommendation:
     """Trading recommendation from AI analysis."""
+
     timestamp: datetime
     symbol: str
     action: str  # 'buy', 'sell', 'hold'
@@ -210,10 +227,23 @@ class TradingRecommendation:
     reasoning: str
     risk_level: str  # 'low', 'medium', 'high'
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "symbol": self.symbol,
+            "action": self.action,
+            "price_range": [float(self.price_range[0]), float(self.price_range[1])],
+            "confidence": self.confidence,
+            "reasoning": self.reasoning,
+            "risk_level": self.risk_level,
+        }
+
 
 @dataclass
 class EnhancedMarketAnalysisResult:
     """Enhanced market analysis result with wave peak detection."""
+
     timestamp: datetime
     symbol: str
 
@@ -240,20 +270,24 @@ class EnhancedMarketAnalysisResult:
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'symbol': self.symbol,
-            'aggregated_bids': {str(k): float(v) for k, v in self.aggregated_bids.items()},
-            'aggregated_asks': {str(k): float(v) for k, v in self.aggregated_asks.items()},
-            'wave_peaks': [peak.to_dict() for peak in self.wave_peaks],
-            'support_zones': [zone.to_dict() for zone in self.support_zones],
-            'resistance_zones': [zone.to_dict() for zone in self.resistance_zones],
-            'support_levels': [level.to_dict() for level in self.support_levels],
-            'resistance_levels': [level.to_dict() for level in self.resistance_levels],
-            'poc_levels': [float(poc) for poc in self.poc_levels],
-            'liquidity_vacuum_zones': [float(zone) for zone in self.liquidity_vacuum_zones],
-            'resonance_zones': [float(zone) for zone in self.resonance_zones],
-            'depth_statistics': {k: float(v) for k, v in self.depth_statistics.items()},
-            'peak_detection_quality': self.peak_detection_quality,
+            "timestamp": self.timestamp.isoformat(),
+            "symbol": self.symbol,
+            "aggregated_bids": {
+                str(k): float(v) for k, v in self.aggregated_bids.items()
+            },
+            "aggregated_asks": {
+                str(k): float(v) for k, v in self.aggregated_asks.items()
+            },
+            "wave_peaks": [peak.to_dict() for peak in self.wave_peaks],
+            "support_zones": [zone.to_dict() for zone in self.support_zones],
+            "resistance_zones": [zone.to_dict() for zone in self.resistance_zones],
+            "support_levels": [level.to_dict() for level in self.support_levels],
+            "resistance_levels": [level.to_dict() for level in self.resistance_levels],
+            "poc_levels": [float(poc) for poc in self.poc_levels],
+            "liquidity_vacuum_zones": [
+                float(zone) for zone in self.liquidity_vacuum_zones
+            ],
+            "resonance_zones": [float(zone) for zone in self.resonance_zones],
+            "depth_statistics": {k: float(v) for k, v in self.depth_statistics.items()},
+            "peak_detection_quality": self.peak_detection_quality,
         }
-
-

@@ -230,7 +230,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
             # Check if tools were called
             if "tool_calls" in message and message["tool_calls"]:
                 # Process tool calls
-                tool_results = self._process_tool_calls(message["tool_calls"])
+                self._process_tool_calls(message["tool_calls"])
 
                 # Get final recommendation from content
                 if message.get("content"):

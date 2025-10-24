@@ -3,25 +3,25 @@
 Tests the 1-dollar precision aggregation algorithms and depth analysis functionality.
 """
 
-import pytest
 from decimal import Decimal
-from typing import List, Dict
 
+import pytest
+
+from src.core.models import DepthLevel
 from src.core.price_aggregator import (
     aggregate_depth_by_one_dollar,
     calculate_depth_statistics,
-    identify_liquidity_clusters,
     convert_to_depth_levels,
+    identify_liquidity_clusters,
     validate_aggregation_quality,
 )
-from src.core.models import DepthLevel
 
 
 class TestAggregateDepthByOneDollar:
     """Test cases for 1-dollar precision depth aggregation."""
 
     @pytest.fixture
-    def sample_bids(self) -> List[DepthLevel]:
+    def sample_bids(self) -> list[DepthLevel]:
         """Create sample bid data for testing."""
         return [
             DepthLevel(price=Decimal('99.50'), quantity=Decimal('10.0')),
@@ -32,7 +32,7 @@ class TestAggregateDepthByOneDollar:
         ]
 
     @pytest.fixture
-    def sample_asks(self) -> List[DepthLevel]:
+    def sample_asks(self) -> list[DepthLevel]:
         """Create sample ask data for testing."""
         return [
             DepthLevel(price=Decimal('100.10'), quantity=Decimal('8.0')),
@@ -111,7 +111,7 @@ class TestCalculateDepthStatistics:
     """Test cases for depth statistics calculation."""
 
     @pytest.fixture
-    def sample_aggregated_data(self) -> Dict[Decimal, Decimal]:
+    def sample_aggregated_data(self) -> dict[Decimal, Decimal]:
         """Create sample aggregated depth data."""
         return {
             Decimal('99'): Decimal('50.0'),
