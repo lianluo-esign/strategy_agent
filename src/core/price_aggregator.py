@@ -125,102 +125,63 @@ def calculate_depth_statistics(aggregated_bids: Dict[Decimal, Decimal], aggregat
 
 
 def identify_liquidity_clusters(
-    aggregated_bids: Dict[Decimal, Decimal],
-    aggregated_asks: Dict[Decimal, Decimal],
+    price_volume_data: Dict[Decimal, Decimal],
     min_cluster_volume: Decimal = Decimal('10.0')
-) -> Dict[str, List[Dict[str, Decimal]]]:
+) -> List[Dict[str, Decimal]]:
     """
     Identify high-liquidity clusters in aggregated depth data.
 
     Args:
-        aggregated_bids: Aggregated bid data
-        aggregated_asks: Aggregated ask data
+        price_volume_data: Aggregated price-volume data
         min_cluster_volume: Minimum volume to qualify as a cluster
 
     Returns:
-        Dictionary with 'bid_clusters' and 'ask_clusters' keys,
-        each containing a list of cluster data
+        List of cluster data dictionaries
     """
-    bid_clusters = []
-    ask_clusters = []
+    clusters = []
 
-    # Analyze bid clusters
-    if aggregated_bids:
-        sorted_bids = sorted(aggregated_bids.items(), key=lambda x: x[1], reverse=True)
+    if not price_volume_data:
+        return clusters
 
-        # Find contiguous price ranges with significant volume
-        i = 0
-        while i < len(sorted_bids):
-            price, volume = sorted_bids[i]
+    # Sort by volume (descending) to find most significant areas first
+    sorted_data = sorted(price_volume_data.items(), key=lambda x: x[1], reverse=True)
 
-            if volume >= min_cluster_volume:
-                cluster_start = i
-                cluster_end = i
-                cluster_volume = volume
+    # Find contiguous price ranges with significant volume
+    i = 0
+    while i < len(sorted_data):
+        price, volume = sorted_data[i]
 
-                # Extend cluster while volume remains significant
-                for j in range(i + 1, len(sorted_bids)):
-                    next_price, next_volume = sorted_bids[j]
-                    # Check if still in reasonable price range (within $5)
-                    if next_price <= price + Decimal('5') and next_volume >= min_cluster_volume / Decimal('2'):
-                        cluster_end = j
-                        cluster_volume += next_volume
-                    else:
-                        break
+        if volume >= min_cluster_volume:
+            cluster_start = i
+            cluster_end = i
+            cluster_volume = volume
 
-                if cluster_end - cluster_start >= 1:  # At least 2 price levels
-                    bid_clusters.append({
-                        'start_price': sorted_bids[cluster_start][0],
-                        'end_price': sorted_bids[cluster_end][0],
-                        'total_volume': cluster_volume,
-                        'price_levels': cluster_end - cluster_start + 1,
-                        'center_price': (sorted_bids[cluster_start][0] + sorted_bids[cluster_end][0]) / Decimal('2'),
-                    })
+            # Extend cluster while volume remains significant
+            for j in range(i + 1, len(sorted_data)):
+                next_price, next_volume = sorted_data[j]
+                # Check if still in reasonable price range (within $5)
+                if abs(next_price - price) <= Decimal('5') and next_volume >= min_cluster_volume / Decimal('2'):
+                    cluster_end = j
+                    cluster_volume += next_volume
+                else:
+                    break
 
-                i = cluster_end + 1
-            else:
-                i += 1
+            if cluster_end - cluster_start >= 1:  # At least 2 price levels
+                cluster = {
+                    'start_price': sorted_data[cluster_start][0],
+                    'end_price': sorted_data[cluster_end][0],
+                    'total_volume': cluster_volume,
+                    'price_levels': cluster_end - cluster_start + 1,
+                    'center_price': (sorted_data[cluster_start][0] + sorted_data[cluster_end][0]) / Decimal('2'),
+                }
+                clusters.append(cluster)
 
-    # Analyze ask clusters (similar logic)
-    if aggregated_asks:
-        sorted_asks = sorted(aggregated_asks.items(), key=lambda x: x[1], reverse=True)
+            i = cluster_end + 1
+        else:
+            i += 1
 
-        i = 0
-        while i < len(sorted_asks):
-            price, volume = sorted_asks[i]
-
-            if volume >= min_cluster_volume:
-                cluster_start = i
-                cluster_end = i
-                cluster_volume = volume
-
-                for j in range(i + 1, len(sorted_asks)):
-                    next_price, next_volume = sorted_asks[j]
-                    if next_price <= price + Decimal('5') and next_volume >= min_cluster_volume / Decimal('2'):
-                        cluster_end = j
-                        cluster_volume += next_volume
-                    else:
-                        break
-
-                if cluster_end - cluster_start >= 1:
-                    ask_clusters.append({
-                        'start_price': sorted_asks[cluster_start][0],
-                        'end_price': sorted_asks[cluster_end][0],
-                        'total_volume': cluster_volume,
-                        'price_levels': cluster_end - cluster_start + 1,
-                        'center_price': (sorted_asks[cluster_start][0] + sorted_asks[cluster_end][0]) / Decimal('2'),
-                    })
-
-                i = cluster_end + 1
-            else:
-                i += 1
-
-    logger.debug(f"Identified {len(bid_clusters)} bid clusters and {len(ask_clusters)} ask clusters")
-
-    return {
-        'bid_clusters': bid_clusters,
-        'ask_clusters': ask_clusters,
-    }
+    logger.debug(f"Identified {len(clusters)} liquidity clusters")
+    return clusters
 
 
 def convert_to_depth_levels(

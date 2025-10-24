@@ -169,10 +169,11 @@ class TestIdentifyLiquidityClusters:
 
         # Verify cluster structure
         for cluster in clusters:
-            assert 'center_price' in cluster
+            assert 'start_price' in cluster
+            assert 'end_price' in cluster
             assert 'total_volume' in cluster
-            assert 'price_range' in cluster
-            assert 'strength' in cluster
+            assert 'center_price' in cluster
+            assert 'price_levels' in cluster
 
     def test_identify_clusters_with_low_volume_threshold(self):
         """Test cluster identification with low volume threshold."""
