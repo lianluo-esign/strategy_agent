@@ -396,7 +396,7 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
     summary = results.get("analysis_summary", {})
 
     if not peaks:
-        print("No liquidity peak zones found")
+        print("未发现流动性峰值区域")
         return
 
     # Separate peaks by type
@@ -407,32 +407,24 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
     ask_peaks.sort(key=lambda x: float(x.price), reverse=True)
     bid_peaks.sort(key=lambda x: float(x.price))
 
-    print("\n=== Liquidity Peak Zone Analysis ===")
-    print(f"Total Volume: {summary.get('total_volume', 0):.1f}")
-    print(
-        f"Bid/Ask Ratio: Bid {summary.get('bid_ratio', 0):.1%} | Ask {summary.get('ask_ratio', 0):.1%}"
-    )
-    print(f"Market Balance: {summary.get('market_balance', 'unknown')}")
-    print(f"Peak Density Score: {summary.get('peak_density_score', 0):.2f}")
+    print("\n=== 流动性峰值区域 ===")
 
     # Display ask peaks (resistance levels)
     if ask_peaks:
-        print(f"\n🔻 Ask Resistance Zones ({len(ask_peaks)}):")
+        print(f"\n🔻 卖盘阻力区域 (Ask Dominant):")
         for i, peak in enumerate(ask_peaks):
             print(
-                f"  Resistance {i + 1}: ${peak.price:,.0f} | "
-                f"Order Volume: {peak.volume_at_level:,.1f} | "
-                f"Strength: {peak.strength:.2f}"
+                f"  阻力 {i + 1}: ${peak.price:,.0f} | "
+                f"挂单量: {peak.volume_at_level:,.0f} | "
+                f"纯度: {peak.strength:.2f}"
             )
 
     # Display bid peaks (support levels)
     if bid_peaks:
-        print(f"\n🟢 Bid Support Zones ({len(bid_peaks)}):")
+        print(f"\n🟢 买盘支撑区域 (Bid Dominant):")
         for i, peak in enumerate(bid_peaks):
             print(
-                f"  Support {i + 1}: ${peak.price:,.0f} | "
-                f"Order Volume: {peak.volume_at_level:,.1f} | "
-                f"Strength: {peak.strength:.2f}"
+                f"  支撑 {i + 1}: ${peak.price:,.0f} | "
+                f"挂单量: {peak.volume_at_level:,.0f} | "
+                f"纯度: {peak.strength:.2f}"
             )
-
-    print(f"\nAnalysis complete, identified {len(peaks)} liquidity peak zones")

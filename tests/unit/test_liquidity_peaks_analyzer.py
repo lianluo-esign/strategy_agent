@@ -474,10 +474,11 @@ def test_print_liquidity_peaks_results(capsys):
     print_liquidity_peaks_results(test_results)
     captured = capsys.readouterr()
 
-    assert "Liquidity Peak Zone Analysis" in captured.out
-    assert "Total Volume: 27.0" in captured.out
-    assert "Bid Support Zones" in captured.out
-    assert "Support 1: $95,000" in captured.out
+    assert "流动性峰值区域" in captured.out
+    assert "买盘支撑区域" in captured.out
+    assert "支撑 1: $95,000" in captured.out
+    assert "挂单量: 15" in captured.out
+    assert "纯度: 0.80" in captured.out
 
 
 def test_print_liquidity_peaks_results_empty(capsys):
@@ -489,4 +490,4 @@ def test_print_liquidity_peaks_results_empty(capsys):
     print_liquidity_peaks_results(test_results)
     captured = capsys.readouterr()
 
-    assert "No liquidity peak zones found" in captured.out
+    assert "未发现流动性峰值区域" in captured.out
