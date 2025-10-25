@@ -186,8 +186,8 @@ class LiquidityPeaksAnalyzer:
         # Sort peaks by peak score (descending)
         peaks.sort(key=lambda x: x["peak_score"], reverse=True)
 
-        # Limit number of peaks returned
-        return peaks[:MAX_PEAKS_RETURNED]
+        # Return all detected peaks (no limit)
+        return peaks
 
     def _calculate_peak_score(
         self,
