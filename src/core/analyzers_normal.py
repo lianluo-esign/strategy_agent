@@ -60,7 +60,7 @@ class NormalDistributionMarketAnalyzer:
 
         # Initialize simplified liquidity peaks analyzer
         self.liquidity_analyzer = LiquidityPeaksAnalyzer(
-            min_volume_threshold=10.0, peak_detection_window=5, volume_weight=2.0
+            min_volume_threshold=1.0, peak_detection_window=5, volume_weight=2.0
         )
 
         logger.info(

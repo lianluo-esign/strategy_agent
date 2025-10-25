@@ -27,7 +27,7 @@ class LiquidityPeaksAnalyzer:
 
     def __init__(
         self,
-        min_volume_threshold: float = 10.0,
+        min_volume_threshold: float = 1.0,
         peak_detection_window: int = LOCAL_DENSITY_WINDOW_SIZE,  # Price levels to consider for peak detection
         volume_weight: float = 2.0,
     ) -> None:
