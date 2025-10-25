@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Union
 
 from .liquidity_peaks_analyzer import LiquidityPeaksAnalyzer
 from .models import (
@@ -40,6 +40,7 @@ class NormalDistributionMarketAnalyzer:
         min_volume_threshold: Decimal = Decimal("1.0"),
         analysis_window_minutes: int = 180,
         confidence_level: float = 0.95,
+        price_aggregation_config: dict[str, Any] | None = None,
     ):
         """
         Initialize the enhanced market analyzer.
@@ -48,24 +49,34 @@ class NormalDistributionMarketAnalyzer:
             min_volume_threshold: Minimum volume threshold for analysis
             analysis_window_minutes: Analysis window in minutes
             confidence_level: Statistical confidence level for peak detection
+            price_aggregation_config: Configuration for price aggregation
         """
         self.min_volume_threshold = min_volume_threshold
         self.analysis_window_minutes = analysis_window_minutes
         self.confidence_level = confidence_level
+        self.price_aggregation_config = price_aggregation_config or {}
 
         # Initialize normal distribution analyzer
+        price_precision = self.price_aggregation_config.get("precision", 1.0)
         self.peak_analyzer = NormalDistributionPeakAnalyzer(
-            price_precision=1.0, confidence_level=confidence_level
+            price_precision=price_precision, confidence_level=confidence_level
         )
 
-        # Initialize simplified liquidity peaks analyzer
+        # Initialize simplified liquidity peaks analyzer with configuration
         self.liquidity_analyzer = LiquidityPeaksAnalyzer(
-            min_volume_threshold=1.0, peak_detection_window=5, volume_weight=2.0
+            min_volume_threshold=1.0,
+            peak_detection_window=5,
+            volume_weight=2.0,
+            price_aggregation_config=self.price_aggregation_config
         )
+
+        # Initialize DeepSeek analyzer placeholder (will be configured via enable_deepseek_analysis)
+        self.deepseek_analyzer = None
 
         logger.info(
             f"Initialized NormalDistributionMarketAnalyzer with confidence_level={confidence_level}, "
-            f"window={analysis_window_minutes}min, simplified liquidity peaks enabled"
+            f"window={analysis_window_minutes}min, price_precision={price_precision}, "
+            f"simplified liquidity peaks enabled"
         )
 
     def analyze_market(
@@ -74,7 +85,7 @@ class NormalDistributionMarketAnalyzer:
         trade_data_list: list[MinuteTradeData],
         symbol: str,
         enhanced_mode: bool = True,
-    ) -> MarketAnalysisResult | EnhancedMarketAnalysisResult:
+    ) -> Union[MarketAnalysisResult, EnhancedMarketAnalysisResult]:
         """
         Perform comprehensive market analysis using normal distribution methods.
 
@@ -174,6 +185,26 @@ class NormalDistributionMarketAnalyzer:
         peak_quality = self._calculate_nd_peak_quality(
             nd_analysis_decimal, aggregated_trades
         )
+
+        # Step 7.5: Perform DeepSeek LLM analysis if enabled
+        deepseek_analysis_result = None
+        if self.deepseek_analyzer:
+            try:
+                logger.info("Starting DeepSeek LLM analysis")
+                deepseek_analysis_result = self.deepseek_analyzer.analyze_order_book_with_llm(
+                    nd_analysis_decimal.get("aggregated_bids", {}),
+                    nd_analysis_decimal.get("aggregated_asks", {}),
+                    symbol
+                )
+                logger.info("DeepSeek LLM analysis completed successfully")
+
+                # Print DeepSeek analysis results
+                from .deepseek_analyzer import print_deepseek_analysis_results
+                print_deepseek_analysis_results(deepseek_analysis_result)
+
+            except Exception as e:
+                logger.error(f"DeepSeek LLM analysis failed: {e}")
+                deepseek_analysis_result = None
 
         result = EnhancedMarketAnalysisResult(
             timestamp=datetime.now(),
@@ -551,6 +582,31 @@ class NormalDistributionMarketAnalyzer:
             "confidence_level": self.confidence_level,
         }
 
+    def enable_deepseek_analysis(self, **kwargs) -> None:
+        """Enable DeepSeek LLM analysis functionality.
+
+        Args:
+            **kwargs: Configuration parameters for DeepSeek analyzer
+                - api_key: DeepSeek API key
+                - base_url: API base URL
+                - model: Model name
+                - max_tokens: Maximum tokens
+                - temperature: Temperature setting
+                - timeout: Request timeout
+                - max_retries: Maximum retry attempts
+        """
+        try:
+            from .deepseek_analyzer import DeepSeekOrderBookAnalyzer
+
+            self.deepseek_analyzer = DeepSeekOrderBookAnalyzer(**kwargs)
+            logger.info("DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer")
+        except ImportError as e:
+            logger.error(f"Failed to import DeepSeek analyzer: {e}")
+            self.deepseek_analyzer = None
+        except Exception as e:
+            logger.error(f"Failed to enable DeepSeek analysis: {e}")
+            self.deepseek_analyzer = None
+
 
 # Keep the existing MarketAnalyzer as fallback
 class MarketAnalyzer:
@@ -618,3 +674,28 @@ class MarketAnalyzer:
             return self.nd_analyzer.analyze_market(
                 snapshot, trade_data_list, symbol, enhanced_mode
             )
+
+    def enable_deepseek_analysis(self, **kwargs) -> None:
+        """Enable DeepSeek LLM analysis functionality.
+
+        Args:
+            **kwargs: Configuration parameters for DeepSeek analyzer
+                - api_key: DeepSeek API key
+                - base_url: API base URL
+                - model: Model name
+                - max_tokens: Maximum tokens
+                - temperature: Temperature setting
+                - timeout: Request timeout
+                - max_retries: Maximum retry attempts
+        """
+        try:
+            from .deepseek_analyzer import DeepSeekOrderBookAnalyzer
+
+            self.deepseek_analyzer = DeepSeekOrderBookAnalyzer(**kwargs)
+            logger.info("DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer")
+        except ImportError as e:
+            logger.error(f"Failed to import DeepSeek analyzer: {e}")
+            self.deepseek_analyzer = None
+        except Exception as e:
+            logger.error(f"Failed to enable DeepSeek analysis: {e}")
+            self.deepseek_analyzer = None

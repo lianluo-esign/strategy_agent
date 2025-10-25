@@ -1,7 +1,7 @@
-"""Price aggregation utilities for 1-dollar precision order book analysis.
+"""Price aggregation utilities for configurable precision order book analysis.
 
-This module provides functions to aggregate depth snapshot data
-by 1-dollar precision to support more sophisticated wave peak analysis.
+This module provides functions and classes to aggregate depth snapshot data
+by configurable precision to support more sophisticated wave peak analysis.
 """
 
 import logging
@@ -336,3 +336,186 @@ def validate_aggregation_quality(
 
     logger.info(f"Aggregation quality: {quality_metrics}")
     return quality_metrics
+
+
+class PriceAggregator:
+    """Configurable price aggregation for order book analysis.
+
+    This class provides flexible price aggregation with configurable precision
+    and validation, supporting various aggregation strategies.
+    """
+
+    def __init__(self, precision: float = 1.0, enabled: bool = True, max_price_levels: int = 5000):
+        """Initialize the price aggregator.
+
+        Args:
+            precision: Aggregation precision (e.g., 1.0 for $1, 0.1 for $0.1)
+            enabled: Whether aggregation is enabled
+            max_price_levels: Maximum number of price levels after aggregation
+        """
+        if precision <= 0:
+            raise ValueError(f"Precision must be positive, got {precision}")
+        if max_price_levels <= 0:
+            raise ValueError(f"Max price levels must be positive, got {max_price_levels}")
+
+        self.precision = Decimal(str(precision))
+        self.enabled = enabled
+        self.max_price_levels = max_price_levels
+
+        logger.info(f"Initialized PriceAggregator with precision={precision}, "
+                   f"enabled={enabled}, max_levels={max_price_levels}")
+
+    def aggregate_order_book_levels(
+        self,
+        bids: list[DepthLevel],
+        asks: list[DepthLevel]
+    ) -> tuple[dict[Decimal, Decimal], dict[Decimal, Decimal]]:
+        """Aggregate order book levels using configured precision.
+
+        Args:
+            bids: List of bid levels
+            asks: List of ask levels
+
+        Returns:
+            Tuple of (aggregated_bids, aggregated_asks) dictionaries
+        """
+        if not self.enabled:
+            # Return original data as dict if aggregation is disabled
+            logger.debug("Aggregation disabled, returning original data")
+            return (
+                {bid.price: bid.quantity for bid in bids},
+                {ask.price: ask.quantity for ask in asks}
+            )
+
+        logger.debug(f"Aggregating {len(bids)} bid levels and {len(asks)} ask levels "
+                    f"with precision {self.precision}")
+
+        aggregated_bids: dict[Decimal, Decimal] = defaultdict(Decimal)
+        aggregated_asks: dict[Decimal, Decimal] = defaultdict(Decimal)
+
+        # Aggregate bids
+        for bid_level in bids:
+            if self._is_valid_level(bid_level):
+                rounded_price = self._round_down_to_precision(bid_level.price)
+                aggregated_bids[rounded_price] += bid_level.quantity
+
+        # Aggregate asks
+        for ask_level in asks:
+            if self._is_valid_level(ask_level):
+                rounded_price = self._round_down_to_precision(ask_level.price)
+                aggregated_asks[rounded_price] += ask_level.quantity
+
+        # Apply max price levels limit
+        aggregated_bids = self._limit_price_levels(aggregated_bids, is_bids=True)
+        aggregated_asks = self._limit_price_levels(aggregated_asks, is_bids=False)
+
+        logger.debug(f"Aggregated to {len(aggregated_bids)} bid levels, "
+                    f"{len(aggregated_asks)} ask levels")
+
+        return dict(aggregated_bids), dict(aggregated_asks)
+
+    def _is_valid_level(self, level: DepthLevel) -> bool:
+        """Validate if a depth level is suitable for aggregation.
+
+        Args:
+            level: DepthLevel to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        if not isinstance(level.price, Decimal) or not isinstance(level.quantity, Decimal):
+            return False
+
+        if level.price <= 0 or level.quantity <= 0:
+            return False
+
+        return True
+
+    def _round_down_to_precision(self, price: Decimal) -> Decimal:
+        """Round price down to the configured precision.
+
+        Args:
+            price: Original price
+
+        Returns:
+            Price rounded down to configured precision
+        """
+        if not isinstance(price, Decimal):
+            raise TypeError(f"Expected Decimal, got {type(price)}")
+
+        # Round down to the nearest precision unit
+        # For example: precision=1.0, price=50001.50 -> 50001.00
+        #              precision=0.1, price=50001.53 -> 50001.50
+        rounded = (price // self.precision) * self.precision
+        return rounded
+
+    def _limit_price_levels(
+        self,
+        price_data: dict[Decimal, Decimal],
+        is_bids: bool
+    ) -> dict[Decimal, Decimal]:
+        """Limit the number of price levels based on configuration.
+
+        Args:
+            price_data: Price-volume data
+            is_bids: Whether this is bid data (affects sorting)
+
+        Returns:
+            Limited price data dictionary
+        """
+        if len(price_data) <= self.max_price_levels:
+            return price_data
+
+        # Sort and limit
+        if is_bids:
+            # For bids, sort by price descending (keep highest prices)
+            sorted_items = sorted(price_data.items(), key=lambda x: x[0], reverse=True)
+        else:
+            # For asks, sort by price ascending (keep lowest prices)
+            sorted_items = sorted(price_data.items(), key=lambda x: x[0])
+
+        limited_items = sorted_items[:self.max_price_levels]
+        logger.debug(f"Limited {'bids' if is_bids else 'asks'} from {len(price_data)} "
+                    f"to {len(limited_items)} levels")
+
+        return dict(limited_items)
+
+    def get_aggregation_stats(
+        self,
+        original_bids: list[DepthLevel],
+        original_asks: list[DepthLevel],
+        aggregated_bids: dict[Decimal, Decimal],
+        aggregated_asks: dict[Decimal, Decimal]
+    ) -> dict[str, Decimal | int]:
+        """Get statistics about the aggregation process.
+
+        Args:
+            original_bids: Original bid levels
+            original_asks: Original ask levels
+            aggregated_bids: Aggregated bid data
+            aggregated_asks: Aggregated ask data
+
+        Returns:
+            Dictionary with aggregation statistics
+        """
+        original_count = len(original_bids) + len(original_asks)
+        aggregated_count = len(aggregated_bids) + len(aggregated_asks)
+
+        # Calculate volume preservation
+        original_volume = sum(bid.quantity for bid in original_bids) + \
+                         sum(ask.quantity for ask in original_asks)
+        aggregated_volume = sum(aggregated_bids.values()) + sum(aggregated_asks.values())
+
+        volume_preservation = (aggregated_volume / (original_volume + Decimal("0.01"))) * 100
+
+        return {
+            "original_levels": original_count,
+            "aggregated_levels": aggregated_count,
+            "reduction_ratio": original_count / (aggregated_count + 1),
+            "original_volume": float(original_volume),
+            "aggregated_volume": float(aggregated_volume),
+            "volume_preservation_percent": float(volume_preservation),
+            "precision": float(self.precision),
+            "enabled": self.enabled,
+            "max_levels": self.max_price_levels
+        }

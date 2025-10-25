@@ -6,9 +6,12 @@ in order book data without complex machine learning clustering algorithms.
 
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any, Union
 
 from .models import DepthSnapshot, SupportResistanceLevel
+
+if TYPE_CHECKING:
+    from .price_aggregator import PriceAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,7 @@ class LiquidityPeaksAnalyzer:
         min_volume_threshold: float = 1.0,
         peak_detection_window: int = LOCAL_DENSITY_WINDOW_SIZE,  # Price levels to consider for peak detection
         volume_weight: float = 2.0,
+        price_aggregation_config: dict[str, Any] | None = None,
     ) -> None:
         """
         Initialize the liquidity peaks analyzer.
@@ -38,6 +42,7 @@ class LiquidityPeaksAnalyzer:
             min_volume_threshold: Minimum volume to consider as a peak
             peak_detection_window: Number of price levels to analyze for peak detection
             volume_weight: Weight factor for volume in peak scoring
+            price_aggregation_config: Configuration for price aggregation
         """
         if min_volume_threshold <= 0:
             raise ValueError("min_volume_threshold must be positive")
@@ -50,10 +55,56 @@ class LiquidityPeaksAnalyzer:
         self.peak_detection_window = peak_detection_window
         self.volume_weight = volume_weight
 
+        # Initialize price aggregator with configuration
+        if price_aggregation_config:
+            self.price_aggregator = self._create_price_aggregator(price_aggregation_config)
+        else:
+            # Default configuration for backward compatibility
+            self.price_aggregator = self._create_default_price_aggregator()
+
         logger.info(
             f"Initialized LiquidityPeaksAnalyzer with min_volume={min_volume_threshold}, "
-            f"peak_window={peak_detection_window}, volume_weight={volume_weight}"
+            f"peak_window={peak_detection_window}, volume_weight={volume_weight}, "
+            f"price_aggregation={'enabled' if self.price_aggregator else 'disabled'}"
         )
+
+    def _create_price_aggregator(self, config: dict[str, Any]) -> Union["PriceAggregator", None]:
+        """Create a price aggregator from configuration.
+
+        Args:
+            config: Price aggregation configuration
+
+        Returns:
+            PriceAggregator instance or None if disabled
+        """
+        if not config.get("enabled", True):
+            return None
+
+        try:
+            from .price_aggregator import PriceAggregator
+
+            return PriceAggregator(
+                precision=config.get("precision", 1.0),
+                enabled=config.get("enabled", True),
+                max_price_levels=config.get("max_price_levels", 5000)
+            )
+        except ImportError as e:
+            logger.warning(f"Failed to import PriceAggregator, falling back to default: {e}")
+            return self._create_default_price_aggregator()
+
+    def _create_default_price_aggregator(self) -> Union["PriceAggregator", None]:
+        """Create default price aggregator for backward compatibility.
+
+        Returns:
+            Default PriceAggregator instance
+        """
+        try:
+            from .price_aggregator import PriceAggregator
+
+            return PriceAggregator(precision=1.0, enabled=True, max_price_levels=5000)
+        except ImportError as e:
+            logger.error(f"Failed to import PriceAggregator: {e}")
+            return None
 
     def analyze_liquidity_peaks(self, snapshot: DepthSnapshot) -> dict[str, Any]:
         """
@@ -127,7 +178,7 @@ class LiquidityPeaksAnalyzer:
     def _aggregate_order_book_data(
         self, snapshot: DepthSnapshot
     ) -> tuple[dict[Decimal, Decimal], dict[Decimal, Decimal]]:
-        """Aggregate order book data by 1-dollar precision.
+        """Aggregate order book data using configured precision.
 
         Args:
             snapshot: Depth snapshot data
@@ -135,10 +186,17 @@ class LiquidityPeaksAnalyzer:
         Returns:
             Tuple of (aggregated_bids, aggregated_asks) dictionaries
         """
-        # Use existing price aggregation utility
-        from .price_aggregator import aggregate_depth_by_one_dollar
-
-        return aggregate_depth_by_one_dollar(snapshot.bids, snapshot.asks)
+        if self.price_aggregator:
+            # Use configured price aggregator
+            logger.debug(f"Using configured price aggregator with precision {self.price_aggregator.precision}")
+            return self.price_aggregator.aggregate_order_book_levels(snapshot.bids, snapshot.asks)
+        else:
+            # No aggregation configured - return original data as dictionaries
+            logger.debug("No price aggregation configured, returning original data")
+            return (
+                {level.price: level.quantity for level in snapshot.bids},
+                {level.price: level.quantity for level in snapshot.asks}
+            )
 
     def _identify_peaks_from_data(
         self, data: dict[Decimal, Decimal], side: str
@@ -393,7 +451,6 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
         results: Liquidity peaks analysis results
     """
     peaks = results.get("liquidity_peaks", [])
-    summary = results.get("analysis_summary", {})
 
     if not peaks:
         print("未发现流动性峰值区域")
@@ -411,7 +468,7 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
 
     # Display ask peaks (resistance levels)
     if ask_peaks:
-        print(f"\n🔻 卖盘阻力区域 (Ask Dominant):")
+        print("\n🔻 卖盘阻力区域 (Ask Dominant):")
         for i, peak in enumerate(ask_peaks):
             print(
                 f"  阻力 {i + 1}: ${peak.price:,.0f} | "
@@ -421,7 +478,7 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
 
     # Display bid peaks (support levels)
     if bid_peaks:
-        print(f"\n🟢 买盘支撑区域 (Bid Dominant):")
+        print("\n🟢 买盘支撑区域 (Bid Dominant):")
         for i, peak in enumerate(bid_peaks):
             print(
                 f"  支撑 {i + 1}: ${peak.price:,.0f} | "

@@ -5,6 +5,7 @@ import logging
 import signal
 import sys
 from datetime import datetime
+from decimal import Decimal
 
 from ..core.models import MarketAnalysisResult, TradingRecommendation
 from ..core.redis_client import RedisDataStore
@@ -21,7 +22,7 @@ RETRY_DELAY_ON_ERROR = 10  # Seconds to wait before retry after error
 # Try to import normal distribution analyzer first
 try:
     from ..core.analyzers_normal import (
-        MarketAnalyzer as NormalDistributionMarketAnalyzer,
+        NormalDistributionMarketAnalyzer,
     )
 
     logger.info("Using normal distribution market analyzer")
@@ -56,13 +57,39 @@ class AnalyzerAgent:
 
         # Use normal distribution analyzer if available
         if use_normal_distribution:
+            # Convert price aggregation config to dict
+            price_aggregation_config = None
+            if hasattr(settings.analyzer, 'price_aggregation'):
+                price_aggregation_config = {
+                    "precision": settings.analyzer.price_aggregation.precision,
+                    "enabled": settings.analyzer.price_aggregation.enabled,
+                    "max_price_levels": settings.analyzer.price_aggregation.max_price_levels
+                }
+
             self.market_analyzer = NormalDistributionMarketAnalyzer(
-                min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
+                min_volume_threshold=Decimal(str(settings.analyzer.analysis.min_order_volume_threshold)),
                 analysis_window_minutes=180,  # 3 hours
-                enhanced_mode=True,
-                use_normal_distribution=True,
                 confidence_level=getattr(settings.analyzer, "confidence_level", 0.95),
+                price_aggregation_config=price_aggregation_config
             )
+
+            # Enable DeepSeek analysis if configured
+            if settings.analyzer.deepseek.enable and settings.analyzer.deepseek.api_key:
+                try:
+                    self.market_analyzer.enable_deepseek_analysis(
+                        api_key=settings.analyzer.deepseek.api_key,
+                        base_url=settings.analyzer.deepseek.base_url,
+                        model=settings.analyzer.deepseek.model,
+                        max_tokens=settings.analyzer.deepseek.max_tokens,
+                        temperature=settings.analyzer.deepseek.temperature,
+                        timeout=30,
+                        max_retries=3,
+                    )
+                    logger.info("DeepSeek LLM analysis enabled in analyzer agent")
+                except Exception as e:
+                    logger.error(f"Failed to enable DeepSeek analysis in analyzer agent: {e}")
+            else:
+                logger.info("DeepSeek LLM analysis is disabled in analyzer agent")
         else:
             self.market_analyzer = EnhancedMarketAnalyzer(
                 min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,

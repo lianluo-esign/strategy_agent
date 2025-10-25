@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -119,6 +119,32 @@ class DeepSeekConfig(BaseModel):
         super().__init__(**data)
 
 
+class PriceAggregationConfig(BaseModel):
+    """Price aggregation configuration."""
+
+    precision: float = 1.0  # $1 precision for price aggregation (configurable)
+    enabled: bool = True
+    max_price_levels: int = 5000  # Maximum number of price levels after aggregation
+
+    model_config = {"validate_assignment": True}
+
+    @field_validator('precision')
+    @classmethod
+    def validate_precision(cls, v: float) -> float:
+        """Validate precision field."""
+        if v <= 0:
+            raise ValueError("Price aggregation precision must be positive")
+        return v
+
+    @field_validator('max_price_levels')
+    @classmethod
+    def validate_max_price_levels(cls, v: int) -> int:
+        """Validate max_price_levels field."""
+        if v <= 0:
+            raise ValueError("Max price levels must be positive")
+        return v
+
+
 class AnalysisConfig(BaseModel):
     """Analysis configuration."""
 
@@ -147,6 +173,7 @@ class AnalyzerConfig(BaseModel):
 
     deepseek: DeepSeekConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    price_aggregation: PriceAggregationConfig = Field(default_factory=PriceAggregationConfig)
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
 
 
