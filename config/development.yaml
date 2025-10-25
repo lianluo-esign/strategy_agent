@@ -40,13 +40,14 @@ data_collector:
 
 analyzer:
   deepseek:
+    enable: false
     api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"
     base_url: "https://api.deepseek.com/v1"
     model: "deepseek-chat"
     max_tokens: 4000
     temperature: 0.1
   analysis:
-    interval_seconds: 60
+    interval_seconds: 1800
     min_order_volume_threshold: 0.01
     support_resistance_threshold: 0.1
 

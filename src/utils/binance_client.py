@@ -41,11 +41,10 @@ class BinanceAPIClient:
                 limit=100,  # Connection pool limit
                 limit_per_host=30,
                 keepalive_timeout=30,
-                enable_cleanup_closed=True
+                enable_cleanup_closed=True,
             )
             self._async_session = aiohttp.ClientSession(
-                timeout=timeout,
-                connector=connector
+                timeout=timeout, connector=connector
             )
         return self._async_session
 
@@ -54,19 +53,20 @@ class BinanceAPIClient:
         if self._async_session and not self._async_session.closed:
             await self._async_session.close()
 
-    async def get_depth_snapshot(self, symbol: str = BTC_FDUSD_SYMBOL, limit: int = DEPTH_SNAPSHOT_LIMIT) -> DepthSnapshot | None:
+    async def get_depth_snapshot(
+        self, symbol: str = BTC_FDUSD_SYMBOL, limit: int = DEPTH_SNAPSHOT_LIMIT
+    ) -> DepthSnapshot | None:
         """Get order book depth snapshot."""
         try:
             url = f"{self.base_url}/api/v3/depth"
-            params = {
-                "symbol": symbol,
-                "limit": limit
-            }
+            params = {"symbol": symbol, "limit": limit}
 
             session = await self.get_async_session()
             async with session.get(url, params=params) as response:
                 if response.status != 200:
-                    logger.error(f"Binance API error: {response.status} - {await response.text()}")
+                    logger.error(
+                        f"Binance API error: {response.status} - {await response.text()}"
+                    )
                     return None
 
                 data = await response.json()
@@ -81,20 +81,21 @@ class BinanceAPIClient:
 
     def _parse_depth_snapshot(self, data: dict, symbol: str) -> DepthSnapshot:
         """Parse depth snapshot from API response."""
-        timestamp = datetime.now()  # Use current time since Binance depth API doesn't provide timestamp
+        timestamp = (
+            datetime.now()
+        )  # Use current time since Binance depth API doesn't provide timestamp
 
-        bids = [DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
-                for price, qty in data['bids']]
+        bids = [
+            DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
+            for price, qty in data["bids"]
+        ]
 
-        asks = [DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
-                for price, qty in data['asks']]
+        asks = [
+            DepthLevel(price=Decimal(str(price)), quantity=Decimal(str(qty)))
+            for price, qty in data["asks"]
+        ]
 
-        return DepthSnapshot(
-            symbol=symbol,
-            timestamp=timestamp,
-            bids=bids,
-            asks=asks
-        )
+        return DepthSnapshot(symbol=symbol, timestamp=timestamp, bids=bids, asks=asks)
 
 
 class BinanceWebSocketClient:
@@ -111,10 +112,7 @@ class BinanceWebSocketClient:
         """Connect to WebSocket."""
         try:
             self.websocket = await websockets.connect(
-                self.websocket_url,
-                ping_interval=20,
-                ping_timeout=10,
-                close_timeout=10
+                self.websocket_url, ping_interval=20, ping_timeout=10, close_timeout=10
             )
             self.is_connected = True
             logger.info(f"Connected to Binance WebSocket for {self.symbol}")
@@ -166,23 +164,26 @@ class BinanceWebSocketClient:
         """Parse trade message from WebSocket."""
         try:
             # Validate required fields
-            required_fields = ['p', 'q', 'm', 'T', 'a']
+            required_fields = ["p", "q", "m", "T", "a"]
             if not all(field in data for field in required_fields):
                 logger.warning(f"Missing required fields in trade message: {data}")
                 return None
 
             # Validate data types
-            if not all(isinstance(data[field], (int, float, str)) for field in ['p', 'q', 'T', 'a']):
+            if not all(
+                isinstance(data[field], (int, float, str))
+                for field in ["p", "q", "T", "a"]
+            ):
                 logger.warning(f"Invalid data types in trade message: {data}")
                 return None
 
-            if not isinstance(data['m'], bool):
+            if not isinstance(data["m"], bool):
                 logger.warning(f"Invalid maker flag in trade message: {data}")
                 return None
 
             # Validate values
-            price = Decimal(str(data['p']))
-            quantity = Decimal(str(data['q']))
+            price = Decimal(str(data["p"]))
+            quantity = Decimal(str(data["q"]))
 
             if price <= 0 or quantity <= 0:
                 logger.warning(f"Invalid price or quantity in trade message: {data}")
@@ -193,9 +194,9 @@ class BinanceWebSocketClient:
                 symbol=self.symbol,
                 price=price,
                 quantity=quantity,
-                is_buyer_maker=data['m'],  # True if buyer is the maker
-                timestamp=datetime.fromtimestamp(data['T'] / 1000),
-                trade_id=str(data['a'])
+                is_buyer_maker=data["m"],  # True if buyer is the maker
+                timestamp=datetime.fromtimestamp(data["T"] / 1000),
+                trade_id=str(data["a"]),
             )
 
         except (ValueError, TypeError, KeyError) as e:

@@ -8,6 +8,7 @@ import sys
 import time
 from pathlib import Path
 
+
 def test_graceful_shutdown():
     """Test that agent_analyzer.py can be gracefully terminated with Ctrl+C."""
 
@@ -20,7 +21,7 @@ def test_graceful_shutdown():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        cwd=Path(__file__).parent
+        cwd=Path(__file__).parent,
     )
 
     # Wait a bit for the process to start
@@ -71,12 +72,16 @@ def test_graceful_shutdown():
         print(f"STDOUT: {stdout[-500:]}")  # Last 500 chars
         print(f"STDERR: {stderr[-500:]}")  # Last 500 chars
 
-    if "Market Analyzer Agent shutdown complete" in stdout or "Market Analyzer Agent shutdown complete" in stderr:
+    if (
+        "Market Analyzer Agent shutdown complete" in stdout
+        or "Market Analyzer Agent shutdown complete" in stderr
+    ):
         print("✅ Complete shutdown message detected")
     else:
         print("⚠️  No complete shutdown message found")
 
     return True
+
 
 def test_immediate_shutdown():
     """Test immediate shutdown after startup."""
@@ -90,7 +95,7 @@ def test_immediate_shutdown():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        cwd=Path(__file__).parent
+        cwd=Path(__file__).parent,
     )
 
     # Wait a very short time for process to start
@@ -121,6 +126,7 @@ def test_immediate_shutdown():
     print(f"✅ Process terminated in {elapsed:.2f} seconds")
 
     return True
+
 
 if __name__ == "__main__":
     print("=" * 60)

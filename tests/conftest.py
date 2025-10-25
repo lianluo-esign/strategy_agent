@@ -19,26 +19,23 @@ from src.core.models import (
 def sample_depth_snapshot():
     """Create a sample depth snapshot for testing."""
     bids = [
-        DepthLevel(price=Decimal('50000.00'), quantity=Decimal('1.5')),
-        DepthLevel(price=Decimal('49999.00'), quantity=Decimal('2.0')),
-        DepthLevel(price=Decimal('49998.00'), quantity=Decimal('0.8')),
-        DepthLevel(price=Decimal('49997.00'), quantity=Decimal('5.0')),  # Large wall
-        DepthLevel(price=Decimal('49996.00'), quantity=Decimal('0.3')),
+        DepthLevel(price=Decimal("50000.00"), quantity=Decimal("1.5")),
+        DepthLevel(price=Decimal("49999.00"), quantity=Decimal("2.0")),
+        DepthLevel(price=Decimal("49998.00"), quantity=Decimal("0.8")),
+        DepthLevel(price=Decimal("49997.00"), quantity=Decimal("5.0")),  # Large wall
+        DepthLevel(price=Decimal("49996.00"), quantity=Decimal("0.3")),
     ]
 
     asks = [
-        DepthLevel(price=Decimal('50001.00'), quantity=Decimal('0.7')),
-        DepthLevel(price=Decimal('50002.00'), quantity=Decimal('1.2')),
-        DepthLevel(price=Decimal('50003.00'), quantity=Decimal('3.0')),  # Large wall
-        DepthLevel(price=Decimal('50004.00'), quantity=Decimal('0.9')),
-        DepthLevel(price=Decimal('50005.00'), quantity=Decimal('2.5')),
+        DepthLevel(price=Decimal("50001.00"), quantity=Decimal("0.7")),
+        DepthLevel(price=Decimal("50002.00"), quantity=Decimal("1.2")),
+        DepthLevel(price=Decimal("50003.00"), quantity=Decimal("3.0")),  # Large wall
+        DepthLevel(price=Decimal("50004.00"), quantity=Decimal("0.9")),
+        DepthLevel(price=Decimal("50005.00"), quantity=Decimal("2.5")),
     ]
 
     return DepthSnapshot(
-        symbol='BTCFDUSD',
-        timestamp=datetime.now(),
-        bids=bids,
-        asks=asks
+        symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
     )
 
 
@@ -49,44 +46,44 @@ def sample_trades():
 
     trades = [
         Trade(
-            symbol='BTCFDUSD',
-            price=Decimal('50000.50'),
-            quantity=Decimal('0.1'),
+            symbol="BTCFDUSD",
+            price=Decimal("50000.50"),
+            quantity=Decimal("0.1"),
             is_buyer_maker=False,  # Aggressive buyer
             timestamp=base_time,
-            trade_id='1'
+            trade_id="1",
         ),
         Trade(
-            symbol='BTCFDUSD',
-            price=Decimal('50000.25'),
-            quantity=Decimal('0.2'),
-            is_buyer_maker=True,   # Aggressive seller
+            symbol="BTCFDUSD",
+            price=Decimal("50000.25"),
+            quantity=Decimal("0.2"),
+            is_buyer_maker=True,  # Aggressive seller
             timestamp=base_time + timedelta(seconds=10),
-            trade_id='2'
+            trade_id="2",
         ),
         Trade(
-            symbol='BTCFDUSD',
-            price=Decimal('50000.00'),
-            quantity=Decimal('0.5'),
+            symbol="BTCFDUSD",
+            price=Decimal("50000.00"),
+            quantity=Decimal("0.5"),
             is_buyer_maker=False,  # Aggressive buyer
             timestamp=base_time + timedelta(seconds=20),
-            trade_id='3'
+            trade_id="3",
         ),
         Trade(
-            symbol='BTCFDUSD',
-            price=Decimal('50001.00'),
-            quantity=Decimal('0.15'),
-            is_buyer_maker=True,   # Aggressive seller
+            symbol="BTCFDUSD",
+            price=Decimal("50001.00"),
+            quantity=Decimal("0.15"),
+            is_buyer_maker=True,  # Aggressive seller
             timestamp=base_time + timedelta(seconds=30),
-            trade_id='4'
+            trade_id="4",
         ),
         Trade(
-            symbol='BTCFDUSD',
-            price=Decimal('50000.75'),
-            quantity=Decimal('0.3'),
+            symbol="BTCFDUSD",
+            price=Decimal("50000.75"),
+            quantity=Decimal("0.3"),
             is_buyer_maker=False,  # Aggressive buyer
             timestamp=base_time + timedelta(seconds=40),
-            trade_id='5'
+            trade_id="5",
         ),
     ]
 
@@ -109,40 +106,40 @@ def sample_support_resistance_levels():
     """Create sample support and resistance levels."""
     support = [
         SupportResistanceLevel(
-            price=Decimal('49997.00'),
+            price=Decimal("49997.00"),
             strength=0.8,
-            level_type='support',
-            volume_at_level=Decimal('5.0'),
+            level_type="support",
+            volume_at_level=Decimal("5.0"),
             confirmation_count=2,
-            last_confirmed=datetime.now()
+            last_confirmed=datetime.now(),
         ),
         SupportResistanceLevel(
-            price=Decimal('49995.00'),
+            price=Decimal("49995.00"),
             strength=0.6,
-            level_type='support',
-            volume_at_level=Decimal('2.0'),
+            level_type="support",
+            volume_at_level=Decimal("2.0"),
             confirmation_count=1,
-            last_confirmed=datetime.now() - timedelta(minutes=5)
-        )
+            last_confirmed=datetime.now() - timedelta(minutes=5),
+        ),
     ]
 
     resistance = [
         SupportResistanceLevel(
-            price=Decimal('50003.00'),
+            price=Decimal("50003.00"),
             strength=0.9,
-            level_type='resistance',
-            volume_at_level=Decimal('3.0'),
+            level_type="resistance",
+            volume_at_level=Decimal("3.0"),
             confirmation_count=3,
-            last_confirmed=datetime.now()
+            last_confirmed=datetime.now(),
         ),
         SupportResistanceLevel(
-            price=Decimal('50005.00'),
+            price=Decimal("50005.00"),
             strength=0.5,
-            level_type='resistance',
-            volume_at_level=Decimal('2.5'),
+            level_type="resistance",
+            volume_at_level=Decimal("2.5"),
             confirmation_count=1,
-            last_confirmed=datetime.now() - timedelta(minutes=3)
-        )
+            last_confirmed=datetime.now() - timedelta(minutes=3),
+        ),
     ]
 
     return support, resistance
@@ -174,47 +171,43 @@ def test_settings():
     from src.utils.config import Settings
 
     return Settings(
-        app={
-            'name': 'test-agent',
-            'environment': 'test',
-            'log_level': 'DEBUG'
-        },
+        app={"name": "test-agent", "environment": "test", "log_level": "DEBUG"},
         redis={
-            'host': 'localhost',
-            'port': 6379,
-            'db': 15,  # Use test DB
-            'decode_responses': True,
-            'socket_timeout': 5,
-            'socket_connect_timeout': 5
+            "host": "localhost",
+            "port": 6379,
+            "db": 15,  # Use test DB
+            "decode_responses": True,
+            "socket_timeout": 5,
+            "socket_connect_timeout": 5,
         },
         binance={
-            'rest_api_base': 'https://api.binance.com',
-            'websocket_base': 'wss://stream.binance.com:9443',
-            'symbol': 'BTCFDUSD',
-            'rate_limit_requests_per_minute': 1200,
-            'timeout': 30
+            "rest_api_base": "https://api.binance.com",
+            "websocket_base": "wss://stream.binance.com:9443",
+            "symbol": "BTCFDUSD",
+            "rate_limit_requests_per_minute": 1200,
+            "timeout": 30,
         },
         analyzer={
-            'deepseek': {
-                'api_key': 'test-key',
-                'base_url': 'https://api.deepseek.com/v1',
-                'model': 'deepseek-chat',
-                'max_tokens': 4000,
-                'temperature': 0.1
+            "deepseek": {
+                "api_key": "test-key",
+                "base_url": "https://api.deepseek.com/v1",
+                "model": "deepseek-chat",
+                "max_tokens": 4000,
+                "temperature": 0.1,
             },
-            'analysis': {
-                'interval_seconds': 60,
-                'min_order_volume_threshold': 0.01,
-                'support_resistance_threshold': 0.1
-            }
+            "analysis": {
+                "interval_seconds": 60,
+                "min_order_volume_threshold": 0.01,
+                "support_resistance_threshold": 0.1,
+            },
         },
         logging={
-            'level': 'DEBUG',
-            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            'file_path': 'logs/test.log',
-            'max_file_size_mb': 10,
-            'backup_count': 2
-        }
+            "level": "DEBUG",
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "file_path": "logs/test.log",
+            "max_file_size_mb": 10,
+            "backup_count": 2,
+        },
     )
 
 

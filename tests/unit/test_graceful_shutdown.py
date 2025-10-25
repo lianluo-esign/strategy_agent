@@ -43,9 +43,11 @@ class TestGracefulShutdown:
     @pytest.fixture
     def data_collector(self, mock_settings):
         """Create DataCollectorAgent instance for testing."""
-        with patch('src.agents.data_collector.RedisDataStore'), \
-             patch('src.agents.data_collector.BinanceAPIClient'), \
-             patch('src.agents.data_collector.BinanceWebSocketClient'):
+        with (
+            patch("src.agents.data_collector.RedisDataStore"),
+            patch("src.agents.data_collector.BinanceAPIClient"),
+            patch("src.agents.data_collector.BinanceWebSocketClient"),
+        ):
             agent = DataCollectorAgent(mock_settings)
             return agent
 
@@ -99,6 +101,7 @@ class TestGracefulShutdown:
     @pytest.mark.asyncio
     async def test_cancel_remaining_tasks_with_timeout(self, data_collector):
         """Test cancellation of remaining tasks with timeout."""
+
         # Create mock tasks
         async def mock_task():
             await asyncio.sleep(10)  # Long running task
@@ -138,11 +141,14 @@ class TestGracefulShutdown:
     @pytest.mark.asyncio
     async def test_close_connections_timeout_handling(self, data_collector):
         """Test timeout handling during connection closing."""
+
         # Mock slow connections that timeout
         async def slow_disconnect():
             await asyncio.sleep(10)  # Longer than timeout
 
-        data_collector.websocket_client.disconnect = AsyncMock(side_effect=slow_disconnect)
+        data_collector.websocket_client.disconnect = AsyncMock(
+            side_effect=slow_disconnect
+        )
         data_collector.redis_store.close = AsyncMock()
         data_collector.api_client.close_async_session = AsyncMock()
 
@@ -166,10 +172,10 @@ class TestGracefulShutdown:
 
         from src.core.models import PriceLevelData
 
-        data_collector.current_minute_data.price_levels[Decimal("60000")] = PriceLevelData(
-            price_level=Decimal("60000"),
-            total_volume=Decimal("1.0"),
-            trade_count=5
+        data_collector.current_minute_data.price_levels[Decimal("60000")] = (
+            PriceLevelData(
+                price_level=Decimal("60000"), total_volume=Decimal("1.0"), trade_count=5
+            )
         )
 
         # Mock the store method

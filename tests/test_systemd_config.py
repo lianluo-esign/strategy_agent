@@ -19,7 +19,11 @@ class TestSystemdConfig:
     @pytest.fixture
     def service_file_path(self):
         """Path to the systemd service file."""
-        return Path(__file__).parent.parent / "systemd" / "strategy-agent-data-collector.service"
+        return (
+            Path(__file__).parent.parent
+            / "systemd"
+            / "strategy-agent-data-collector.service"
+        )
 
     @pytest.fixture
     def service_content(self, service_file_path):
@@ -36,7 +40,9 @@ class TestSystemdConfig:
         """Test service file permissions."""
         stat = service_file_path.stat()
         # Should be readable by all, writable only by owner
-        assert oct(stat.st_mode)[-3:] == "644", "Service file should have 644 permissions"
+        assert oct(stat.st_mode)[-3:] == "644", (
+            "Service file should have 644 permissions"
+        )
 
     def test_service_content_required_sections(self, service_content):
         """Test that service file contains required systemd sections."""
@@ -57,13 +63,17 @@ class TestSystemdConfig:
         assert "Type=simple" in service_content, "Should be simple service type"
         assert "User=" in service_content, "Should specify user"
         assert "Group=" in service_content, "Should specify group"
-        assert "WorkingDirectory=" in service_content, "Should specify working directory"
+        assert "WorkingDirectory=" in service_content, (
+            "Should specify working directory"
+        )
         assert "ExecStart=" in service_content, "Should specify ExecStart"
         assert "Restart=on-failure" in service_content, "Should restart on failure"
 
     def test_service_install_configuration(self, service_content):
         """Test Install section configuration."""
-        assert "WantedBy=multi-user.target" in service_content, "Should be wanted by multi-user target"
+        assert "WantedBy=multi-user.target" in service_content, (
+            "Should be wanted by multi-user target"
+        )
 
     def test_service_security_settings(self, service_content):
         """Test security hardening settings."""
@@ -74,7 +84,7 @@ class TestSystemdConfig:
             "ProtectHome=true",
             "ProtectKernelTunables=true",
             "ProtectKernelModules=true",
-            "ProtectControlGroups=true"
+            "ProtectControlGroups=true",
         ]
 
         for setting in security_settings:
@@ -90,7 +100,9 @@ class TestSystemdConfig:
     def test_service_logging_configuration(self, service_content):
         """Test logging configuration."""
         assert "StandardOutput=journal" in service_content, "Should output to journal"
-        assert "StandardError=journal" in service_content, "Should log errors to journal"
+        assert "StandardError=journal" in service_content, (
+            "Should log errors to journal"
+        )
         assert "SyslogIdentifier=" in service_content, "Should set syslog identifier"
 
     def test_service_path_validation(self, service_content):
@@ -99,24 +111,36 @@ class TestSystemdConfig:
         expected_working_dir = str(project_root)
         expected_exec_start = f"{project_root}/venv/bin/python agent_data_collector.py"
 
-        assert expected_working_dir in service_content, "Working directory should match project root"
-        assert "agent_data_collector.py" in service_content, "Should reference correct executable"
+        assert expected_working_dir in service_content, (
+            "Working directory should match project root"
+        )
+        assert "agent_data_collector.py" in service_content, (
+            "Should reference correct executable"
+        )
 
     def test_environment_configuration(self, service_content):
         """Test environment configuration."""
         assert "EnvironmentFile=" in service_content, "Should load environment file"
-        assert "Environment=PATH=" in service_content, "Should set PATH environment variable"
+        assert "Environment=PATH=" in service_content, (
+            "Should set PATH environment variable"
+        )
 
     def test_restart_policy(self, service_content):
         """Test restart policy configuration."""
         assert "Restart=on-failure" in service_content, "Should restart on failure"
         assert "RestartSec=" in service_content, "Should set restart delay"
-        assert "StartLimitInterval=" in service_content, "Should set start limit interval"
+        assert "StartLimitInterval=" in service_content, (
+            "Should set start limit interval"
+        )
         assert "StartLimitBurst=" in service_content, "Should set start limit burst"
 
     def test_timer_file_exists(self):
         """Test that timer file exists."""
-        timer_path = Path(__file__).parent.parent / "systemd" / "strategy-agent-data-collector.timer"
+        timer_path = (
+            Path(__file__).parent.parent
+            / "systemd"
+            / "strategy-agent-data-collector.timer"
+        )
         if timer_path.exists():
             with open(timer_path) as f:
                 timer_content = f.read()
@@ -126,7 +150,12 @@ class TestSystemdConfig:
 
     def test_logrotate_config_exists(self):
         """Test that logrotate configuration exists."""
-        logrotate_path = Path(__file__).parent.parent / "systemd" / "logrotate.d" / "strategy-agent-data-collector"
+        logrotate_path = (
+            Path(__file__).parent.parent
+            / "systemd"
+            / "logrotate.d"
+            / "strategy-agent-data-collector"
+        )
         if logrotate_path.exists():
             with open(logrotate_path) as f:
                 logrotate_content = f.read()
@@ -141,11 +170,11 @@ class TestSystemdConfig:
         assert install_path.is_file(), "Install script should be a regular file"
 
         # Check if executable (on Unix systems)
-        if os.name == 'posix':
+        if os.name == "posix":
             stat = install_path.stat()
             assert stat.st_mode & 0o111, "Install script should be executable"
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_service_syntax_validation(self, mock_run):
         """Test that service file has valid systemd syntax."""
         # Mock successful systemd validation
@@ -164,4 +193,6 @@ class TestSystemdConfig:
 
     def test_service_condition_checks(self, service_content):
         """Test service condition checks."""
-        assert "ConditionPathExists=" in service_content, "Should check if executable exists"
+        assert "ConditionPathExists=" in service_content, (
+            "Should check if executable exists"
+        )

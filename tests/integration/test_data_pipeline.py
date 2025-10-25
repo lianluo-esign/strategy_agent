@@ -23,25 +23,25 @@ class TestDataPipelineIntegration:
         mock_redis.ping.return_value = True
         mock_redis.set.return_value = True
 
-        with patch('src.core.redis_client.redis.Redis', return_value=mock_redis):
+        with patch("src.core.redis_client.redis.Redis", return_value=mock_redis):
             redis_store = RedisDataStore(
                 host=test_settings.redis.host,
                 port=test_settings.redis.port,
-                db=test_settings.redis.db
+                db=test_settings.redis.db,
             )
 
             # Create test depth snapshot
             snapshot = DepthSnapshot(
-                symbol='BTCFDUSD',
+                symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[
-                    DepthLevel(price=Decimal('50000.00'), quantity=Decimal('1.5')),
-                    DepthLevel(price=Decimal('49999.00'), quantity=Decimal('2.0')),
+                    DepthLevel(price=Decimal("50000.00"), quantity=Decimal("1.5")),
+                    DepthLevel(price=Decimal("49999.00"), quantity=Decimal("2.0")),
                 ],
                 asks=[
-                    DepthLevel(price=Decimal('50001.00'), quantity=Decimal('1.2')),
-                    DepthLevel(price=Decimal('50002.00'), quantity=Decimal('0.8')),
-                ]
+                    DepthLevel(price=Decimal("50001.00"), quantity=Decimal("1.2")),
+                    DepthLevel(price=Decimal("50002.00"), quantity=Decimal("0.8")),
+                ],
             )
 
             # Store snapshot
@@ -56,9 +56,9 @@ class TestDataPipelineIntegration:
             data = json.loads(call_args[1])
 
             assert key == "depth_snapshot_5000"
-            assert data['symbol'] == 'BTCFDUSD'
-            assert len(data['bids']) == 2
-            assert len(data['asks']) == 2
+            assert data["symbol"] == "BTCFDUSD"
+            assert len(data["bids"]) == 2
+            assert len(data["asks"]) == 2
 
     async def test_trade_data_aggregation_flow(self, test_settings, mock_redis):
         """Test trade data aggregation and storage flow."""
@@ -67,11 +67,11 @@ class TestDataPipelineIntegration:
         mock_redis.lpush.return_value = 1
         mock_redis.ltrim.return_value = True
 
-        with patch('src.core.redis_client.redis.Redis', return_value=mock_redis):
+        with patch("src.core.redis_client.redis.Redis", return_value=mock_redis):
             redis_store = RedisDataStore(
                 host=test_settings.redis.host,
                 port=test_settings.redis.port,
-                db=test_settings.redis.db
+                db=test_settings.redis.db,
             )
 
             # Create test minute trade data
@@ -80,28 +80,28 @@ class TestDataPipelineIntegration:
             # Add some trades
             trades = [
                 Trade(
-                    symbol='BTCFDUSD',
-                    price=Decimal('50000.75'),
-                    quantity=Decimal('0.1'),
+                    symbol="BTCFDUSD",
+                    price=Decimal("50000.75"),
+                    quantity=Decimal("0.1"),
                     is_buyer_maker=False,
                     timestamp=datetime.now(),
-                    trade_id='1'
+                    trade_id="1",
                 ),
                 Trade(
-                    symbol='BTCFDUSD',
-                    price=Decimal('50000.25'),
-                    quantity=Decimal('0.2'),
+                    symbol="BTCFDUSD",
+                    price=Decimal("50000.25"),
+                    quantity=Decimal("0.2"),
                     is_buyer_maker=True,
                     timestamp=datetime.now(),
-                    trade_id='2'
+                    trade_id="2",
                 ),
                 Trade(
-                    symbol='BTCFDUSD',
-                    price=Decimal('50001.50'),
-                    quantity=Decimal('0.15'),
+                    symbol="BTCFDUSD",
+                    price=Decimal("50001.50"),
+                    quantity=Decimal("0.15"),
                     is_buyer_maker=False,
                     timestamp=datetime.now(),
-                    trade_id='3'
+                    trade_id="3",
                 ),
             ]
 
@@ -121,33 +121,35 @@ class TestDataPipelineIntegration:
             data = json.loads(call_args[1])
 
             assert key == "trades_window"
-            assert 'timestamp' in data
-            assert 'price_levels' in data
+            assert "timestamp" in data
+            assert "price_levels" in data
 
             # Check price aggregation (should round to $1 precision)
-            price_levels = data['price_levels']
+            price_levels = data["price_levels"]
             # 50001.50 should round to 50002 (rounding half up)
-            assert '50002' in price_levels
+            assert "50002" in price_levels
             # 50000.75 rounds to 50001, 50000.25 rounds to 50000
-            assert '50001' in price_levels
-            assert '50000' in price_levels
+            assert "50001" in price_levels
+            assert "50000" in price_levels
 
             # Check that the expected price levels exist (may be rounded differently)
             assert len(price_levels) >= 2  # Should have at least 2 price levels
 
             # Verify total volume and trade counts
-            total_volume = sum(level['total_volume'] for level in price_levels.values())
-            total_trades = sum(level['trade_count'] for level in price_levels.values())
+            total_volume = sum(level["total_volume"] for level in price_levels.values())
+            total_trades = sum(level["trade_count"] for level in price_levels.values())
             assert total_volume == 0.45  # 0.1 + 0.2 + 0.15
             assert total_trades == 3
 
     async def test_data_collector_initialization(self, test_settings):
         """Test data collector agent initialization."""
-        with patch('src.core.redis_client.redis.Redis') as mock_redis:
+        with patch("src.core.redis_client.redis.Redis") as mock_redis:
             mock_redis.ping.return_value = True
 
-            with patch('src.utils.binance_client.BinanceAPIClient') as mock_api:
-                with patch('src.utils.binance_client.BinanceWebSocketClient') as mock_ws:
+            with patch("src.utils.binance_client.BinanceAPIClient") as mock_api:
+                with patch(
+                    "src.utils.binance_client.BinanceWebSocketClient"
+                ) as mock_ws:
                     agent = DataCollectorAgent(test_settings)
 
                     # Check that components are initialized
@@ -160,10 +162,10 @@ class TestDataPipelineIntegration:
     async def test_analyzer_initialization(self, test_settings):
         """Test analyzer agent initialization."""
         # Mock DeepSeek client to avoid API calls
-        with patch('src.core.redis_client.redis.Redis') as mock_redis:
+        with patch("src.core.redis_client.redis.Redis") as mock_redis:
             mock_redis.ping.return_value = True
 
-            with patch('src.utils.ai_client.httpx.AsyncClient'):
+            with patch("src.utils.ai_client.httpx.AsyncClient"):
                 agent = AnalyzerAgent(test_settings)
 
                 # Check that components are initialized
@@ -183,7 +185,7 @@ class TestDataPipelineIntegration:
         redis_store = RedisDataStore(
             host=test_settings.redis.host,
             port=test_settings.redis.port,
-            db=test_settings.redis.db
+            db=test_settings.redis.db,
         )
 
         if not redis_store.test_connection():
@@ -195,26 +197,26 @@ class TestDataPipelineIntegration:
 
             # Store test depth snapshot
             snapshot = DepthSnapshot(
-                symbol='BTCFDUSD',
+                symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[
-                    DepthLevel(price=Decimal('50000.00'), quantity=Decimal('1.5')),
+                    DepthLevel(price=Decimal("50000.00"), quantity=Decimal("1.5")),
                 ],
                 asks=[
-                    DepthLevel(price=Decimal('50001.00'), quantity=Decimal('1.2')),
-                ]
+                    DepthLevel(price=Decimal("50001.00"), quantity=Decimal("1.2")),
+                ],
             )
             await redis_store.store_depth_snapshot(snapshot)
 
             # Store test trade data
             minute_data = MinuteTradeData(timestamp=datetime.now())
             trade = Trade(
-                symbol='BTCFDUSD',
-                price=Decimal('50000.50'),
-                quantity=Decimal('0.1'),
+                symbol="BTCFDUSD",
+                price=Decimal("50000.50"),
+                quantity=Decimal("0.1"),
                 is_buyer_maker=False,
                 timestamp=datetime.now(),
-                trade_id='1'
+                trade_id="1",
             )
             minute_data.add_trade(trade)
             await redis_store.store_minute_trade_data(minute_data)
@@ -222,7 +224,7 @@ class TestDataPipelineIntegration:
             # Retrieve and verify data
             retrieved_snapshot = redis_store.get_latest_depth_snapshot()
             assert retrieved_snapshot is not None
-            assert retrieved_snapshot.symbol == 'BTCFDUSD'
+            assert retrieved_snapshot.symbol == "BTCFDUSD"
 
             retrieved_trades = redis_store.get_recent_trade_data(minutes=60)
             assert len(retrieved_trades) > 0
@@ -238,11 +240,11 @@ class TestDataPipelineIntegration:
         mock_redis.ping.side_effect = [True, False]  # Second call fails
         mock_redis.set.side_effect = Exception("Redis connection failed")
 
-        with patch('src.core.redis_client.redis.Redis', return_value=mock_redis):
+        with patch("src.core.redis_client.redis.Redis", return_value=mock_redis):
             redis_store = RedisDataStore(
                 host=test_settings.redis.host,
                 port=test_settings.redis.port,
-                db=test_settings.redis.db
+                db=test_settings.redis.db,
             )
 
             # Test connection failure handling
@@ -250,10 +252,7 @@ class TestDataPipelineIntegration:
 
             # Test storage failure handling
             snapshot = DepthSnapshot(
-                symbol='BTCFDUSD',
-                timestamp=datetime.now(),
-                bids=[],
-                asks=[]
+                symbol="BTCFDUSD", timestamp=datetime.now(), bids=[], asks=[]
             )
 
             with pytest.raises(Exception):
@@ -262,27 +261,31 @@ class TestDataPipelineIntegration:
     async def test_data_retrieval_consistency(self, test_settings, mock_redis):
         """Test data retrieval consistency."""
         # Setup mock Redis with test data
-        test_snapshot_data = json.dumps({
-            'symbol': 'BTCFDUSD',
-            'timestamp': datetime.now().isoformat(),
-            'bids': [['50000.00', '1.5'], ['49999.00', '2.0']],
-            'asks': [['50001.00', '1.2'], ['50002.00', '0.8']]
-        })
+        test_snapshot_data = json.dumps(
+            {
+                "symbol": "BTCFDUSD",
+                "timestamp": datetime.now().isoformat(),
+                "bids": [["50000.00", "1.5"], ["49999.00", "2.0"]],
+                "asks": [["50001.00", "1.2"], ["50002.00", "0.8"]],
+            }
+        )
 
         # Create proper trade data format
-        test_trade_data = json.dumps({
-            'timestamp': datetime.now().isoformat(),
-            'price_levels': {
-                '50000.0': {
-                    'price_level': 50000.0,
-                    'buy_volume': 0.1,
-                    'sell_volume': 0.2,
-                    'total_volume': 0.3,
-                    'delta': -0.1,
-                    'trade_count': 2
-                }
+        test_trade_data = json.dumps(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "price_levels": {
+                    "50000.0": {
+                        "price_level": 50000.0,
+                        "buy_volume": 0.1,
+                        "sell_volume": 0.2,
+                        "total_volume": 0.3,
+                        "delta": -0.1,
+                        "trade_count": 2,
+                    }
+                },
             }
-        })
+        )
 
         mock_redis.ping.return_value = True
         mock_redis.get.return_value = test_snapshot_data
@@ -290,17 +293,17 @@ class TestDataPipelineIntegration:
         mock_redis.exists.return_value = 1
         mock_redis.llen.return_value = 1
 
-        with patch('src.core.redis_client.redis.Redis', return_value=mock_redis):
+        with patch("src.core.redis_client.redis.Redis", return_value=mock_redis):
             redis_store = RedisDataStore(
                 host=test_settings.redis.host,
                 port=test_settings.redis.port,
-                db=test_settings.redis.db
+                db=test_settings.redis.db,
             )
 
             # Test depth snapshot retrieval
             snapshot = redis_store.get_latest_depth_snapshot()
             assert snapshot is not None
-            assert snapshot.symbol == 'BTCFDUSD'
+            assert snapshot.symbol == "BTCFDUSD"
             assert len(snapshot.bids) == 2
             assert len(snapshot.asks) == 2
 
@@ -317,25 +320,33 @@ class TestDataPipelineIntegration:
         mock_redis.ping.return_value = True
         mock_redis.set.return_value = True
 
-        with patch('src.core.redis_client.redis.Redis', return_value=mock_redis):
+        with patch("src.core.redis_client.redis.Redis", return_value=mock_redis):
             redis_store = RedisDataStore(
                 host=test_settings.redis.host,
                 port=test_settings.redis.port,
-                db=test_settings.redis.db
+                db=test_settings.redis.db,
             )
 
             # Create and store complex data
             snapshot = DepthSnapshot(
-                symbol='BTCFDUSD',
+                symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[
-                    DepthLevel(price=Decimal('50000.123456'), quantity=Decimal('1.987654')),
-                    DepthLevel(price=Decimal('49999.987654'), quantity=Decimal('2.123456')),
+                    DepthLevel(
+                        price=Decimal("50000.123456"), quantity=Decimal("1.987654")
+                    ),
+                    DepthLevel(
+                        price=Decimal("49999.987654"), quantity=Decimal("2.123456")
+                    ),
                 ],
                 asks=[
-                    DepthLevel(price=Decimal('50001.456789'), quantity=Decimal('1.345678')),
-                    DepthLevel(price=Decimal('50002.012345'), quantity=Decimal('0.876543')),
-                ]
+                    DepthLevel(
+                        price=Decimal("50001.456789"), quantity=Decimal("1.345678")
+                    ),
+                    DepthLevel(
+                        price=Decimal("50002.012345"), quantity=Decimal("0.876543")
+                    ),
+                ],
             )
 
             await redis_store.store_depth_snapshot(snapshot)
@@ -347,11 +358,15 @@ class TestDataPipelineIntegration:
             # Should be valid JSON
             parsed_data = json.loads(data_str)
             assert isinstance(parsed_data, dict)
-            assert 'symbol' in parsed_data
-            assert 'timestamp' in parsed_data
-            assert 'bids' in parsed_data
-            assert 'asks' in parsed_data
+            assert "symbol" in parsed_data
+            assert "timestamp" in parsed_data
+            assert "bids" in parsed_data
+            assert "asks" in parsed_data
 
             # Verify precision handling
-            assert isinstance(parsed_data['bids'][0][0], float)  # Price converted to float
-            assert isinstance(parsed_data['bids'][0][1], float)  # Quantity converted to float
+            assert isinstance(
+                parsed_data["bids"][0][0], float
+            )  # Price converted to float
+            assert isinstance(
+                parsed_data["bids"][0][1], float
+            )  # Quantity converted to float

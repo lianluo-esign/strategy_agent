@@ -22,54 +22,53 @@ class TestVisualizationComponents:
     def create_mock_results(self) -> dict:
         """Create mock clustering results for testing."""
         return {
-            'optimal_clusters': 2,
-            'silhouette_score': 0.75,
-            'wcss': [100.0, 50.0, 25.0],
-            'clustering_data': np.array([
-                [1.0, 2.0, 0.0],  # bid point
-                [1.1, 1.8, 0.0],  # bid point
-                [2.0, 3.0, 1.0],  # ask point
-                [2.1, 2.9, 1.0],  # ask point
-            ]),
-            'labels': np.array([0, 0, 1, 1]),
-            'centers': np.array([
-                [1.05, 1.9, 0.0],
-                [2.05, 2.95, 1.0]
-            ]),
-            'cluster_analysis': {
+            "optimal_clusters": 2,
+            "silhouette_score": 0.75,
+            "wcss": [100.0, 50.0, 25.0],
+            "clustering_data": np.array(
+                [
+                    [1.0, 2.0, 0.0],  # bid point
+                    [1.1, 1.8, 0.0],  # bid point
+                    [2.0, 3.0, 1.0],  # ask point
+                    [2.1, 2.9, 1.0],  # ask point
+                ]
+            ),
+            "labels": np.array([0, 0, 1, 1]),
+            "centers": np.array([[1.05, 1.9, 0.0], [2.05, 2.95, 1.0]]),
+            "cluster_analysis": {
                 0: {
-                    'size': 2,
-                    'avg_price': 1.05,
-                    'total_volume': 3.8,
-                    'avg_volume': 1.9,
-                    'bid_ratio': 1.0,
-                    'ask_ratio': 0.0,
-                    'dominant_side': 'bid'
+                    "size": 2,
+                    "avg_price": 1.05,
+                    "total_volume": 3.8,
+                    "avg_volume": 1.9,
+                    "bid_ratio": 1.0,
+                    "ask_ratio": 0.0,
+                    "dominant_side": "bid",
                 },
                 1: {
-                    'size': 2,
-                    'avg_price': 2.05,
-                    'total_volume': 5.9,
-                    'avg_volume': 2.95,
-                    'bid_ratio': 0.0,
-                    'ask_ratio': 1.0,
-                    'dominant_side': 'ask'
-                }
+                    "size": 2,
+                    "avg_price": 2.05,
+                    "total_volume": 5.9,
+                    "avg_volume": 2.95,
+                    "bid_ratio": 0.0,
+                    "ask_ratio": 1.0,
+                    "dominant_side": "ask",
+                },
             },
-            'liquidity_peaks': [
+            "liquidity_peaks": [
                 {
-                    'center_price': 2.05,
-                    'total_volume': 5.9,
-                    'dominant_side': 'ask',
-                    'purity': 0.9
+                    "center_price": 2.05,
+                    "total_volume": 5.9,
+                    "dominant_side": "ask",
+                    "purity": 0.9,
                 },
                 {
-                    'center_price': 1.05,
-                    'total_volume': 3.8,
-                    'dominant_side': 'bid',
-                    'purity': 0.85
-                }
-            ]
+                    "center_price": 1.05,
+                    "total_volume": 3.8,
+                    "dominant_side": "bid",
+                    "purity": 0.85,
+                },
+            ],
         }
 
     def test_cluster_visualizer_initialization(self):
@@ -78,18 +77,20 @@ class TestVisualizationComponents:
         assert self.visualizer.axes is not None
         assert len(self.visualizer.axes.flatten()) == 4  # 2x2 subplot grid
 
-    @patch('matplotlib.pyplot.savefig')
-    @patch('matplotlib.pyplot.show')
+    @patch("matplotlib.pyplot.savefig")
+    @patch("matplotlib.pyplot.show")
     def test_plot_clustering_results_with_save_path(self, mock_show, mock_savefig):
         """Test plotting with save path functionality."""
         mock_results = self.create_mock_results()
 
-        self.visualizer.plot_clustering_results(mock_results, save_path='test_plot.png')
+        self.visualizer.plot_clustering_results(mock_results, save_path="test_plot.png")
 
-        mock_savefig.assert_called_once_with('test_plot.png', dpi=300, bbox_inches='tight')
+        mock_savefig.assert_called_once_with(
+            "test_plot.png", dpi=300, bbox_inches="tight"
+        )
         mock_show.assert_called_once()
 
-    @patch('matplotlib.pyplot.show')
+    @patch("matplotlib.pyplot.show")
     def test_plot_clustering_results_without_save_path(self, mock_show):
         """Test plotting without save path."""
         mock_results = self.create_mock_results()
@@ -101,11 +102,11 @@ class TestVisualizationComponents:
     def test_plot_clustering_results_empty_data(self):
         """Test plotting with empty data."""
         empty_results = {
-            'clustering_data': np.array([]),
-            'labels': np.array([]),
-            'centers': np.array([]),
-            'cluster_analysis': {},
-            'liquidity_peaks': []
+            "clustering_data": np.array([]),
+            "labels": np.array([]),
+            "centers": np.array([]),
+            "cluster_analysis": {},
+            "liquidity_peaks": [],
         }
 
         # Should not raise an exception
@@ -130,7 +131,7 @@ class TestVisualizationComponents:
         self.visualizer.axes[1, 0] = ax
 
         # Call with empty WCSS
-        self.visualizer._plot_elbow_method({'wcss': []})
+        self.visualizer._plot_elbow_method({"wcss": []})
 
         # Verify text was added for empty state
         ax.text.assert_called_once()
@@ -146,7 +147,7 @@ class TestVisualizationComponents:
 
         # Verify text was added for empty state
         ax.text.assert_called_once()
-        ax.axis.assert_called_once_with('off')
+        ax.axis.assert_called_once_with("off")
 
     def test_edge_case_insufficient_data(self):
         """Test analyzer with insufficient data."""
@@ -155,18 +156,15 @@ class TestVisualizationComponents:
         asks = [DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.0"))]
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Should return empty result structure
-        assert results['optimal_clusters'] == 0
-        assert results['silhouette_score'] == 0.0
-        assert len(results['liquidity_peaks']) == 0
+        assert results["optimal_clusters"] == 0
+        assert results["silhouette_score"] == 0.0
+        assert len(results["liquidity_peaks"]) == 0
 
     def test_edge_case_single_price_level(self):
         """Test analyzer with single price level data."""
@@ -174,44 +172,38 @@ class TestVisualizationComponents:
         bids = [
             DepthLevel(price=Decimal("70000.00"), quantity=Decimal("1.0")),
             DepthLevel(price=Decimal("70000.00"), quantity=Decimal("2.0")),
-            DepthLevel(price=Decimal("70000.00"), quantity=Decimal("1.5"))
+            DepthLevel(price=Decimal("70000.00"), quantity=Decimal("1.5")),
         ]
         asks = [
             DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.0")),
             DepthLevel(price=Decimal("70100.00"), quantity=Decimal("2.0")),
-            DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.5"))
+            DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.5")),
         ]
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Should handle gracefully
         assert isinstance(results, dict)
-        assert 'optimal_clusters' in results
+        assert "optimal_clusters" in results
 
     def test_edge_case_zero_volumes(self):
         """Test analyzer with zero volume orders."""
         # Create data with zero volumes
         bids = [
             DepthLevel(price=Decimal("70000.00"), quantity=Decimal("0.0")),
-            DepthLevel(price=Decimal("69900.00"), quantity=Decimal("0.0"))
+            DepthLevel(price=Decimal("69900.00"), quantity=Decimal("0.0")),
         ]
         asks = [
             DepthLevel(price=Decimal("70100.00"), quantity=Decimal("0.0")),
-            DepthLevel(price=Decimal("70200.00"), quantity=Decimal("0.0"))
+            DepthLevel(price=Decimal("70200.00"), quantity=Decimal("0.0")),
         ]
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
@@ -225,15 +217,15 @@ class TestVisualizationComponents:
             _print_summary_metrics,
             _print_liquidity_peaks,
             _print_detailed_cluster_analysis,
-            _print_market_structure_analysis
+            _print_market_structure_analysis,
         )
 
         # Test with empty results
         empty_results = {
-            'optimal_clusters': 0,
-            'silhouette_score': 0.0,
-            'liquidity_peaks': [],
-            'cluster_analysis': {}
+            "optimal_clusters": 0,
+            "silhouette_score": 0.0,
+            "liquidity_peaks": [],
+            "cluster_analysis": {},
         }
 
         # Should not raise exceptions
@@ -247,25 +239,22 @@ class TestVisualizationComponents:
         # Create data with extreme values
         bids = [
             DepthLevel(price=Decimal("1.00"), quantity=Decimal("1000000.0")),
-            DepthLevel(price=Decimal("1000000.00"), quantity=Decimal("0.000001"))
+            DepthLevel(price=Decimal("1000000.00"), quantity=Decimal("0.000001")),
         ]
         asks = [
             DepthLevel(price=Decimal("2.00"), quantity=Decimal("2000000.0")),
-            DepthLevel(price=Decimal("2000000.00"), quantity=Decimal("0.000002"))
+            DepthLevel(price=Decimal("2000000.00"), quantity=Decimal("0.000002")),
         ]
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Should handle extreme values without overflow
         assert isinstance(results, dict)
-        assert 'optimal_clusters' in results
+        assert "optimal_clusters" in results
 
     def test_memory_efficiency_large_dataset(self):
         """Test analyzer with large dataset for memory efficiency."""
@@ -274,20 +263,21 @@ class TestVisualizationComponents:
         asks = []
 
         for i in range(1000):
-            bids.append(DepthLevel(
-                price=Decimal(f"70000.{i%100:02d}"),
-                quantity=Decimal(f"1.{i%10:02d}")
-            ))
-            asks.append(DepthLevel(
-                price=Decimal(f"70100.{i%100:02d}"),
-                quantity=Decimal(f"1.{i%10:02d}")
-            ))
+            bids.append(
+                DepthLevel(
+                    price=Decimal(f"70000.{i % 100:02d}"),
+                    quantity=Decimal(f"1.{i % 10:02d}"),
+                )
+            )
+            asks.append(
+                DepthLevel(
+                    price=Decimal(f"70100.{i % 100:02d}"),
+                    quantity=Decimal(f"1.{i % 10:02d}"),
+                )
+            )
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         # Should process without memory issues
@@ -295,7 +285,7 @@ class TestVisualizationComponents:
 
         assert isinstance(results, dict)
         # Large dataset should produce multiple clusters
-        assert results['optimal_clusters'] >= 0
+        assert results["optimal_clusters"] >= 0
 
     def test_constructor_input_validation(self):
         """Test analyzer constructor input validation."""
@@ -318,27 +308,20 @@ class TestVisualizationComponents:
     def test_clustering_failure_scenarios(self):
         """Test clustering algorithm failure scenarios."""
         # Test with malformed data that could cause clustering failures
-        bids = [
-            DepthLevel(price=Decimal("70000.00"), quantity=Decimal("1.0"))
-        ]
-        asks = [
-            DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.0"))
-        ]
+        bids = [DepthLevel(price=Decimal("70000.00"), quantity=Decimal("1.0"))]
+        asks = [DepthLevel(price=Decimal("70100.00"), quantity=Decimal("1.0"))]
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         # Should handle gracefully with empty result
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         assert isinstance(results, dict)
-        assert results['optimal_clusters'] == 0
-        assert results['silhouette_score'] == 0.0
-        assert len(results['liquidity_peaks']) == 0
+        assert results["optimal_clusters"] == 0
+        assert results["silhouette_score"] == 0.0
+        assert len(results["liquidity_peaks"]) == 0
 
 
 def run_additional_tests():
@@ -352,8 +335,14 @@ def run_additional_tests():
 
     tests = [
         ("可视化器初始化测试", test_instance.test_cluster_visualizer_initialization),
-        ("带保存路径绘图测试", test_instance.test_plot_clustering_results_with_save_path),
-        ("无保存路径绘图测试", test_instance.test_plot_clustering_results_without_save_path),
+        (
+            "带保存路径绘图测试",
+            test_instance.test_plot_clustering_results_with_save_path,
+        ),
+        (
+            "无保存路径绘图测试",
+            test_instance.test_plot_clustering_results_without_save_path,
+        ),
         ("空数据绘图测试", test_instance.test_plot_clustering_results_empty_data),
         ("空流动性峰值绘图测试", test_instance.test_plot_liquidity_peaks_empty),
         ("空WCSS肘部方法测试", test_instance.test_plot_elbow_method_empty_wcss),
@@ -396,7 +385,8 @@ if __name__ == "__main__":
     # Set matplotlib backend for headless testing
     try:
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
     except ImportError:
         pass
 

@@ -6,7 +6,10 @@ import numpy as np
 from decimal import Decimal
 
 from src.core.models import DepthLevel, DepthSnapshot
-from src.core.sklearn_cluster_analyzer import SklearnClusterAnalyzer, print_clustering_results
+from src.core.sklearn_cluster_analyzer import (
+    SklearnClusterAnalyzer,
+    print_clustering_results,
+)
 
 
 def create_test_order_book():
@@ -19,7 +22,7 @@ def create_test_order_book():
 
     # Bid clusters (support levels)
     bid_clusters = [
-        {"center": base_price - 50, "spread": 20, "volume": 15.0},   # Strong support
+        {"center": base_price - 50, "spread": 20, "volume": 15.0},  # Strong support
         {"center": base_price - 120, "spread": 30, "volume": 8.0},  # Medium support
         {"center": base_price - 200, "spread": 25, "volume": 5.0},  # Weak support
     ]
@@ -31,20 +34,22 @@ def create_test_order_book():
 
         # Create multiple orders around the cluster center
         for i in range(10):
-            price_offset = np.random.uniform(-spread/2, spread/2)
+            price_offset = np.random.uniform(-spread / 2, spread / 2)
             price = center + price_offset
             order_volume = volume * np.random.uniform(0.5, 1.5)
 
-            bids.append(DepthLevel(
-                price=Decimal(f"{price:.2f}"),
-                quantity=Decimal(f"{order_volume:.4f}")
-            ))
+            bids.append(
+                DepthLevel(
+                    price=Decimal(f"{price:.2f}"),
+                    quantity=Decimal(f"{order_volume:.4f}"),
+                )
+            )
 
     # Ask clusters (resistance levels)
     ask_clusters = [
-        {"center": base_price + 30, "spread": 15, "volume": 12.0},   # Strong resistance
-        {"center": base_price + 80, "spread": 25, "volume": 6.0},   # Medium resistance
-        {"center": base_price + 150, "spread": 20, "volume": 4.0},   # Weak resistance
+        {"center": base_price + 30, "spread": 15, "volume": 12.0},  # Strong resistance
+        {"center": base_price + 80, "spread": 25, "volume": 6.0},  # Medium resistance
+        {"center": base_price + 150, "spread": 20, "volume": 4.0},  # Weak resistance
     ]
 
     for cluster in ask_clusters:
@@ -53,14 +58,16 @@ def create_test_order_book():
         volume = cluster["volume"]
 
         for i in range(8):
-            price_offset = np.random.uniform(-spread/2, spread/2)
+            price_offset = np.random.uniform(-spread / 2, spread / 2)
             price = center + price_offset
             order_volume = volume * np.random.uniform(0.5, 1.5)
 
-            asks.append(DepthLevel(
-                price=Decimal(f"{price:.2f}"),
-                quantity=Decimal(f"{order_volume:.4f}")
-            ))
+            asks.append(
+                DepthLevel(
+                    price=Decimal(f"{price:.2f}"),
+                    quantity=Decimal(f"{order_volume:.4f}"),
+                )
+            )
 
     # Sort by price
     bids.sort(key=lambda x: x.price, reverse=True)
@@ -81,10 +88,7 @@ def main():
 
     # Create depth snapshot
     snapshot = DepthSnapshot(
-        symbol="BTCFDUSD",
-        timestamp=pd.Timestamp.now(),
-        bids=bids,
-        asks=asks
+        symbol="BTCFDUSD", timestamp=pd.Timestamp.now(), bids=bids, asks=asks
     )
 
     print(f"订单簿数据: {len(bids)}个买盘, {len(asks)}个卖盘")
@@ -96,7 +100,7 @@ def main():
         min_samples=3,
         eps_multiplier=0.015,  # Smaller for better cluster detection
         max_clusters=6,
-        volume_weight=1.5
+        volume_weight=1.5,
     )
 
     print("执行聚类分析...")
@@ -107,14 +111,14 @@ def main():
 
     # Additional insights
     print(f"\n=== 聚类分析洞察 ===")
-    liquidity_peaks = results['liquidity_peaks']
+    liquidity_peaks = results["liquidity_peaks"]
 
     if liquidity_peaks:
         print(f"识别出 {len(liquidity_peaks)} 个流动性峰值")
 
         # Analyze dominant sides
-        bid_peaks = [p for p in liquidity_peaks if p['dominant_side'] == 'bid']
-        ask_peaks = [p for p in liquidity_peaks if p['dominant_side'] == 'ask']
+        bid_peaks = [p for p in liquidity_peaks if p["dominant_side"] == "bid"]
+        ask_peaks = [p for p in liquidity_peaks if p["dominant_side"] == "ask"]
 
         print(f"买盘峰值: {len(bid_peaks)}个")
         print(f"卖盘峰值: {len(ask_peaks)}个")
@@ -127,13 +131,15 @@ def main():
             print("市场结构: 买卖力量相对平衡")
 
         # Find strongest peaks
-        strongest_peak = max(liquidity_peaks, key=lambda x: x['total_volume'])
-        print(f"最强峰值: ${strongest_peak['center_price']:.2f}, "
-              f"总量: {strongest_peak['total_volume']:.0f}, "
-              f"方向: {strongest_peak['dominant_side']}")
+        strongest_peak = max(liquidity_peaks, key=lambda x: x["total_volume"])
+        print(
+            f"最强峰值: ${strongest_peak['center_price']:.2f}, "
+            f"总量: {strongest_peak['total_volume']:.0f}, "
+            f"方向: {strongest_peak['dominant_side']}"
+        )
 
     # Clustering quality assessment
-    silhouette = results['silhouette_score']
+    silhouette = results["silhouette_score"]
     if silhouette > 0.7:
         print("聚类质量: 优秀 (轮廓系数 > 0.7)")
     elif silhouette > 0.5:
@@ -150,8 +156,11 @@ def main():
     print("\n生成可视化图表...")
     try:
         from src.core.sklearn_cluster_analyzer import ClusterVisualizer
+
         visualizer = ClusterVisualizer()
-        visualizer.plot_clustering_results(results, save_path='sklearn_clustering_integration_test.png')
+        visualizer.plot_clustering_results(
+            results, save_path="sklearn_clustering_integration_test.png"
+        )
         print("图表已保存为 sklearn_clustering_integration_test.png")
     except Exception as e:
         print(f"可视化生成失败: {e}")
@@ -166,7 +175,8 @@ if __name__ == "__main__":
     # Set matplotlib backend
     try:
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
     except ImportError:
         pass
 

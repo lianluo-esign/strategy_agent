@@ -41,11 +41,12 @@ class TestAnalyzerGracefulShutdown:
     @pytest.fixture
     def agent(self, mock_settings):
         """Create analyzer agent for testing."""
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.DeepSeekClient') as mock_ai, \
-             patch('src.agents.analyzer.use_normal_distribution', False), \
-             patch('src.agents.analyzer.EnhancedMarketAnalyzer'):
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.DeepSeekClient") as mock_ai,
+            patch("src.agents.analyzer.use_normal_distribution", False),
+            patch("src.agents.analyzer.EnhancedMarketAnalyzer"),
+        ):
             mock_redis.return_value.test_connection.return_value = True
             mock_redis.return_value.close = AsyncMock()
             mock_ai.return_value.close = AsyncMock()
@@ -119,13 +120,12 @@ class TestAnalyzerGracefulShutdown:
     async def test_shutdown_cancels_all_tasks(self, agent):
         """Test that shutdown cancels all pending tasks."""
         # Create some mock tasks
-        mock_tasks = [
-            MagicMock(cancel=MagicMock()),
-            MagicMock(cancel=MagicMock())
-        ]
+        mock_tasks = [MagicMock(cancel=MagicMock()), MagicMock(cancel=MagicMock())]
 
-        with patch('asyncio.all_tasks', return_value=mock_tasks + [asyncio.current_task()]):
-            with patch('asyncio.gather', new_callable=AsyncMock) as mock_gather:
+        with patch(
+            "asyncio.all_tasks", return_value=mock_tasks + [asyncio.current_task()]
+        ):
+            with patch("asyncio.gather", new_callable=AsyncMock) as mock_gather:
                 mock_gather.return_value = []
 
                 await agent._shutdown()
@@ -143,8 +143,10 @@ class TestAnalyzerGracefulShutdown:
         # Create mock task
         mock_task = MagicMock(cancel=MagicMock())
 
-        with patch('asyncio.all_tasks', return_value=[mock_task, asyncio.current_task()]):
-            with patch('asyncio.gather', new_callable=AsyncMock) as mock_gather:
+        with patch(
+            "asyncio.all_tasks", return_value=[mock_task, asyncio.current_task()]
+        ):
+            with patch("asyncio.gather", new_callable=AsyncMock) as mock_gather:
                 # Simulate timeout
                 mock_gather.side_effect = asyncio.TimeoutError()
 
@@ -180,7 +182,7 @@ class TestAnalyzerGracefulShutdown:
         """Test that setup_signal_handlers initializes shutdown flags."""
         agent.setup_signal_handlers()
 
-        assert hasattr(agent, '_shutdown_requested')
+        assert hasattr(agent, "_shutdown_requested")
         assert agent._shutdown_requested is False
 
     @pytest.mark.asyncio
@@ -191,11 +193,12 @@ class TestAnalyzerGracefulShutdown:
         mock_settings.redis.port = 6379
         mock_settings.redis.db = 0
 
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.DeepSeekClient') as mock_ai, \
-             patch('src.agents.analyzer.use_normal_distribution', False), \
-             patch('src.agents.analyzer.EnhancedMarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.DeepSeekClient") as mock_ai,
+            patch("src.agents.analyzer.use_normal_distribution", False),
+            patch("src.agents.analyzer.EnhancedMarketAnalyzer") as mock_analyzer,
+        ):
             mock_redis.return_value.test_connection.return_value = True
             mock_ai.return_value.close = AsyncMock()
             mock_analyzer.return_value.analyze_market = MagicMock()
@@ -219,7 +222,7 @@ class TestAnalyzerGracefulShutdown:
                 # Wait for start to complete
                 await start_task
 
-            with patch('asyncio.get_running_loop') as mock_loop:
+            with patch("asyncio.get_running_loop") as mock_loop:
                 mock_signal_handler = MagicMock()
                 mock_loop.add_signal_handler = MagicMock()
 
@@ -235,9 +238,13 @@ class TestAnalyzerGracefulShutdown:
     @pytest.mark.asyncio
     async def test_main_handles_keyboard_interrupt(self, mock_settings):
         """Test that main function handles KeyboardInterrupt gracefully."""
-        with patch('src.agents.analyzer.Settings.load_from_file', return_value=mock_settings), \
-             patch('src.agents.analyzer.AnalyzerAgent') as mock_agent_class:
-
+        with (
+            patch(
+                "src.agents.analyzer.Settings.load_from_file",
+                return_value=mock_settings,
+            ),
+            patch("src.agents.analyzer.AnalyzerAgent") as mock_agent_class,
+        ):
             mock_agent = MagicMock()
             mock_agent.start = AsyncMock(side_effect=KeyboardInterrupt())
             mock_agent_class.return_value = mock_agent
@@ -254,9 +261,13 @@ class TestAnalyzerGracefulShutdown:
     @pytest.mark.asyncio
     async def test_main_handles_cancelled_error(self, mock_settings):
         """Test that main function handles CancelledError gracefully."""
-        with patch('src.agents.analyzer.Settings.load_from_file', return_value=mock_settings), \
-             patch('src.agents.analyzer.AnalyzerAgent') as mock_agent_class:
-
+        with (
+            patch(
+                "src.agents.analyzer.Settings.load_from_file",
+                return_value=mock_settings,
+            ),
+            patch("src.agents.analyzer.AnalyzerAgent") as mock_agent_class,
+        ):
             mock_agent = MagicMock()
             mock_agent.start = AsyncMock(side_effect=asyncio.CancelledError())
             mock_agent_class.return_value = mock_agent

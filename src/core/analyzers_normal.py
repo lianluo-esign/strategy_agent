@@ -55,16 +55,12 @@ class NormalDistributionMarketAnalyzer:
 
         # Initialize normal distribution analyzer
         self.peak_analyzer = NormalDistributionPeakAnalyzer(
-            price_precision=1.0,
-            confidence_level=confidence_level
+            price_precision=1.0, confidence_level=confidence_level
         )
 
         # Initialize sklearn cluster analyzer
         self.cluster_analyzer = SklearnClusterAnalyzer(
-            min_samples=3,
-            eps_multiplier=0.02,
-            max_clusters=8,
-            volume_weight=2.0
+            min_samples=3, eps_multiplier=0.02, max_clusters=8, volume_weight=2.0
         )
 
         logger.info(
@@ -143,7 +139,9 @@ class NormalDistributionMarketAnalyzer:
         nd_analysis = self.peak_analyzer.analyze_order_book(order_book_data)
 
         # Step 2.5: Perform sklearn clustering analysis
-        clustering_results = self.cluster_analyzer.analyze_order_book_clustering(snapshot)
+        clustering_results = self.cluster_analyzer.analyze_order_book_clustering(
+            snapshot
+        )
 
         # Step 3: Convert to decimal format for consistency
         nd_analysis_decimal = convert_to_decimal_format(nd_analysis)
@@ -159,8 +157,8 @@ class NormalDistributionMarketAnalyzer:
         # Step 6: Calculate additional analysis metrics
         poc_levels = self._identify_poc_levels(aggregated_trades)
         liquidity_vacuum_zones = self._identify_liquidity_vacuum_zones(
-            nd_analysis_decimal.get('aggregated_bids', {}),
-            nd_analysis_decimal.get('aggregated_asks', {})
+            nd_analysis_decimal.get("aggregated_bids", {}),
+            nd_analysis_decimal.get("aggregated_asks", {}),
         )
         resonance_zones = self._identify_resonance_zones(
             support_levels, resistance_levels, aggregated_trades
@@ -168,17 +166,20 @@ class NormalDistributionMarketAnalyzer:
 
         # Step 7: Calculate quality metrics
         depth_statistics = self._calculate_depth_statistics(
-            snapshot.bids, snapshot.asks,
-            nd_analysis_decimal.get('aggregated_bids', {}),
-            nd_analysis_decimal.get('aggregated_asks', {})
+            snapshot.bids,
+            snapshot.asks,
+            nd_analysis_decimal.get("aggregated_bids", {}),
+            nd_analysis_decimal.get("aggregated_asks", {}),
         )
-        peak_quality = self._calculate_nd_peak_quality(nd_analysis_decimal, aggregated_trades)
+        peak_quality = self._calculate_nd_peak_quality(
+            nd_analysis_decimal, aggregated_trades
+        )
 
         result = EnhancedMarketAnalysisResult(
             timestamp=datetime.now(),
             symbol=symbol,
-            aggregated_bids=nd_analysis_decimal.get('aggregated_bids', {}),
-            aggregated_asks=nd_analysis_decimal.get('aggregated_asks', {}),
+            aggregated_bids=nd_analysis_decimal.get("aggregated_bids", {}),
+            aggregated_asks=nd_analysis_decimal.get("aggregated_asks", {}),
             wave_peaks=[],  # Empty for now, could be populated later
             support_zones=[],  # Convert from confidence intervals
             resistance_zones=[],
@@ -190,16 +191,18 @@ class NormalDistributionMarketAnalyzer:
             depth_statistics=depth_statistics,
             peak_detection_quality=peak_quality,
             # New fields for normal distribution analysis
-            normal_distribution_peaks=nd_analysis_decimal.get('peak_analysis', {}),
-            confidence_intervals=self._extract_confidence_intervals(nd_analysis_decimal),
-            market_metrics=nd_analysis_decimal.get('market_metrics', {}),
-            spread_analysis=nd_analysis_decimal.get('spread_analysis', {}),
+            normal_distribution_peaks=nd_analysis_decimal.get("peak_analysis", {}),
+            confidence_intervals=self._extract_confidence_intervals(
+                nd_analysis_decimal
+            ),
+            market_metrics=nd_analysis_decimal.get("market_metrics", {}),
+            spread_analysis=nd_analysis_decimal.get("spread_analysis", {}),
             # New fields for sklearn clustering analysis
             clustering_results=clustering_results,
-            optimal_clusters=clustering_results.get('optimal_clusters', 0),
-            silhouette_score=clustering_results.get('silhouette_score', 0.0),
+            optimal_clusters=clustering_results.get("optimal_clusters", 0),
+            silhouette_score=clustering_results.get("silhouette_score", 0.0),
             liquidity_peaks=self._convert_clustering_peaks_to_support_resistance(
-                clustering_results.get('liquidity_peaks', [])
+                clustering_results.get("liquidity_peaks", [])
             ),
         )
 
@@ -219,9 +222,10 @@ class NormalDistributionMarketAnalyzer:
         )
 
         # Print clustering results in the optimized format
-        if clustering_results.get('optimal_clusters', 0) > 0:
+        if clustering_results.get("optimal_clusters", 0) > 0:
             # Use the optimized display function from sklearn_cluster_analyzer
             from .sklearn_cluster_analyzer import print_clustering_results
+
             print_clustering_results(clustering_results)
 
         return result
@@ -266,14 +270,12 @@ class NormalDistributionMarketAnalyzer:
             Order book data in the expected format
         """
         order_book_data = {
-            'bids': [
-                (float(level.price), float(level.quantity))
-                for level in snapshot.bids
+            "bids": [
+                (float(level.price), float(level.quantity)) for level in snapshot.bids
             ],
-            'asks': [
-                (float(level.price), float(level.quantity))
-                for level in snapshot.asks
-            ]
+            "asks": [
+                (float(level.price), float(level.quantity)) for level in snapshot.asks
+            ],
         }
         return order_book_data
 
@@ -288,7 +290,9 @@ class NormalDistributionMarketAnalyzer:
                 # Handle both PriceLevelData objects and dictionaries (from Redis)
                 if isinstance(price_level_data, dict):
                     # Data is stored as dictionary from Redis JSON deserialization
-                    price_key = Decimal(str(price_level_data["price_level"])).quantize(Decimal("1"))
+                    price_key = Decimal(str(price_level_data["price_level"])).quantize(
+                        Decimal("1")
+                    )
                     total_volume = Decimal(str(price_level_data["total_volume"]))
                 else:
                     # Data is a PriceLevelData object
@@ -316,37 +320,39 @@ class NormalDistributionMarketAnalyzer:
         support_levels = []
         resistance_levels = []
 
-        peak_analysis = nd_analysis.get('peak_analysis', {})
+        peak_analysis = nd_analysis.get("peak_analysis", {})
 
         # Generate support levels from bid peak interval
-        if 'bids' in peak_analysis:
-            bid_data = peak_analysis['bids']
-            if bid_data.get('peak_interval') and bid_data.get('mean_price'):
-                lower_price, upper_price = bid_data['peak_interval']
+        if "bids" in peak_analysis:
+            bid_data = peak_analysis["bids"]
+            if bid_data.get("peak_interval") and bid_data.get("mean_price"):
+                lower_price, upper_price = bid_data["peak_interval"]
                 if lower_price is not None and upper_price is not None:
                     # Use the lower bound as support level
                     support_level = SupportResistanceLevel(
                         price=lower_price,
-                        strength=bid_data.get('z_score', 1.96) / 3.0,  # Normalize to 0-1 range
+                        strength=bid_data.get("z_score", 1.96)
+                        / 3.0,  # Normalize to 0-1 range
                         level_type="support",
-                        volume_at_level=bid_data.get('peak_volume', Decimal("0")),
+                        volume_at_level=bid_data.get("peak_volume", Decimal("0")),
                         confirmation_count=1,
                         last_confirmed=datetime.now(),
                     )
                     support_levels.append(support_level)
 
         # Generate resistance levels from ask peak interval
-        if 'asks' in peak_analysis:
-            ask_data = peak_analysis['asks']
-            if ask_data.get('peak_interval') and ask_data.get('mean_price'):
-                lower_price, upper_price = ask_data['peak_interval']
+        if "asks" in peak_analysis:
+            ask_data = peak_analysis["asks"]
+            if ask_data.get("peak_interval") and ask_data.get("mean_price"):
+                lower_price, upper_price = ask_data["peak_interval"]
                 if lower_price is not None and upper_price is not None:
                     # Use the upper bound as resistance level
                     resistance_level = SupportResistanceLevel(
                         price=upper_price,
-                        strength=ask_data.get('z_score', 1.96) / 3.0,  # Normalize to 0-1 range
+                        strength=ask_data.get("z_score", 1.96)
+                        / 3.0,  # Normalize to 0-1 range
                         level_type="resistance",
-                        volume_at_level=ask_data.get('peak_volume', Decimal("0")),
+                        volume_at_level=ask_data.get("peak_volume", Decimal("0")),
                         confirmation_count=1,
                         last_confirmed=datetime.now(),
                     )
@@ -354,7 +360,9 @@ class NormalDistributionMarketAnalyzer:
 
         return support_levels, resistance_levels
 
-    def _extract_confidence_intervals(self, nd_analysis: dict[str, Any]) -> dict[str, Any]:
+    def _extract_confidence_intervals(
+        self, nd_analysis: dict[str, Any]
+    ) -> dict[str, Any]:
         """Extract confidence intervals from analysis results.
 
         Args:
@@ -363,25 +371,25 @@ class NormalDistributionMarketAnalyzer:
         Returns:
             Dictionary containing confidence intervals
         """
-        peak_analysis = nd_analysis.get('peak_analysis', {})
+        peak_analysis = nd_analysis.get("peak_analysis", {})
         confidence_intervals = {}
 
-        if 'bids' in peak_analysis:
-            bid_data = peak_analysis['bids']
-            confidence_intervals['bid'] = {
-                'interval': bid_data.get('peak_interval'),
-                'mean_price': bid_data.get('mean_price'),
-                'confidence_level': bid_data.get('confidence_level'),
-                'z_score': bid_data.get('z_score'),
+        if "bids" in peak_analysis:
+            bid_data = peak_analysis["bids"]
+            confidence_intervals["bid"] = {
+                "interval": bid_data.get("peak_interval"),
+                "mean_price": bid_data.get("mean_price"),
+                "confidence_level": bid_data.get("confidence_level"),
+                "z_score": bid_data.get("z_score"),
             }
 
-        if 'asks' in peak_analysis:
-            ask_data = peak_analysis['asks']
-            confidence_intervals['ask'] = {
-                'interval': ask_data.get('peak_interval'),
-                'mean_price': ask_data.get('mean_price'),
-                'confidence_level': ask_data.get('confidence_level'),
-                'z_score': ask_data.get('z_score'),
+        if "asks" in peak_analysis:
+            ask_data = peak_analysis["asks"]
+            confidence_intervals["ask"] = {
+                "interval": ask_data.get("peak_interval"),
+                "mean_price": ask_data.get("mean_price"),
+                "confidence_level": ask_data.get("confidence_level"),
+                "z_score": ask_data.get("z_score"),
             }
 
         return confidence_intervals
@@ -432,7 +440,9 @@ class NormalDistributionMarketAnalyzer:
             )
 
             # If both adjacent price levels have low volume, mark as vacuum
-            if prev_volume < avg_volume * Decimal("0.2") and curr_volume < avg_volume * Decimal("0.2"):
+            if prev_volume < avg_volume * Decimal(
+                "0.2"
+            ) and curr_volume < avg_volume * Decimal("0.2"):
                 vacuum_zones.append((prev_price + curr_price) / Decimal("2"))
 
         return vacuum_zones
@@ -508,7 +518,7 @@ class NormalDistributionMarketAnalyzer:
         self, nd_analysis: dict[str, Any], aggregated_trades: dict[Decimal, Decimal]
     ) -> dict[str, float]:
         """Calculate quality metrics for normal distribution peak detection."""
-        if not nd_analysis or 'peak_analysis' not in nd_analysis:
+        if not nd_analysis or "peak_analysis" not in nd_analysis:
             return {
                 "peak_count": 0,
                 "avg_confidence": 0.0,
@@ -516,23 +526,23 @@ class NormalDistributionMarketAnalyzer:
                 "confidence_level": self.confidence_level,
             }
 
-        peak_analysis = nd_analysis['peak_analysis']
-        total_peaks = len([side for side in ['bids', 'asks'] if side in peak_analysis])
+        peak_analysis = nd_analysis["peak_analysis"]
+        total_peaks = len([side for side in ["bids", "asks"] if side in peak_analysis])
 
         # Average confidence based on z-scores
         z_scores = []
-        for side in ['bids', 'asks']:
+        for side in ["bids", "asks"]:
             if side in peak_analysis:
-                z_scores.append(peak_analysis[side].get('z_score', 0))
+                z_scores.append(peak_analysis[side].get("z_score", 0))
 
         avg_confidence = sum(z_scores) / len(z_scores) if z_scores else 0.0
 
         # Calculate coverage (percentage of significant volume captured by peaks)
         total_volume = sum(aggregated_trades.values())
         peak_volume = 0.0
-        for side in ['bids', 'asks']:
+        for side in ["bids", "asks"]:
             if side in peak_analysis:
-                peak_volume += float(peak_analysis[side].get('peak_volume', 0))
+                peak_volume += float(peak_analysis[side].get("peak_volume", 0))
 
         coverage_rate = (
             peak_volume / (float(total_volume) + 0.01) if total_volume > 0 else 0.0
@@ -598,6 +608,7 @@ class MarketAnalyzer:
             # Fall back to importing traditional analyzer
             try:
                 from . import analyzers
+
                 self.traditional_analyzer = analyzers.MarketAnalyzer(
                     min_volume_threshold=min_volume_threshold,
                     analysis_window_minutes=analysis_window_minutes,
@@ -620,11 +631,11 @@ class MarketAnalyzer:
         enhanced_mode: bool = True,
     ):
         """Perform market analysis using the selected method."""
-        if self.use_normal_distribution and hasattr(self, 'nd_analyzer'):
+        if self.use_normal_distribution and hasattr(self, "nd_analyzer"):
             return self.nd_analyzer.analyze_market(
                 snapshot, trade_data_list, symbol, enhanced_mode
             )
-        elif hasattr(self, 'traditional_analyzer'):
+        elif hasattr(self, "traditional_analyzer"):
             return self.traditional_analyzer.analyze_market(
                 snapshot, trade_data_list, symbol, enhanced_mode
             )

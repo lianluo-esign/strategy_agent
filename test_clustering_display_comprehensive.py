@@ -17,10 +17,7 @@ class TestSklearnClusteringDisplay:
     def setup_method(self):
         """Set up test fixtures."""
         self.analyzer = SklearnClusterAnalyzer(
-            min_samples=3,
-            eps_multiplier=0.02,
-            max_clusters=6,
-            volume_weight=1.5
+            min_samples=3, eps_multiplier=0.02, max_clusters=6, volume_weight=1.5
         )
 
     def create_test_order_book_with_clusters(self):
@@ -31,9 +28,17 @@ class TestSklearnClusteringDisplay:
 
         # Ask clusters (resistance levels) - higher prices
         ask_clusters = [
-            {"center": base_price + 150, "spread": 20, "volume": 12.0},  # Strong resistance
-            {"center": base_price + 80, "spread": 25, "volume": 6.0},    # Medium resistance
-            {"center": base_price + 30, "spread": 15, "volume": 4.0},    # Weak resistance
+            {
+                "center": base_price + 150,
+                "spread": 20,
+                "volume": 12.0,
+            },  # Strong resistance
+            {
+                "center": base_price + 80,
+                "spread": 25,
+                "volume": 6.0,
+            },  # Medium resistance
+            {"center": base_price + 30, "spread": 15, "volume": 4.0},  # Weak resistance
         ]
 
         for cluster in ask_clusters:
@@ -41,17 +46,19 @@ class TestSklearnClusteringDisplay:
             spread = cluster["spread"]
             volume = cluster["volume"]
             for i in range(8):
-                price_offset = np.random.uniform(-spread/2, spread/2)
+                price_offset = np.random.uniform(-spread / 2, spread / 2)
                 price = center + price_offset
                 order_volume = volume * np.random.uniform(0.5, 1.5)
-                asks.append(DepthLevel(
-                    price=Decimal(f"{price:.2f}"),
-                    quantity=Decimal(f"{order_volume:.4f}")
-                ))
+                asks.append(
+                    DepthLevel(
+                        price=Decimal(f"{price:.2f}"),
+                        quantity=Decimal(f"{order_volume:.4f}"),
+                    )
+                )
 
         # Bid clusters (support levels) - lower prices
         bid_clusters = [
-            {"center": base_price - 50, "spread": 20, "volume": 15.0},   # Strong support
+            {"center": base_price - 50, "spread": 20, "volume": 15.0},  # Strong support
             {"center": base_price - 120, "spread": 30, "volume": 8.0},  # Medium support
             {"center": base_price - 200, "spread": 25, "volume": 5.0},  # Weak support
         ]
@@ -61,13 +68,15 @@ class TestSklearnClusteringDisplay:
             spread = cluster["spread"]
             volume = cluster["volume"]
             for i in range(10):
-                price_offset = np.random.uniform(-spread/2, spread/2)
+                price_offset = np.random.uniform(-spread / 2, spread / 2)
                 price = center + price_offset
                 order_volume = volume * np.random.uniform(0.5, 1.5)
-                bids.append(DepthLevel(
-                    price=Decimal(f"{price:.2f}"),
-                    quantity=Decimal(f"{order_volume:.4f}")
-                ))
+                bids.append(
+                    DepthLevel(
+                        price=Decimal(f"{price:.2f}"),
+                        quantity=Decimal(f"{order_volume:.4f}"),
+                    )
+                )
 
         # Sort by price
         bids.sort(key=lambda x: x.price, reverse=True)
@@ -83,143 +92,140 @@ class TestSklearnClusteringDisplay:
         if len(bids) < 3 or len(asks) < 3:
             # Add more data points if needed
             for i in range(10):
-                bids.append(DepthLevel(
-                    price=Decimal(f"69800.{i:02d}"),
-                    quantity=Decimal(f"1.{i:02d}")
-                ))
-                asks.append(DepthLevel(
-                    price=Decimal(f"70200.{i:02d}"),
-                    quantity=Decimal(f"1.{i:02d}")
-                ))
+                bids.append(
+                    DepthLevel(
+                        price=Decimal(f"69800.{i:02d}"), quantity=Decimal(f"1.{i:02d}")
+                    )
+                )
+                asks.append(
+                    DepthLevel(
+                        price=Decimal(f"70200.{i:02d}"), quantity=Decimal(f"1.{i:02d}")
+                    )
+                )
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Verify basic structure
-        assert 'liquidity_peaks' in results
-        assert 'optimal_clusters' in results
-        assert 'silhouette_score' in results
-        assert 'cluster_analysis' in results
+        assert "liquidity_peaks" in results
+        assert "optimal_clusters" in results
+        assert "silhouette_score" in results
+        assert "cluster_analysis" in results
 
         # Verify liquidity peaks were found (if clustering was possible)
-        liquidity_peaks = results['liquidity_peaks']
-        if results['optimal_clusters'] > 0:  # Only check if clustering succeeded
+        liquidity_peaks = results["liquidity_peaks"]
+        if results["optimal_clusters"] > 0:  # Only check if clustering succeeded
             assert len(liquidity_peaks) >= 0, "Should identify liquidity peaks"
 
             # Verify peak structure for any peaks found
             for peak in liquidity_peaks:
-                assert 'center_price' in peak
-                assert 'dominant_side' in peak
-                assert 'total_volume' in peak
-                assert 'price_range' in peak
-                assert peak['dominant_side'] in ['ask', 'bid']
-                assert peak['total_volume'] >= 0, "Total volume should be positive"
+                assert "center_price" in peak
+                assert "dominant_side" in peak
+                assert "total_volume" in peak
+                assert "price_range" in peak
+                assert peak["dominant_side"] in ["ask", "bid"]
+                assert peak["total_volume"] >= 0, "Total volume should be positive"
 
     def test_ask_peaks_displayed_above_bid_peaks(self):
         """Test that ask peaks are displayed above bid peaks in output."""
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Get peaks organized by side
-        peaks = results.get('liquidity_peaks', [])
-        ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
-        bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
+        peaks = results.get("liquidity_peaks", [])
+        ask_peaks = [p for p in peaks if p["dominant_side"] == "ask"]
+        bid_peaks = [p for p in peaks if p["dominant_side"] == "bid"]
 
         # Ask peaks should have higher prices than bid peaks
         if ask_peaks and bid_peaks:
-            max_bid_price = max(p['center_price'] for p in bid_peaks)
-            min_ask_price = min(p['center_price'] for p in ask_peaks)
-            assert min_ask_price > max_bid_price, "Ask peaks should have higher prices than bid peaks"
+            max_bid_price = max(p["center_price"] for p in bid_peaks)
+            min_ask_price = min(p["center_price"] for p in ask_peaks)
+            assert min_ask_price > max_bid_price, (
+                "Ask peaks should have higher prices than bid peaks"
+            )
 
     def test_peaks_sorted_by_price_descending(self):
         """Test that peaks are sorted by price descending within each side."""
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Test the sorting logic that would be applied in print_clustering_results
-        peaks = results.get('liquidity_peaks', [])
-        ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
-        bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
+        peaks = results.get("liquidity_peaks", [])
+        ask_peaks = [p for p in peaks if p["dominant_side"] == "ask"]
+        bid_peaks = [p for p in peaks if p["dominant_side"] == "bid"]
 
         # Sort peaks by price (descending) as done in the optimized display
-        ask_peaks_sorted = sorted(ask_peaks, key=lambda x: x['center_price'], reverse=True)
-        bid_peaks_sorted = sorted(bid_peaks, key=lambda x: x['center_price'], reverse=True)
+        ask_peaks_sorted = sorted(
+            ask_peaks, key=lambda x: x["center_price"], reverse=True
+        )
+        bid_peaks_sorted = sorted(
+            bid_peaks, key=lambda x: x["center_price"], reverse=True
+        )
 
         # Verify sorting is correct
         for i in range(len(ask_peaks_sorted) - 1):
-            assert ask_peaks_sorted[i]['center_price'] >= ask_peaks_sorted[i + 1]['center_price'], \
-                "Ask peaks should be sorted by price descending"
+            assert (
+                ask_peaks_sorted[i]["center_price"]
+                >= ask_peaks_sorted[i + 1]["center_price"]
+            ), "Ask peaks should be sorted by price descending"
 
         for i in range(len(bid_peaks_sorted) - 1):
-            assert bid_peaks_sorted[i]['center_price'] >= bid_peaks_sorted[i + 1]['center_price'], \
-                "Bid peaks should be sorted by price descending"
+            assert (
+                bid_peaks_sorted[i]["center_price"]
+                >= bid_peaks_sorted[i + 1]["center_price"]
+            ), "Bid peaks should be sorted by price descending"
 
     def test_volume_calculations_are_positive(self):
         """Test that all volume calculations are positive (absolute values)."""
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Check cluster statistics for positive volumes
-        cluster_stats = results.get('cluster_analysis', {}).values()
+        cluster_stats = results.get("cluster_analysis", {}).values()
         for stat in cluster_stats:
-            assert 'total_volume' in stat
-            assert 'avg_volume' in stat
-            assert stat['total_volume'] >= 0, "Cluster total volume should be positive"
-            assert stat['avg_volume'] >= 0, "Cluster average volume should be positive"
+            assert "total_volume" in stat
+            assert "avg_volume" in stat
+            assert stat["total_volume"] >= 0, "Cluster total volume should be positive"
+            assert stat["avg_volume"] >= 0, "Cluster average volume should be positive"
 
         # Check liquidity peaks for positive volumes
-        peaks = results.get('liquidity_peaks', [])
+        peaks = results.get("liquidity_peaks", [])
         for peak in peaks:
-            assert peak['total_volume'] >= 0, "Peak total volume should be positive"
+            assert peak["total_volume"] >= 0, "Peak total volume should be positive"
 
     def test_cluster_statistics_separated_by_side(self):
         """Test that clustering statistics are properly separated by bid/ask side."""
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
-        cluster_analysis = results.get('cluster_analysis', {})
+        cluster_analysis = results.get("cluster_analysis", {})
 
         # Check that clusters are analyzed by side
-        bid_clusters = cluster_analysis.get('bid_clusters', [])
-        ask_clusters = cluster_analysis.get('ask_clusters', [])
+        bid_clusters = cluster_analysis.get("bid_clusters", [])
+        ask_clusters = cluster_analysis.get("ask_clusters", [])
 
         # Should have clusters for both sides
         assert len(bid_clusters) >= 0, "Should have bid cluster analysis"
@@ -227,11 +233,11 @@ class TestSklearnClusteringDisplay:
 
         # Verify cluster structure
         for cluster in bid_clusters + ask_clusters:
-            assert 'cluster_id' in cluster
-            assert 'center_price' in cluster
-            assert 'volume' in cluster
-            assert 'size' in cluster
-            assert cluster['volume'] >= 0, "Cluster volume should be positive"
+            assert "cluster_id" in cluster
+            assert "center_price" in cluster
+            assert "volume" in cluster
+            assert "size" in cluster
+            assert cluster["volume"] >= 0, "Cluster volume should be positive"
 
     def test_print_clustering_results_output_format(self):
         """Test that print_clustering_results produces the expected output format."""
@@ -240,60 +246,60 @@ class TestSklearnClusteringDisplay:
 
         # Create a mock results structure to test display formatting
         mock_results = {
-            'optimal_clusters': 3,
-            'silhouette_score': 0.65,
-            'liquidity_peaks': [
+            "optimal_clusters": 3,
+            "silhouette_score": 0.65,
+            "liquidity_peaks": [
                 {
-                    'cluster_id': 0,
-                    'center_price': 70150.0,
-                    'total_volume': 25.5,
-                    'dominant_side': 'ask',
-                    'purity': 0.85,
-                    'size': 8,
-                    'price_range': (70100.0, 70200.0),
-                    'bid_ratio': 0.3,
-                    'ask_ratio': 0.7,
-                    'avg_volume': 3.2
+                    "cluster_id": 0,
+                    "center_price": 70150.0,
+                    "total_volume": 25.5,
+                    "dominant_side": "ask",
+                    "purity": 0.85,
+                    "size": 8,
+                    "price_range": (70100.0, 70200.0),
+                    "bid_ratio": 0.3,
+                    "ask_ratio": 0.7,
+                    "avg_volume": 3.2,
                 },
                 {
-                    'cluster_id': 1,
-                    'center_price': 69950.0,
-                    'total_volume': 32.1,
-                    'dominant_side': 'bid',
-                    'purity': 0.92,
-                    'size': 12,
-                    'price_range': (69900.0, 70000.0),
-                    'bid_ratio': 0.8,
-                    'ask_ratio': 0.2,
-                    'avg_volume': 2.7
-                }
+                    "cluster_id": 1,
+                    "center_price": 69950.0,
+                    "total_volume": 32.1,
+                    "dominant_side": "bid",
+                    "purity": 0.92,
+                    "size": 12,
+                    "price_range": (69900.0, 70000.0),
+                    "bid_ratio": 0.8,
+                    "ask_ratio": 0.2,
+                    "avg_volume": 2.7,
+                },
             ],
-            'cluster_analysis': {
+            "cluster_analysis": {
                 0: {
-                    'size': 8,
-                    'avg_price': 70150.0,
-                    'price_range': (70100.0, 70200.0),
-                    'total_volume': 25.5,
-                    'avg_volume': 3.2,
-                    'bid_ratio': 0.3,
-                    'ask_ratio': 0.7,
-                    'dominant_side': 'ask',
-                    'price_std': 15.5,
-                    'volume_std': 1.1
+                    "size": 8,
+                    "avg_price": 70150.0,
+                    "price_range": (70100.0, 70200.0),
+                    "total_volume": 25.5,
+                    "avg_volume": 3.2,
+                    "bid_ratio": 0.3,
+                    "ask_ratio": 0.7,
+                    "dominant_side": "ask",
+                    "price_std": 15.5,
+                    "volume_std": 1.1,
                 },
                 1: {
-                    'size': 12,
-                    'avg_price': 69950.0,
-                    'price_range': (69900.0, 70000.0),
-                    'total_volume': 32.1,
-                    'avg_volume': 2.7,
-                    'bid_ratio': 0.8,
-                    'ask_ratio': 0.2,
-                    'dominant_side': 'bid',
-                    'price_std': 12.3,
-                    'volume_std': 0.9
-                }
-            }
+                    "size": 12,
+                    "avg_price": 69950.0,
+                    "price_range": (69900.0, 70000.0),
+                    "total_volume": 32.1,
+                    "avg_volume": 2.7,
+                    "bid_ratio": 0.8,
+                    "ask_ratio": 0.2,
+                    "dominant_side": "bid",
+                    "price_std": 12.3,
+                    "volume_std": 0.9,
+                },
+            },
         }
 
         # Capture stdout
@@ -302,6 +308,7 @@ class TestSklearnClusteringDisplay:
 
         try:
             from src.core.sklearn_cluster_analyzer import print_clustering_results
+
             print_clustering_results(mock_results)
             output = captured_output.getvalue()
         finally:
@@ -339,23 +346,20 @@ class TestSklearnClusteringDisplay:
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
-        peaks = results.get('liquidity_peaks', [])
+        peaks = results.get("liquidity_peaks", [])
 
         if peaks:
             # Calculate sentiment as done in the display function
-            ask_peaks = [p for p in peaks if p['dominant_side'] == 'ask']
-            bid_peaks = [p for p in peaks if p['dominant_side'] == 'bid']
+            ask_peaks = [p for p in peaks if p["dominant_side"] == "ask"]
+            bid_peaks = [p for p in peaks if p["dominant_side"] == "bid"]
 
-            total_ask_volume = sum(p['total_volume'] for p in ask_peaks)
-            total_bid_volume = sum(p['total_volume'] for p in bid_peaks)
+            total_ask_volume = sum(p["total_volume"] for p in ask_peaks)
+            total_bid_volume = sum(p["total_volume"] for p in bid_peaks)
             total_volume = total_ask_volume + total_bid_volume
 
             if total_volume > 0:
@@ -365,7 +369,9 @@ class TestSklearnClusteringDisplay:
                 # Verify ratios are valid
                 assert 0 <= bid_ratio <= 1, "Bid ratio should be between 0 and 1"
                 assert 0 <= ask_ratio <= 1, "Ask ratio should be between 0 and 1"
-                assert abs((bid_ratio + ask_ratio) - 1.0) < 0.001, "Ratios should sum to 1"
+                assert abs((bid_ratio + ask_ratio) - 1.0) < 0.001, (
+                    "Ratios should sum to 1"
+                )
 
     def test_edge_cases(self):
         """Test edge cases and robustness."""
@@ -377,34 +383,31 @@ class TestSklearnClusteringDisplay:
             symbol="BTCFDUSD",
             timestamp=datetime.now(),
             bids=minimal_bids,
-            asks=minimal_asks
+            asks=minimal_asks,
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
         # Should still return valid structure
-        assert 'liquidity_peaks' in results
-        assert 'optimal_clusters' in results
-        assert isinstance(results['optimal_clusters'], int)
+        assert "liquidity_peaks" in results
+        assert "optimal_clusters" in results
+        assert isinstance(results["optimal_clusters"], int)
 
     def test_price_range_formatting(self):
         """Test that price ranges are formatted correctly."""
         bids, asks = self.create_test_order_book_with_clusters()
 
         snapshot = DepthSnapshot(
-            symbol="BTCFDUSD",
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         results = self.analyzer.analyze_order_book_clustering(snapshot)
 
-        peaks = results.get('liquidity_peaks', [])
+        peaks = results.get("liquidity_peaks", [])
 
         for peak in peaks:
-            assert 'price_range' in peak
-            price_range = peak['price_range']
+            assert "price_range" in peak
+            price_range = peak["price_range"]
 
             # Should be a tuple with (min_price, max_price)
             assert isinstance(price_range, tuple)
@@ -414,8 +417,10 @@ class TestSklearnClusteringDisplay:
             max_price = float(price_range[1])
 
             assert min_price <= max_price, "Price range minimum should be <= maximum"
-            assert abs(min_price - peak['center_price']) <= 100 or abs(max_price - peak['center_price']) <= 100, \
-                "Center price should be within the price range"
+            assert (
+                abs(min_price - peak["center_price"]) <= 100
+                or abs(max_price - peak["center_price"]) <= 100
+            ), "Center price should be within the price range"
 
 
 def run_comprehensive_test():
@@ -428,7 +433,10 @@ def run_comprehensive_test():
     test_instance.setup_method()
 
     tests = [
-        ("聚类峰值识别测试", test_instance.test_clustering_analysis_identifies_peaks_correctly),
+        (
+            "聚类峰值识别测试",
+            test_instance.test_clustering_analysis_identifies_peaks_correctly,
+        ),
         ("卖盘在买盘上方测试", test_instance.test_ask_peaks_displayed_above_bid_peaks),
         ("价格降序排列测试", test_instance.test_peaks_sorted_by_price_descending),
         ("正向成交量测试", test_instance.test_volume_calculations_are_positive),
@@ -467,7 +475,8 @@ if __name__ == "__main__":
     # Set matplotlib backend for headless testing
     try:
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
     except ImportError:
         pass
 

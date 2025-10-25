@@ -22,7 +22,7 @@ class DeepSeekClient:
         base_url: str = "https://api.deepseek.com/v1",
         model: str = "deepseek-chat",
         max_tokens: int = 4000,
-        temperature: float = 0.1
+        temperature: float = 0.1,
     ):
         """Initialize DeepSeek client."""
         self.api_key = api_key
@@ -37,17 +37,14 @@ class DeepSeekClient:
         self.client = httpx.AsyncClient(
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_key}"},
-            timeout=30.0
+            timeout=30.0,
         )
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10)
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
     async def analyze_market_data(
-        self,
-        analysis_result: MarketAnalysisResult,
-        symbol: str = "BTCFDUSD"
+        self, analysis_result: MarketAnalysisResult, symbol: str = "BTCFDUSD"
     ) -> TradingRecommendation | None:
         """Analyze market data using DeepSeek AI."""
         try:
@@ -74,9 +71,9 @@ class DeepSeekClient:
                                         "properties": {
                                             "price": {"type": "number"},
                                             "strength": {"type": "number"},
-                                            "volume": {"type": "number"}
-                                        }
-                                    }
+                                            "volume": {"type": "number"},
+                                        },
+                                    },
                                 },
                                 "resistance_levels": {
                                     "type": "array",
@@ -85,13 +82,13 @@ class DeepSeekClient:
                                         "properties": {
                                             "price": {"type": "number"},
                                             "strength": {"type": "number"},
-                                            "volume": {"type": "number"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                            "volume": {"type": "number"},
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
                 {
                     "type": "function",
@@ -103,7 +100,7 @@ class DeepSeekClient:
                             "properties": {
                                 "poc_levels": {
                                     "type": "array",
-                                    "items": {"type": "number"}
+                                    "items": {"type": "number"},
                                 },
                                 "confirmed_levels": {
                                     "type": "array",
@@ -112,14 +109,14 @@ class DeepSeekClient:
                                         "properties": {
                                             "price": {"type": "number"},
                                             "type": {"type": "string"},
-                                            "confirmation_strength": {"type": "number"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                                            "confirmation_strength": {"type": "number"},
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             ]
 
             # Make API request
@@ -127,12 +124,12 @@ class DeepSeekClient:
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 "tools": tools,
                 "tool_choice": "auto",
                 "max_tokens": self.max_tokens,
-                "temperature": self.temperature
+                "temperature": self.temperature,
             }
 
             response = await self.client.post("/chat/completions", json=request_data)
@@ -177,7 +174,9 @@ Provide specific actionable recommendations including:
 
 Always prioritize capital preservation and optimal execution timing."""
 
-    def _format_market_data_prompt(self, analysis_result: MarketAnalysisResult, symbol: str) -> str:
+    def _format_market_data_prompt(
+        self, analysis_result: MarketAnalysisResult, symbol: str
+    ) -> str:
         """Format market analysis data for AI prompt."""
         prompt = f"""Please analyze the following market data for {symbol} and provide market-making recommendations.
 
@@ -222,7 +221,9 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
             )
         return "\n".join(formatted)
 
-    def _process_ai_response(self, response: dict, symbol: str) -> TradingRecommendation:
+    def _process_ai_response(
+        self, response: dict, symbol: str
+    ) -> TradingRecommendation:
         """Process AI response and extract trading recommendation."""
         try:
             message = response["choices"][0]["message"]
@@ -252,7 +253,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
                 price_range=(Decimal("0"), Decimal("0")),
                 confidence=0.0,
                 reasoning="Unable to parse AI recommendation",
-                risk_level="HIGH"
+                risk_level="HIGH",
             )
 
         except Exception as e:
@@ -264,7 +265,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
                 price_range=(Decimal("0"), Decimal("0")),
                 confidence=0.0,
                 reasoning="Error processing AI response",
-                risk_level="HIGH"
+                risk_level="HIGH",
             )
 
     def _process_tool_calls(self, tool_calls: list[dict]) -> dict:
@@ -278,7 +279,9 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
 
         return results
 
-    def _parse_recommendation_from_content(self, content: str, symbol: str) -> TradingRecommendation:
+    def _parse_recommendation_from_content(
+        self, content: str, symbol: str
+    ) -> TradingRecommendation:
         """Parse trading recommendation from AI response content."""
         # This is a simplified parser - in production, you'd want more robust parsing
         content_lower = content.lower()
@@ -314,7 +317,7 @@ Focus on identifying optimal liquidity deployment zones where multiple signals c
             price_range=price_range,
             confidence=confidence,
             reasoning=content[:500],  # Truncate for storage
-            risk_level=risk_level
+            risk_level=risk_level,
         )
 
     async def close(self) -> None:

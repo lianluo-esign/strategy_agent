@@ -23,11 +23,18 @@ class TestTradePersistenceIntegration:
     def test_settings(self):
         """Create test settings."""
         return Settings(
-            redis=MagicMock(host="localhost", port=6379, db=0, storage_dir="test_integration_storage"),
-            binance=MagicMock(rest_api_base="https://api.binance.com", symbol="BTCFDUSD", timeout=30),
+            redis=MagicMock(
+                host="localhost",
+                port=6379,
+                db=0,
+                storage_dir="test_integration_storage",
+            ),
+            binance=MagicMock(
+                rest_api_base="https://api.binance.com", symbol="BTCFDUSD", timeout=30
+            ),
             data_collector=MagicMock(),
             analyzer=MagicMock(),
-            logging=MagicMock()
+            logging=MagicMock(),
         )
 
     @pytest.fixture
@@ -37,16 +44,14 @@ class TestTradePersistenceIntegration:
         test_storage.mkdir(exist_ok=True)
 
         store = RedisDataStore(
-            host="localhost",
-            port=6379,
-            db=0,
-            storage_dir=str(test_storage)
+            host="localhost", port=6379, db=0, storage_dir=str(test_storage)
         )
 
         yield store
 
         # Cleanup
         import shutil
+
         shutil.rmtree(test_storage, ignore_errors=True)
 
     @pytest.fixture
@@ -60,7 +65,7 @@ class TestTradePersistenceIntegration:
             ("60000.00", "1.5", 10, "0.8", "0.7"),
             ("60001.50", "0.8", 6, "0.4", "0.4"),
             ("59998.75", "2.1", 15, "1.2", "0.9"),
-            ("60002.00", "0.5", 3, "0.2", "0.3")
+            ("60002.00", "0.5", 3, "0.2", "0.3"),
         ]
 
         for price, volume, count, buy_vol, sell_vol in prices_volumes:
@@ -69,13 +74,15 @@ class TestTradePersistenceIntegration:
                 total_volume=Decimal(volume),
                 trade_count=count,
                 buy_volume=Decimal(buy_vol),
-                sell_volume=Decimal(sell_vol)
+                sell_volume=Decimal(sell_vol),
             )
 
         return trade_data
 
     @pytest.mark.asyncio
-    async def test_full_trade_data_persistence_flow(self, redis_store, sample_minute_trade_data):
+    async def test_full_trade_data_persistence_flow(
+        self, redis_store, sample_minute_trade_data
+    ):
         """Test complete flow from trade data storage to file persistence."""
         # Mock Redis operations to simulate full window
         redis_store.redis.lpush.return_value = TRADES_WINDOW_SIZE_MINUTES + 1
@@ -89,7 +96,7 @@ class TestTradePersistenceIntegration:
             total_volume=Decimal("1.0"),
             trade_count=5,
             buy_volume=Decimal("0.5"),
-            sell_volume=Decimal("0.5")
+            sell_volume=Decimal("0.5"),
         )
 
         redis_store.redis.lrange.return_value = [json.dumps(expired_data.to_dict())]
@@ -114,10 +121,10 @@ class TestTradePersistenceIntegration:
         with open(expected_filepath) as f:
             file_data = json.load(f)
 
-        assert 'timestamp' in file_data
-        assert 'price_levels' in file_data
-        assert datetime.fromisoformat(file_data['timestamp']) == expired_timestamp
-        assert '59995.00' in file_data['price_levels']
+        assert "timestamp" in file_data
+        assert "price_levels" in file_data
+        assert datetime.fromisoformat(file_data["timestamp"]) == expired_timestamp
+        assert "59995.00" in file_data["price_levels"]
 
     @pytest.mark.asyncio
     async def test_multiple_files_creation(self, redis_store):
@@ -136,7 +143,7 @@ class TestTradePersistenceIntegration:
                 total_volume=Decimal(f"{i + 1}.0"),
                 trade_count=i + 2,
                 buy_volume=Decimal(f"{i + 0.5}"),
-                sell_volume=Decimal(f"{i + 0.5}")
+                sell_volume=Decimal(f"{i + 0.5}"),
             )
             trade_data_list.append(trade_data)
 
@@ -166,16 +173,20 @@ class TestTradePersistenceIntegration:
     async def test_data_collector_integration(self, test_settings):
         """Test integration with DataCollectorAgent."""
         # Mock the Redis connection test
-        with patch.object(RedisDataStore, 'test_connection', return_value=True):
+        with patch.object(RedisDataStore, "test_connection", return_value=True):
             # Create agent with test settings
             agent = DataCollectorAgent(test_settings)
 
             # Verify storage directory is configured
-            assert agent.redis_store.storage_dir == Path(test_settings.redis.storage_dir)
+            assert agent.redis_store.storage_dir == Path(
+                test_settings.redis.storage_dir
+            )
             assert agent.redis_store.storage_dir.exists()
 
     @pytest.mark.asyncio
-    async def test_file_persistence_error_recovery(self, redis_store, sample_minute_trade_data):
+    async def test_file_persistence_error_recovery(
+        self, redis_store, sample_minute_trade_data
+    ):
         """Test recovery from file persistence errors."""
         # Mock Redis operations
         redis_store.redis.lpush.return_value = TRADES_WINDOW_SIZE_MINUTES + 1
@@ -188,12 +199,12 @@ class TestTradePersistenceIntegration:
             total_volume=Decimal("1.0"),
             trade_count=5,
             buy_volume=Decimal("0.5"),
-            sell_volume=Decimal("0.5")
+            sell_volume=Decimal("0.5"),
         )
         redis_store.redis.lrange.return_value = [json.dumps(expired_data.to_dict())]
 
         # Mock file writing to raise an exception
-        with patch('aiofiles.open', side_effect=OSError("Disk full")):
+        with patch("aiofiles.open", side_effect=OSError("Disk full")):
             # Should still complete without raising exception
             await redis_store.store_minute_trade_data(sample_minute_trade_data)
 
@@ -218,7 +229,7 @@ class TestTradePersistenceIntegration:
                 total_volume=Decimal(f"{i + 1}.0"),
                 trade_count=i + 2,
                 buy_volume=Decimal(f"{i + 0.5}"),
-                sell_volume=Decimal(f"{i + 0.5}")
+                sell_volume=Decimal(f"{i + 0.5}"),
             )
 
             # Mock Redis to trigger file persistence
@@ -279,7 +290,7 @@ class TestTradePersistenceIntegration:
                 total_volume=Decimal(f"{i + 1}.{i}"),
                 trade_count=i * 10 + 5,
                 buy_volume=Decimal(f"{i + 0.5}"),
-                sell_volume=Decimal(f"{i + 0.5}")
+                sell_volume=Decimal(f"{i + 0.5}"),
             )
 
         # Mock Redis operations
@@ -302,7 +313,7 @@ class TestTradePersistenceIntegration:
         with open(expected_filepath) as f:
             file_data = json.load(f)
 
-        assert len(file_data['price_levels']) == 100
+        assert len(file_data["price_levels"]) == 100
 
     @pytest.mark.asyncio
     async def test_redis_and_file_sync(self, redis_store, sample_minute_trade_data):
@@ -315,7 +326,9 @@ class TestTradePersistenceIntegration:
                 # Mock expired data for file persistence
                 expired_timestamp = datetime.now() - timedelta(minutes=48, seconds=1)
                 expired_data = MinuteTradeData(timestamp=expired_timestamp)
-                redis_store.redis.lrange.return_value = [json.dumps(expired_data.to_dict())]
+                redis_store.redis.lrange.return_value = [
+                    json.dumps(expired_data.to_dict())
+                ]
             else:
                 redis_store.redis.lrange.return_value = []
 
@@ -324,9 +337,7 @@ class TestTradePersistenceIntegration:
 
         # Verify Redis was trimmed to correct size
         redis_store.redis.ltrim.assert_called_with(
-            REDIS_TRADES_WINDOW_KEY,
-            0,
-            TRADES_WINDOW_SIZE_MINUTES - 1
+            REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1
         )
 
         # Verify file was created for expired data

@@ -463,7 +463,10 @@ class MarketAnalyzer:
                         "z_score_threshold": 1.5,
                         "min_peak_confidence": 0.3,
                     },
-                    volume_params={"min_relative_volume": 2.0, "min_absolume": Decimal("10.0")},
+                    volume_params={
+                        "min_relative_volume": 2.0,
+                        "min_absolume": Decimal("10.0"),
+                    },
                 )
 
                 result.wave_peaks = wave_peaks
@@ -474,8 +477,12 @@ class MarketAnalyzer:
                     zones = analyze_wave_formation(wave_peaks)
 
                     # Split zones into support and resistance
-                    support_zones = [zone for zone in zones if zone.zone_type == "support"]
-                    resistance_zones = [zone for zone in zones if zone.zone_type == "resistance"]
+                    support_zones = [
+                        zone for zone in zones if zone.zone_type == "support"
+                    ]
+                    resistance_zones = [
+                        zone for zone in zones if zone.zone_type == "resistance"
+                    ]
 
                     result.support_zones = support_zones
                     result.resistance_zones = resistance_zones

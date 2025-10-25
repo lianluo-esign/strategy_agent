@@ -31,15 +31,19 @@ def _expand_env_vars(config_data: Any) -> Any:
         return [_expand_env_vars(item) for item in config_data]
     elif isinstance(config_data, str):
         # Expand ${VAR_NAME} patterns with pre-compiled regex
-        pattern = r'\$\{([^}]+)\}'
+        pattern = r"\$\{([^}]+)\}"
+
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1)
             value = os.getenv(var_name)
             if value is None:
                 # Log warning but don't fail - let validation handle required vars
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Environment variable {var_name} not found, using empty string")
+                logger.warning(
+                    f"Environment variable {var_name} not found, using empty string"
+                )
                 return ""
             return value
 
@@ -50,6 +54,7 @@ def _expand_env_vars(config_data: Any) -> Any:
 
 class RedisConfig(BaseModel):
     """Redis configuration."""
+
     host: str = "localhost"
     port: int = 6379
     db: int = 0
@@ -61,6 +66,7 @@ class RedisConfig(BaseModel):
 
 class BinanceConfig(BaseModel):
     """Binance API configuration."""
+
     rest_api_base: str = "https://api.binance.com"
     websocket_base: str = "wss://stream.binance.com:9443"
     symbol: str = "BTCFDUSD"
@@ -74,12 +80,14 @@ class DepthSnapshotConfig(BaseModel):
     Note: window_size has been removed as depth_snapshot_5000 now uses
     single-key overwrite mechanism instead of sliding window.
     """
+
     limit: int = 5000
     update_interval_seconds: int = 60
 
 
 class OrderFlowConfig(BaseModel):
     """Order flow data collection configuration."""
+
     websocket_url: str = "wss://stream.binance.com:9443/ws/btcfdusd@aggTrade"
     window_size_minutes: int = 48 * 60  # 48 hours
     price_precision: float = 1.0  # $1 precision
@@ -88,13 +96,16 @@ class OrderFlowConfig(BaseModel):
 
 class DataCollectorConfig(BaseModel):
     """Data collector configuration."""
+
     depth_snapshot: DepthSnapshotConfig = Field(default_factory=DepthSnapshotConfig)
     order_flow: OrderFlowConfig = Field(default_factory=OrderFlowConfig)
 
 
 class DeepSeekConfig(BaseModel):
     """DeepSeek AI configuration."""
-    api_key: str
+
+    enable: bool = True
+    api_key: str = ""
     base_url: str = "https://api.deepseek.com/v1"
     model: str = "deepseek-chat"
     max_tokens: int = 4000
@@ -103,13 +114,14 @@ class DeepSeekConfig(BaseModel):
     def __init__(self, **data: Any) -> None:
         """Initialize with environment variable support."""
         # Support environment variable for API key
-        if 'api_key' not in data:
-            data['api_key'] = os.getenv('DEEPSEEK_API_KEY', '')
+        if "api_key" not in data:
+            data["api_key"] = os.getenv("DEEPSEEK_API_KEY", "")
         super().__init__(**data)
 
 
 class AnalysisConfig(BaseModel):
     """Analysis configuration."""
+
     interval_seconds: int = 60
     min_order_volume_threshold: float = 0.01
     support_resistance_threshold: float = 0.1
@@ -117,12 +129,14 @@ class AnalysisConfig(BaseModel):
 
 class AnalyzerConfig(BaseModel):
     """Analyzer configuration."""
+
     deepseek: DeepSeekConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
 
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
+
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     file_path: str = "logs/strategy_agent.log"
@@ -132,6 +146,7 @@ class LoggingConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Application configuration."""
+
     name: str = "strategy-agent"
     environment: str = "development"
     log_level: str = "DEBUG"
@@ -139,6 +154,7 @@ class AppConfig(BaseModel):
 
 class Settings(BaseSettings):
     """Main settings class."""
+
     app: AppConfig = Field(default_factory=AppConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     binance: BinanceConfig = Field(default_factory=BinanceConfig)
@@ -150,7 +166,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
-        "extra": "ignore"
+        "extra": "ignore",
     }
 
     @classmethod
@@ -177,9 +193,13 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If required environment variables are missing
         """
-        required_vars = {
-            'DEEPSEEK_API_KEY': 'DeepSeek API key is required but not set'
-        }
+        required_vars = {}
+
+        # Only require DeepSeek API key if DeepSeek is enabled
+        if self.analyzer.deepseek.enable:
+            required_vars["DEEPSEEK_API_KEY"] = (
+                "DeepSeek API key is required but not set"
+            )
 
         missing_vars = []
         for var_name, error_msg in required_vars.items():
@@ -200,40 +220,59 @@ class Settings(BaseSettings):
         """
         import logging
 
-        # Validate Redis configuration
+        self._validate_redis_config()
+        self._validate_binance_config()
+        self._validate_data_collector_config()
+        self._validate_analyzer_config()
+        self._validate_logging_config()
+
+        logging.getLogger(__name__).info("Configuration validation passed")
+
+    def _validate_redis_config(self) -> None:
+        """Validate Redis configuration."""
         if not (1 <= self.redis.port <= 65535):
             raise ValueError(f"Redis port must be 1-65535, got {self.redis.port}")
 
-        # Validate Binance configuration
+    def _validate_binance_config(self) -> None:
+        """Validate Binance configuration."""
         if self.binance.timeout <= 0:
-            raise ValueError(f"Binance timeout must be positive, got {self.binance.timeout}")
+            raise ValueError(
+                f"Binance timeout must be positive, got {self.binance.timeout}"
+            )
 
         # Validate symbol format
-        if not re.match(r'^[A-Z]+[A-Z0-9]*$', self.binance.symbol):
+        if not re.match(r"^[A-Z]+[A-Z0-9]*$", self.binance.symbol):
             raise ValueError(f"Invalid symbol format: {self.binance.symbol}")
 
-        # Validate data collector configuration
+    def _validate_data_collector_config(self) -> None:
+        """Validate data collector configuration."""
         if self.data_collector.depth_snapshot.limit <= 0:
             raise ValueError("Depth snapshot limit must be positive")
 
         if self.data_collector.depth_snapshot.update_interval_seconds <= 0:
             raise ValueError("Update interval must be positive")
 
-        # Validate analyzer configuration
-        if not self.analyzer.deepseek.api_key or self.analyzer.deepseek.api_key.strip() == "":
-            raise ValueError("DeepSeek API key cannot be empty")
+    def _validate_analyzer_config(self) -> None:
+        """Validate analyzer configuration."""
+        if self.analyzer.deepseek.enable:
+            if (
+                not self.analyzer.deepseek.api_key
+                or self.analyzer.deepseek.api_key.strip() == ""
+            ):
+                raise ValueError(
+                    "DeepSeek API key cannot be empty when DeepSeek is enabled"
+                )
 
-        if self.analyzer.deepseek.max_tokens <= 0:
-            raise ValueError("DeepSeek max tokens must be positive")
+            if self.analyzer.deepseek.max_tokens <= 0:
+                raise ValueError("DeepSeek max tokens must be positive")
 
-        # Validate logging configuration
+    def _validate_logging_config(self) -> None:
+        """Validate logging configuration."""
         if self.logging.max_file_size_mb <= 0:
             raise ValueError("Log file size must be positive")
 
         if self.logging.backup_count < 0:
             raise ValueError("Log backup count cannot be negative")
-
-        logging.getLogger(__name__).info("Configuration validation passed")
 
     def setup_logging(self) -> None:
         """Setup logging based on configuration."""
@@ -259,7 +298,7 @@ class Settings(BaseSettings):
         file_handler = logging.handlers.RotatingFileHandler(
             self.logging.file_path,
             maxBytes=self.logging.max_file_size_mb * 1024 * 1024,
-            backupCount=self.logging.backup_count
+            backupCount=self.logging.backup_count,
         )
         file_handler.setFormatter(formatter)
 

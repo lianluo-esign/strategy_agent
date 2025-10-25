@@ -24,10 +24,7 @@ class TestTradeDataPersistence:
         test_storage.mkdir(exist_ok=True)
 
         store = RedisDataStore(
-            host="localhost",
-            port=6379,
-            db=0,
-            storage_dir=str(test_storage)
+            host="localhost", port=6379, db=0, storage_dir=str(test_storage)
         )
 
         # Mock Redis client
@@ -38,6 +35,7 @@ class TestTradeDataPersistence:
 
         # Cleanup
         import shutil
+
         shutil.rmtree(test_storage, ignore_errors=True)
 
     @pytest.fixture
@@ -52,7 +50,7 @@ class TestTradeDataPersistence:
             total_volume=Decimal("1.5"),
             trade_count=10,
             buy_volume=Decimal("0.8"),
-            sell_volume=Decimal("0.7")
+            sell_volume=Decimal("0.7"),
         )
 
         trade_data.price_levels[Decimal("60001.00")] = PriceLevelData(
@@ -60,7 +58,7 @@ class TestTradeDataPersistence:
             total_volume=Decimal("0.7"),
             trade_count=5,
             buy_volume=Decimal("0.3"),
-            sell_volume=Decimal("0.4")
+            sell_volume=Decimal("0.4"),
         )
 
         return trade_data
@@ -71,7 +69,9 @@ class TestTradeDataPersistence:
         return sample_trade_data.to_dict()
 
     @pytest.mark.asyncio
-    async def test_handle_expired_trade_data_no_expiration(self, redis_store, sample_trade_data):
+    async def test_handle_expired_trade_data_no_expiration(
+        self, redis_store, sample_trade_data
+    ):
         """Test handling when no data is expired."""
         # Mock Redis to return count equal to window size
         redis_store.redis.llen.return_value = TRADES_WINDOW_SIZE_MINUTES
@@ -84,14 +84,18 @@ class TestTradeDataPersistence:
         redis_store.redis.ltrim.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_handle_expired_trade_data_with_expiration(self, redis_store, sample_trade_data_dict):
+    async def test_handle_expired_trade_data_with_expiration(
+        self, redis_store, sample_trade_data_dict
+    ):
         """Test handling when data is expired and needs serialization."""
         # Mock Redis to return more than window size items
         expired_count = 5
         redis_store.redis.llen.return_value = TRADES_WINDOW_SIZE_MINUTES + expired_count
 
         # Mock expired items
-        expired_items = [json.dumps(sample_trade_data_dict) for _ in range(expired_count)]
+        expired_items = [
+            json.dumps(sample_trade_data_dict) for _ in range(expired_count)
+        ]
         redis_store.redis.lrange.return_value = expired_items
 
         # Mock file writing method
@@ -102,21 +106,19 @@ class TestTradeDataPersistence:
 
         # Verify Redis operations
         redis_store.redis.lrange.assert_called_once_with(
-            REDIS_TRADES_WINDOW_KEY,
-            TRADES_WINDOW_SIZE_MINUTES,
-            -1
+            REDIS_TRADES_WINDOW_KEY, TRADES_WINDOW_SIZE_MINUTES, -1
         )
         redis_store.redis.ltrim.assert_called_once_with(
-            REDIS_TRADES_WINDOW_KEY,
-            0,
-            TRADES_WINDOW_SIZE_MINUTES - 1
+            REDIS_TRADES_WINDOW_KEY, 0, TRADES_WINDOW_SIZE_MINUTES - 1
         )
 
         # Verify file writing was called for each expired item
         assert redis_store._write_trade_data_file.call_count == expired_count
 
     @pytest.mark.asyncio
-    async def test_serialize_trade_data_to_files_concurrent(self, redis_store, sample_trade_data_dict):
+    async def test_serialize_trade_data_to_files_concurrent(
+        self, redis_store, sample_trade_data_dict
+    ):
         """Test concurrent serialization of multiple trade data items."""
         expired_items = [json.dumps(sample_trade_data_dict) for _ in range(10)]
 
@@ -142,7 +144,7 @@ class TestTradeDataPersistence:
         mock_file = AsyncMock()
         mock_file.write = AsyncMock()
 
-        with patch('aiofiles.open') as mock_open_call:
+        with patch("aiofiles.open") as mock_open_call:
             mock_open_call.return_value.__aenter__.return_value = mock_file
 
             # Execute file writing
@@ -151,8 +153,8 @@ class TestTradeDataPersistence:
             # Verify file was opened for writing
             mock_open_call.assert_called_once()
             args, kwargs = mock_open_call.call_args
-            assert str(args[0]).endswith('.json')
-            assert args[1] == 'w'  # mode is the second positional argument
+            assert str(args[0]).endswith(".json")
+            assert args[1] == "w"  # mode is the second positional argument
 
             # Verify data was written to file
             mock_file.write.assert_called_once()
@@ -160,15 +162,17 @@ class TestTradeDataPersistence:
 
             # Verify JSON structure
             parsed_data = json.loads(written_data)
-            assert 'timestamp' in parsed_data
-            assert 'price_levels' in parsed_data
-            assert isinstance(parsed_data['price_levels'], dict)
+            assert "timestamp" in parsed_data
+            assert "price_levels" in parsed_data
+            assert isinstance(parsed_data["price_levels"], dict)
 
     @pytest.mark.asyncio
-    async def test_write_trade_data_file_error_handling(self, redis_store, sample_trade_data_dict):
+    async def test_write_trade_data_file_error_handling(
+        self, redis_store, sample_trade_data_dict
+    ):
         """Test error handling when writing trade data file."""
         # Mock aiofiles.open to raise an exception
-        with patch('aiofiles.open', side_effect=OSError("Disk full")):
+        with patch("aiofiles.open", side_effect=OSError("Disk full")):
             # Should not raise exception, just log error
             await redis_store._write_trade_data_file(json.dumps(sample_trade_data_dict))
             # Method should complete without raising
@@ -183,12 +187,18 @@ class TestTradeDataPersistence:
         # Method should complete without raising
 
     @pytest.mark.asyncio
-    async def test_store_minute_trade_data_with_expiration(self, redis_store, sample_trade_data):
+    async def test_store_minute_trade_data_with_expiration(
+        self, redis_store, sample_trade_data
+    ):
         """Test storing trade data with expired data handling."""
         # Mock Redis operations
         redis_store.redis.lpush.return_value = 1
         redis_store.redis.llen.return_value = TRADES_WINDOW_SIZE_MINUTES + 3
-        redis_store.redis.lrange.return_value = ['{"test": "data"}', '{"test": "data2"}', '{"test": "data3"}']
+        redis_store.redis.lrange.return_value = [
+            '{"test": "data"}',
+            '{"test": "data2"}',
+            '{"test": "data3"}',
+        ]
 
         # Mock file writing
         redis_store._write_trade_data_file = AsyncMock()
@@ -207,7 +217,7 @@ class TestTradeDataPersistence:
     def test_filename_generation(self, redis_store, sample_trade_data_dict):
         """Test that filenames are generated correctly based on timestamp."""
         # Extract timestamp from sample data
-        timestamp_str = sample_trade_data_dict['timestamp']
+        timestamp_str = sample_trade_data_dict["timestamp"]
         timestamp = datetime.fromisoformat(timestamp_str)
 
         # Expected filename format
@@ -236,7 +246,9 @@ class TestTradeDataPersistence:
         # Method should complete without raising
 
     @pytest.mark.asyncio
-    async def test_store_minute_trade_data_redis_error(self, redis_store, sample_trade_data):
+    async def test_store_minute_trade_data_redis_error(
+        self, redis_store, sample_trade_data
+    ):
         """Test handling Redis errors during trade data storage."""
         # Mock Redis to raise an exception during storage
         redis_store.redis.lpush.side_effect = Exception("Redis error")
@@ -257,10 +269,7 @@ class TestTradeDataPersistence:
         try:
             # Initialize Redis store with non-existent directory
             store = RedisDataStore(
-                host="localhost",
-                port=6379,
-                db=0,
-                storage_dir=str(test_storage_dir)
+                host="localhost", port=6379, db=0, storage_dir=str(test_storage_dir)
             )
 
             # Verify directory was created
@@ -279,7 +288,7 @@ class TestTradeDataPersistence:
         items = []
         for i in range(5):
             data = sample_trade_data_dict.copy()
-            data['timestamp'] = (datetime.now() + timedelta(minutes=i)).isoformat()
+            data["timestamp"] = (datetime.now() + timedelta(minutes=i)).isoformat()
             items.append(json.dumps(data))
 
         # Track file creation
@@ -287,13 +296,13 @@ class TestTradeDataPersistence:
 
         async def track_file_creation(data_str):
             data = json.loads(data_str)
-            timestamp = datetime.fromisoformat(data['timestamp'])
+            timestamp = datetime.fromisoformat(data["timestamp"])
             filename = f"trades_{timestamp.strftime('%Y%m%d_%H%M')}.json"
             filepath = redis_store.storage_dir / filename
 
             # Mock file writing
             mock_file = AsyncMock()
-            with patch('aiofiles.open', return_value=mock_file.__aenter__()):
+            with patch("aiofiles.open", return_value=mock_file.__aenter__()):
                 await redis_store._write_trade_data_file(data_str)
 
             created_files.append(filepath.name)

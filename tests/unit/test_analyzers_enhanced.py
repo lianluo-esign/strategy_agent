@@ -29,34 +29,30 @@ class TestEnhancedMarketAnalyzer:
     def analyzer(self):
         """Create EnhancedMarketAnalyzer instance for testing."""
         return EnhancedMarketAnalyzer(
-            min_volume_threshold=Decimal('1.0'),
-            analysis_window_minutes=180
+            min_volume_threshold=Decimal("1.0"), analysis_window_minutes=180
         )
 
     @pytest.fixture
     def sample_depth_snapshot(self) -> DepthSnapshot:
         """Create sample depth snapshot for testing."""
         bids = [
-            DepthLevel(price=Decimal('99.50'), quantity=Decimal('10.0')),
-            DepthLevel(price=Decimal('99.20'), quantity=Decimal('15.0')),
-            DepthLevel(price=Decimal('98.80'), quantity=Decimal('8.0')),
-            DepthLevel(price=Decimal('98.50'), quantity=Decimal('12.0')),
-            DepthLevel(price=Decimal('98.20'), quantity=Decimal('5.0')),
+            DepthLevel(price=Decimal("99.50"), quantity=Decimal("10.0")),
+            DepthLevel(price=Decimal("99.20"), quantity=Decimal("15.0")),
+            DepthLevel(price=Decimal("98.80"), quantity=Decimal("8.0")),
+            DepthLevel(price=Decimal("98.50"), quantity=Decimal("12.0")),
+            DepthLevel(price=Decimal("98.20"), quantity=Decimal("5.0")),
         ]
 
         asks = [
-            DepthLevel(price=Decimal('100.50'), quantity=Decimal('8.0')),
-            DepthLevel(price=Decimal('100.80'), quantity=Decimal('12.0')),
-            DepthLevel(price=Decimal('101.20'), quantity=Decimal('6.0')),
-            DepthLevel(price=Decimal('101.50'), quantity=Decimal('10.0')),
-            DepthLevel(price=Decimal('101.80'), quantity=Decimal('4.0')),
+            DepthLevel(price=Decimal("100.50"), quantity=Decimal("8.0")),
+            DepthLevel(price=Decimal("100.80"), quantity=Decimal("12.0")),
+            DepthLevel(price=Decimal("101.20"), quantity=Decimal("6.0")),
+            DepthLevel(price=Decimal("101.50"), quantity=Decimal("10.0")),
+            DepthLevel(price=Decimal("101.80"), quantity=Decimal("4.0")),
         ]
 
         return DepthSnapshot(
-            symbol='BTCFDUSD',
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
     @pytest.fixture
@@ -69,15 +65,15 @@ class TestEnhancedMarketAnalyzer:
 
             # Add trades with different price levels
             for price_offset in range(-2, 3):
-                price = Decimal('100') + Decimal(str(price_offset))
+                price = Decimal("100") + Decimal(str(price_offset))
                 for j in range(5):
                     trade = Trade(
-                        symbol='BTCFDUSD',
+                        symbol="BTCFDUSD",
                         price=price,
-                        quantity=Decimal('1.0'),
+                        quantity=Decimal("1.0"),
                         is_buyer_maker=j % 2 == 0,
                         timestamp=minute_data.timestamp,
-                        trade_id=f'trade_{i}_{price_offset}_{j}'
+                        trade_id=f"trade_{i}_{price_offset}_{j}",
                     )
                     minute_data.add_trade(trade)
 
@@ -88,60 +84,60 @@ class TestEnhancedMarketAnalyzer:
     def test_analyzer_initialization(self):
         """Test EnhancedMarketAnalyzer initialization."""
         analyzer = EnhancedMarketAnalyzer(
-            min_volume_threshold=Decimal('5.0'),
-            analysis_window_minutes=240
+            min_volume_threshold=Decimal("5.0"), analysis_window_minutes=240
         )
 
-        assert analyzer.min_volume_threshold == Decimal('5.0')
+        assert analyzer.min_volume_threshold == Decimal("5.0")
         assert analyzer.analysis_window_minutes == 240
 
-    def test_analyze_market_basic_functionality(self, analyzer, sample_depth_snapshot, sample_trade_data):
+    def test_analyze_market_basic_functionality(
+        self, analyzer, sample_depth_snapshot, sample_trade_data
+    ):
         """Test basic market analysis functionality."""
         result = analyzer.analyze_market(
             snapshot=sample_depth_snapshot,
             trade_data_list=sample_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         assert isinstance(result, EnhancedMarketAnalysisResult)
-        assert result.symbol == 'BTCFDUSD'
+        assert result.symbol == "BTCFDUSD"
         assert isinstance(result.timestamp, datetime)
         assert len(result.aggregated_bids) > 0
         assert len(result.aggregated_asks) > 0
 
-    def test_analyze_market_legacy_mode(self, analyzer, sample_depth_snapshot, sample_trade_data):
+    def test_analyze_market_legacy_mode(
+        self, analyzer, sample_depth_snapshot, sample_trade_data
+    ):
         """Test market analysis in legacy mode (returns MarketAnalysisResult)."""
         result = analyzer.analyze_market(
             snapshot=sample_depth_snapshot,
             trade_data_list=sample_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=False
+            symbol="BTCFDUSD",
+            enhanced_mode=False,
         )
 
         assert isinstance(result, MarketAnalysisResult)
-        assert result.symbol == 'BTCFDUSD'
+        assert result.symbol == "BTCFDUSD"
         assert isinstance(result.timestamp, datetime)
 
     def test_analyze_market_empty_data(self, analyzer):
         """Test analysis with empty data."""
         empty_snapshot = DepthSnapshot(
-            symbol='BTCFDUSD',
-            timestamp=datetime.now(),
-            bids=[],
-            asks=[]
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=[], asks=[]
         )
         empty_trade_data = []
 
         result = analyzer.analyze_market(
             snapshot=empty_snapshot,
             trade_data_list=empty_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         assert isinstance(result, EnhancedMarketAnalysisResult)
-        assert result.symbol == 'BTCFDUSD'
+        assert result.symbol == "BTCFDUSD"
         # Should handle empty data gracefully
         assert len(result.aggregated_bids) == 0
         assert len(result.aggregated_asks) == 0
@@ -149,17 +145,19 @@ class TestEnhancedMarketAnalyzer:
     def test_depth_snapshot_aggregation(self, analyzer, sample_depth_snapshot):
         """Test depth snapshot aggregation to 1-dollar precision."""
         # Mock the aggregation process
-        aggregated_bids, aggregated_asks = analyzer._aggregate_depth_snapshot(sample_depth_snapshot)
+        aggregated_bids, aggregated_asks = analyzer._aggregate_depth_snapshot(
+            sample_depth_snapshot
+        )
 
         assert isinstance(aggregated_bids, dict)
         assert isinstance(aggregated_asks, dict)
 
         # Check that prices are rounded to dollar precision
         for price in aggregated_bids.keys():
-            assert price == price.quantize(Decimal('1'))
+            assert price == price.quantize(Decimal("1"))
 
         for price in aggregated_asks.keys():
-            assert price == price.quantize(Decimal('1'))
+            assert price == price.quantize(Decimal("1"))
 
     def test_trade_data_aggregation(self, analyzer, sample_trade_data):
         """Test trade data aggregation by 1-dollar precision."""
@@ -170,22 +168,22 @@ class TestEnhancedMarketAnalyzer:
 
         # Check that prices are aggregated to 1-dollar precision
         for price in aggregated_trades.keys():
-            assert price == price.quantize(Decimal('1'))
+            assert price == price.quantize(Decimal("1"))
 
     def test_wave_peak_detection_integration(self, analyzer):
         """Test wave peak detection integration."""
         # Create data with clear peaks
         price_volume_data = {
-            Decimal('95'): Decimal('5.0'),
-            Decimal('96'): Decimal('8.0'),
-            Decimal('97'): Decimal('20.0'),  # Peak
-            Decimal('98'): Decimal('30.0'),  # Peak
-            Decimal('99'): Decimal('25.0'),  # Peak
-            Decimal('100'): Decimal('10.0'),
-            Decimal('101'): Decimal('15.0'),  # Peak
-            Decimal('102'): Decimal('22.0'),  # Peak
-            Decimal('103'): Decimal('18.0'),  # Peak
-            Decimal('104'): Decimal('7.0'),
+            Decimal("95"): Decimal("5.0"),
+            Decimal("96"): Decimal("8.0"),
+            Decimal("97"): Decimal("20.0"),  # Peak
+            Decimal("98"): Decimal("30.0"),  # Peak
+            Decimal("99"): Decimal("25.0"),  # Peak
+            Decimal("100"): Decimal("10.0"),
+            Decimal("101"): Decimal("15.0"),  # Peak
+            Decimal("102"): Decimal("22.0"),  # Peak
+            Decimal("103"): Decimal("18.0"),  # Peak
+            Decimal("104"): Decimal("7.0"),
         }
 
         wave_peaks = analyzer._detect_wave_peaks(price_volume_data)
@@ -203,10 +201,10 @@ class TestEnhancedMarketAnalyzer:
         """Test price zone formation from wave peaks."""
         # Create sample wave peaks
         wave_peaks = [
-            WavePeak(Decimal('100.0'), Decimal('50.0'), Decimal('2.0'), 1.5, 0.8),
-            WavePeak(Decimal('102.0'), Decimal('40.0'), Decimal('2.0'), 1.2, 0.7),
-            WavePeak(Decimal('110.0'), Decimal('60.0'), Decimal('3.0'), 1.8, 0.9),
-            WavePeak(Decimal('112.0'), Decimal('45.0'), Decimal('2.0'), 1.3, 0.75),
+            WavePeak(Decimal("100.0"), Decimal("50.0"), Decimal("2.0"), 1.5, 0.8),
+            WavePeak(Decimal("102.0"), Decimal("40.0"), Decimal("2.0"), 1.2, 0.7),
+            WavePeak(Decimal("110.0"), Decimal("60.0"), Decimal("3.0"), 1.8, 0.9),
+            WavePeak(Decimal("112.0"), Decimal("45.0"), Decimal("2.0"), 1.3, 0.75),
         ]
 
         support_zones, resistance_zones = analyzer._analyze_price_formation(wave_peaks)
@@ -219,26 +217,32 @@ class TestEnhancedMarketAnalyzer:
             assert isinstance(zone, PriceZone)
             assert zone.lower_price <= zone.upper_price
             assert zone.confidence > 0
-            assert zone.zone_type in ['support', 'resistance']
+            assert zone.zone_type in ["support", "resistance"]
 
     def test_support_resistance_level_generation(self, analyzer):
         """Test generation of traditional support/resistance levels."""
         # Create sample wave peaks and zones
         wave_peaks = [
-            WavePeak(Decimal('100.0'), Decimal('50.0'), Decimal('2.0'), 1.5, 0.8),
-            WavePeak(Decimal('105.0'), Decimal('30.0'), Decimal('2.0'), 1.2, 0.6),
+            WavePeak(Decimal("100.0"), Decimal("50.0"), Decimal("2.0"), 1.5, 0.8),
+            WavePeak(Decimal("105.0"), Decimal("30.0"), Decimal("2.0"), 1.2, 0.6),
         ]
 
         support_zones = [
-            PriceZone(Decimal('99.0'), Decimal('101.0'), 'support', 0.8, Decimal('100.0'))
+            PriceZone(
+                Decimal("99.0"), Decimal("101.0"), "support", 0.8, Decimal("100.0")
+            )
         ]
 
         resistance_zones = [
-            PriceZone(Decimal('104.0'), Decimal('106.0'), 'resistance', 0.7, Decimal('80.0'))
+            PriceZone(
+                Decimal("104.0"), Decimal("106.0"), "resistance", 0.7, Decimal("80.0")
+            )
         ]
 
-        support_levels, resistance_levels = analyzer._generate_support_resistance_levels(
-            wave_peaks, support_zones, resistance_zones
+        support_levels, resistance_levels = (
+            analyzer._generate_support_resistance_levels(
+                wave_peaks, support_zones, resistance_zones
+            )
         )
 
         assert isinstance(support_levels, list)
@@ -247,29 +251,29 @@ class TestEnhancedMarketAnalyzer:
         # Verify level properties
         for level in support_levels:
             assert isinstance(level, SupportResistanceLevel)
-            assert level.level_type == 'support'
+            assert level.level_type == "support"
 
         for level in resistance_levels:
             assert isinstance(level, SupportResistanceLevel)
-            assert level.level_type == 'resistance'
+            assert level.level_type == "resistance"
 
     def test_quality_metrics_calculation(self, analyzer):
         """Test quality metrics calculation for analysis results."""
         # Create sample data
         original_bids = [
-            DepthLevel(price=Decimal('99.50'), quantity=Decimal('10.0')),
-            DepthLevel(price=Decimal('99.80'), quantity=Decimal('15.0')),
+            DepthLevel(price=Decimal("99.50"), quantity=Decimal("10.0")),
+            DepthLevel(price=Decimal("99.80"), quantity=Decimal("15.0")),
         ]
         original_asks = [
-            DepthLevel(price=Decimal('100.20'), quantity=Decimal('8.0')),
-            DepthLevel(price=Decimal('100.70'), quantity=Decimal('12.0')),
+            DepthLevel(price=Decimal("100.20"), quantity=Decimal("8.0")),
+            DepthLevel(price=Decimal("100.70"), quantity=Decimal("12.0")),
         ]
 
-        aggregated_bids = {Decimal('99'): Decimal('25.0')}
-        aggregated_asks = {Decimal('100'): Decimal('20.0')}
+        aggregated_bids = {Decimal("99"): Decimal("25.0")}
+        aggregated_asks = {Decimal("100"): Decimal("20.0")}
 
         wave_peaks = [
-            WavePeak(Decimal('99.0'), Decimal('25.0'), Decimal('2.0'), 1.5, 0.8)
+            WavePeak(Decimal("99.0"), Decimal("25.0"), Decimal("2.0"), 1.5, 0.8)
         ]
 
         # Test depth statistics
@@ -278,30 +282,34 @@ class TestEnhancedMarketAnalyzer:
         )
 
         assert isinstance(depth_stats, dict)
-        assert 'bid_compression_ratio' in depth_stats
-        assert 'ask_compression_ratio' in depth_stats
-        assert 'total_volume_preservation' in depth_stats
+        assert "bid_compression_ratio" in depth_stats
+        assert "ask_compression_ratio" in depth_stats
+        assert "total_volume_preservation" in depth_stats
 
         # Test peak detection quality
-        peak_quality = analyzer._calculate_peak_detection_quality(wave_peaks, aggregated_bids, aggregated_asks)
+        peak_quality = analyzer._calculate_peak_detection_quality(
+            wave_peaks, aggregated_bids, aggregated_asks
+        )
 
         assert isinstance(peak_quality, dict)
-        assert 'peak_count' in peak_quality
-        assert 'avg_confidence' in peak_quality
-        assert 'coverage_rate' in peak_quality
+        assert "peak_count" in peak_quality
+        assert "avg_confidence" in peak_quality
+        assert "coverage_rate" in peak_quality
 
-    def test_comprehensive_analysis_pipeline(self, analyzer, sample_depth_snapshot, sample_trade_data):
+    def test_comprehensive_analysis_pipeline(
+        self, analyzer, sample_depth_snapshot, sample_trade_data
+    ):
         """Test the complete analysis pipeline."""
         result = analyzer.analyze_market(
             snapshot=sample_depth_snapshot,
             trade_data_list=sample_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         # Verify all components are populated
         assert isinstance(result, EnhancedMarketAnalysisResult)
-        assert result.symbol == 'BTCFDUSD'
+        assert result.symbol == "BTCFDUSD"
 
         # Aggregated data
         assert len(result.aggregated_bids) > 0
@@ -327,19 +335,23 @@ class TestEnhancedMarketAnalyzer:
         """Test analysis with realistic market data."""
         # Create more realistic depth snapshot
         realistic_bids = [
-            DepthLevel(price=Decimal(f'{100 - i*0.1}'), quantity=Decimal(f'{10 + i*2}'))
+            DepthLevel(
+                price=Decimal(f"{100 - i * 0.1}"), quantity=Decimal(f"{10 + i * 2}")
+            )
             for i in range(50)
         ]
         realistic_asks = [
-            DepthLevel(price=Decimal(f'{100 + i*0.1}'), quantity=Decimal(f'{8 + i*1.5}'))
+            DepthLevel(
+                price=Decimal(f"{100 + i * 0.1}"), quantity=Decimal(f"{8 + i * 1.5}")
+            )
             for i in range(50)
         ]
 
         realistic_snapshot = DepthSnapshot(
-            symbol='BTCFDUSD',
+            symbol="BTCFDUSD",
             timestamp=datetime.now(),
             bids=realistic_bids,
-            asks=realistic_asks
+            asks=realistic_asks,
         )
 
         # Create realistic trade data
@@ -348,14 +360,16 @@ class TestEnhancedMarketAnalyzer:
             minute_data = MinuteTradeData(timestamp=datetime.now())
 
             for trade in range(20):  # 20 trades per minute
-                price = Decimal('100') + Decimal(str(trade % 10 - 5))  # Prices from 95 to 104
+                price = Decimal("100") + Decimal(
+                    str(trade % 10 - 5)
+                )  # Prices from 95 to 104
                 trade_obj = Trade(
-                    symbol='BTCFDUSD',
+                    symbol="BTCFDUSD",
                     price=price,
-                    quantity=Decimal('1.5'),
+                    quantity=Decimal("1.5"),
                     is_buyer_maker=trade % 2 == 0,
                     timestamp=minute_data.timestamp,
-                    trade_id=f'trade_{minute}_{trade}'
+                    trade_id=f"trade_{minute}_{trade}",
                 )
                 minute_data.add_trade(trade_obj)
 
@@ -364,8 +378,8 @@ class TestEnhancedMarketAnalyzer:
         result = analyzer.analyze_market(
             snapshot=realistic_snapshot,
             trade_data_list=realistic_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         # Should handle realistic data well
@@ -380,19 +394,19 @@ class TestEnhancedMarketAnalyzer:
 
         # Create large dataset
         large_bids = [
-            DepthLevel(price=Decimal(f'{100 - i*0.01}'), quantity=Decimal('10.0'))
+            DepthLevel(price=Decimal(f"{100 - i * 0.01}"), quantity=Decimal("10.0"))
             for i in range(1000)
         ]
         large_asks = [
-            DepthLevel(price=Decimal(f'{100 + i*0.01}'), quantity=Decimal('10.0'))
+            DepthLevel(price=Decimal(f"{100 + i * 0.01}"), quantity=Decimal("10.0"))
             for i in range(1000)
         ]
 
         large_snapshot = DepthSnapshot(
-            symbol='BTCFDUSD',
+            symbol="BTCFDUSD",
             timestamp=datetime.now(),
             bids=large_bids,
-            asks=large_asks
+            asks=large_asks,
         )
 
         large_trade_data = []
@@ -400,14 +414,14 @@ class TestEnhancedMarketAnalyzer:
             minute_data = MinuteTradeData(timestamp=datetime.now())
 
             for trade in range(100):  # 100 trades per minute
-                price = Decimal('100') + Decimal(str(trade % 20 - 10))
+                price = Decimal("100") + Decimal(str(trade % 20 - 10))
                 trade_obj = Trade(
-                    symbol='BTCFDUSD',
+                    symbol="BTCFDUSD",
                     price=price,
-                    quantity=Decimal('2.0'),
+                    quantity=Decimal("2.0"),
                     is_buyer_maker=trade % 2 == 0,
                     timestamp=minute_data.timestamp,
-                    trade_id=f'trade_{minute}_{trade}'
+                    trade_id=f"trade_{minute}_{trade}",
                 )
                 minute_data.add_trade(trade_obj)
 
@@ -418,8 +432,8 @@ class TestEnhancedMarketAnalyzer:
         result = analyzer.analyze_market(
             snapshot=large_snapshot,
             trade_data_list=large_trade_data,
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
         end_time = time.time()
 
@@ -442,27 +456,26 @@ class TestEnhancedAnalyzerEdgeCases:
         """Test analysis with None inputs."""
         with pytest.raises((AttributeError, TypeError)):
             analyzer.analyze_market(
-                snapshot=None,
-                trade_data_list=[],
-                symbol='BTCFDUSD',
-                enhanced_mode=True
+                snapshot=None, trade_data_list=[], symbol="BTCFDUSD", enhanced_mode=True
             )
 
     def test_analysis_with_corrupted_data(self, analyzer):
         """Test analysis with corrupted or inconsistent data."""
         # Create corrupted snapshot
         corrupted_snapshot = DepthSnapshot(
-            symbol='',
+            symbol="",
             timestamp=None,
-            bids=[DepthLevel(price=Decimal('100'), quantity=Decimal('-5'))],  # Negative quantity
-            asks=[]
+            bids=[
+                DepthLevel(price=Decimal("100"), quantity=Decimal("-5"))
+            ],  # Negative quantity
+            asks=[],
         )
 
         result = analyzer.analyze_market(
             snapshot=corrupted_snapshot,
             trade_data_list=[],
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         # Should handle gracefully
@@ -471,23 +484,23 @@ class TestEnhancedAnalyzerEdgeCases:
     def test_analysis_with_extreme_values(self, analyzer):
         """Test analysis with extreme price/volume values."""
         extreme_snapshot = DepthSnapshot(
-            symbol='BTCFDUSD',
+            symbol="BTCFDUSD",
             timestamp=datetime.now(),
             bids=[
-                DepthLevel(price=Decimal('0.01'), quantity=Decimal('999999999')),
-                DepthLevel(price=Decimal('999999999'), quantity=Decimal('0.01')),
+                DepthLevel(price=Decimal("0.01"), quantity=Decimal("999999999")),
+                DepthLevel(price=Decimal("999999999"), quantity=Decimal("0.01")),
             ],
             asks=[
-                DepthLevel(price=Decimal('0.01'), quantity=Decimal('999999999')),
-                DepthLevel(price=Decimal('999999999'), quantity=Decimal('0.01')),
-            ]
+                DepthLevel(price=Decimal("0.01"), quantity=Decimal("999999999")),
+                DepthLevel(price=Decimal("999999999"), quantity=Decimal("0.01")),
+            ],
         )
 
         result = analyzer.analyze_market(
             snapshot=extreme_snapshot,
             trade_data_list=[],
-            symbol='BTCFDUSD',
-            enhanced_mode=True
+            symbol="BTCFDUSD",
+            enhanced_mode=True,
         )
 
         # Should handle extreme values without crashing
@@ -506,23 +519,23 @@ class TestEnhancedAnalyzerEdgeCases:
         # Run multiple analyses
         for i in range(10):
             snapshot = DepthSnapshot(
-                symbol='BTCFDUSD',
+                symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[
-                    DepthLevel(price=Decimal(f'{100 + j}'), quantity=Decimal('10'))
+                    DepthLevel(price=Decimal(f"{100 + j}"), quantity=Decimal("10"))
                     for j in range(100)
                 ],
                 asks=[
-                    DepthLevel(price=Decimal(f'{100 + j}'), quantity=Decimal('10'))
+                    DepthLevel(price=Decimal(f"{100 + j}"), quantity=Decimal("10"))
                     for j in range(100)
-                ]
+                ],
             )
 
             result = analyzer.analyze_market(
                 snapshot=snapshot,
                 trade_data_list=[],
-                symbol='BTCFDUSD',
-                enhanced_mode=True
+                symbol="BTCFDUSD",
+                enhanced_mode=True,
             )
 
             del result

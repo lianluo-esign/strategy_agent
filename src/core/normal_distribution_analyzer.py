@@ -25,8 +25,7 @@ class OrderBookAggregator:
         self.price_precision = price_precision
 
     def aggregate_to_dollar_precision(
-        self,
-        order_book_data: Dict[str, List[Tuple[float, float]]]
+        self, order_book_data: Dict[str, List[Tuple[float, float]]]
     ) -> Tuple[Dict[float, float], Dict[float, float]]:
         """Aggregate order book data to 1-dollar precision (floor rounding).
 
@@ -40,12 +39,12 @@ class OrderBookAggregator:
         aggregated_asks: Dict[float, float] = defaultdict(float)
 
         # Process bids (buy orders)
-        for price, quantity in order_book_data.get('bids', []):
+        for price, quantity in order_book_data.get("bids", []):
             rounded_price = self._round_to_dollar(price)
             aggregated_bids[rounded_price] += quantity
 
         # Process asks (sell orders)
-        for price, quantity in order_book_data.get('asks', []):
+        for price, quantity in order_book_data.get("asks", []):
             rounded_price = self._round_to_dollar(price)
             aggregated_asks[rounded_price] += quantity
 
@@ -97,8 +96,7 @@ class NormalDistributionAnalyzer:
             return abs(4.0 * (confidence_level - 0.5))
 
     def find_peak_interval(
-        self,
-        price_quantities: Dict[float, float]
+        self, price_quantities: Dict[float, float]
     ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
         """Find the peak interval using normal distribution analysis.
 
@@ -119,13 +117,19 @@ class NormalDistributionAnalyzer:
         if total_quantity == 0:
             return None, None, None
 
-        mean_price = sum(price * quantity for price, quantity in zip(prices, quantities)) / total_quantity
+        mean_price = (
+            sum(price * quantity for price, quantity in zip(prices, quantities))
+            / total_quantity
+        )
 
         # Calculate weighted standard deviation
-        variance = sum(
-            quantity * ((price - mean_price) ** 2)
-            for price, quantity in zip(prices, quantities)
-        ) / total_quantity
+        variance = (
+            sum(
+                quantity * ((price - mean_price) ** 2)
+                for price, quantity in zip(prices, quantities)
+            )
+            / total_quantity
+        )
 
         std_price = math.sqrt(variance)
 
@@ -140,9 +144,7 @@ class NormalDistributionAnalyzer:
         return mean_price, lower_bound, upper_bound
 
     def analyze_distribution_peaks(
-        self,
-        aggregated_bids: Dict[float, float],
-        aggregated_asks: Dict[float, float]
+        self, aggregated_bids: Dict[float, float], aggregated_asks: Dict[float, float]
     ) -> Dict[str, Dict[str, Any]]:
         """Analyze distribution peaks for both bids and asks.
 
@@ -158,29 +160,37 @@ class NormalDistributionAnalyzer:
         # Analyze bid distribution
         if aggregated_bids:
             bid_mean, bid_lower, bid_upper = self.find_peak_interval(aggregated_bids)
-            results['bids'] = {
-                'mean_price': bid_mean,
-                'peak_interval': (bid_lower, bid_upper) if bid_lower is not None else None,
-                'total_volume': sum(aggregated_bids.values()),
-                'peak_volume': self._get_volume_in_interval(
+            results["bids"] = {
+                "mean_price": bid_mean,
+                "peak_interval": (bid_lower, bid_upper)
+                if bid_lower is not None
+                else None,
+                "total_volume": sum(aggregated_bids.values()),
+                "peak_volume": self._get_volume_in_interval(
                     aggregated_bids, bid_lower, bid_upper
-                ) if bid_lower is not None else 0,
-                'z_score': self._z_score,
-                'confidence_level': self.confidence_level
+                )
+                if bid_lower is not None
+                else 0,
+                "z_score": self._z_score,
+                "confidence_level": self.confidence_level,
             }
 
         # Analyze ask distribution
         if aggregated_asks:
             ask_mean, ask_lower, ask_upper = self.find_peak_interval(aggregated_asks)
-            results['asks'] = {
-                'mean_price': ask_mean,
-                'peak_interval': (ask_lower, ask_upper) if ask_lower is not None else None,
-                'total_volume': sum(aggregated_asks.values()),
-                'peak_volume': self._get_volume_in_interval(
+            results["asks"] = {
+                "mean_price": ask_mean,
+                "peak_interval": (ask_lower, ask_upper)
+                if ask_lower is not None
+                else None,
+                "total_volume": sum(aggregated_asks.values()),
+                "peak_volume": self._get_volume_in_interval(
                     aggregated_asks, ask_lower, ask_upper
-                ) if ask_lower is not None else 0,
-                'z_score': self._z_score,
-                'confidence_level': self.confidence_level
+                )
+                if ask_lower is not None
+                else 0,
+                "z_score": self._z_score,
+                "confidence_level": self.confidence_level,
             }
 
         return results
@@ -189,7 +199,7 @@ class NormalDistributionAnalyzer:
         self,
         price_quantities: Dict[float, float],
         lower: Optional[float],
-        upper: Optional[float]
+        upper: Optional[float],
     ) -> float:
         """Get total volume within the specified price interval.
 
@@ -225,8 +235,7 @@ class NormalDistributionPeakAnalyzer:
         self.distribution_analyzer = NormalDistributionAnalyzer(confidence_level)
 
     def analyze_order_book(
-        self,
-        order_book_data: Dict[str, List[Tuple[float, float]]]
+        self, order_book_data: Dict[str, List[Tuple[float, float]]]
     ) -> Dict[str, Any]:
         """Perform complete order book analysis using normal distribution methods.
 
@@ -238,8 +247,8 @@ class NormalDistributionPeakAnalyzer:
         """
         try:
             # Step 1: Aggregate to 1-dollar precision (floor rounding)
-            aggregated_bids, aggregated_asks = self.aggregator.aggregate_to_dollar_precision(
-                order_book_data
+            aggregated_bids, aggregated_asks = (
+                self.aggregator.aggregate_to_dollar_precision(order_book_data)
             )
 
             logger.debug(
@@ -255,11 +264,15 @@ class NormalDistributionPeakAnalyzer:
 
             # Step 3: Extract key information
             analysis_result = {
-                'aggregated_bids': aggregated_bids,
-                'aggregated_asks': aggregated_asks,
-                'peak_analysis': peak_analysis,
-                'spread_analysis': self._analyze_spread(aggregated_bids, aggregated_asks),
-                'market_metrics': self._calculate_market_metrics(aggregated_bids, aggregated_asks)
+                "aggregated_bids": aggregated_bids,
+                "aggregated_asks": aggregated_asks,
+                "peak_analysis": peak_analysis,
+                "spread_analysis": self._analyze_spread(
+                    aggregated_bids, aggregated_asks
+                ),
+                "market_metrics": self._calculate_market_metrics(
+                    aggregated_bids, aggregated_asks
+                ),
             }
 
             logger.info(
@@ -273,18 +286,16 @@ class NormalDistributionPeakAnalyzer:
         except Exception as e:
             logger.error(f"Error in normal distribution analysis: {e}")
             return {
-                'aggregated_bids': {},
-                'aggregated_asks': {},
-                'peak_analysis': {},
-                'spread_analysis': {},
-                'market_metrics': {},
-                'error': str(e)
+                "aggregated_bids": {},
+                "aggregated_asks": {},
+                "peak_analysis": {},
+                "spread_analysis": {},
+                "market_metrics": {},
+                "error": str(e),
             }
 
     def _analyze_spread(
-        self,
-        bids: Dict[float, float],
-        asks: Dict[float, float]
+        self, bids: Dict[float, float], asks: Dict[float, float]
     ) -> Dict[str, Any]:
         """Analyze bid-ask spread.
 
@@ -303,17 +314,15 @@ class NormalDistributionPeakAnalyzer:
         spread = best_ask - best_bid
 
         return {
-            'best_bid': best_bid,
-            'best_ask': best_ask,
-            'spread': spread,
-            'mid_price': (best_bid + best_ask) / 2,
-            'spread_percentage': (spread / best_ask) * 100 if best_ask > 0 else 0
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "spread": spread,
+            "mid_price": (best_bid + best_ask) / 2,
+            "spread_percentage": (spread / best_ask) * 100 if best_ask > 0 else 0,
         }
 
     def _calculate_market_metrics(
-        self,
-        bids: Dict[float, float],
-        asks: Dict[float, float]
+        self, bids: Dict[float, float], asks: Dict[float, float]
     ) -> Dict[str, Any]:
         """Calculate additional market metrics.
 
@@ -329,20 +338,26 @@ class NormalDistributionPeakAnalyzer:
         total_volume = bid_volume + ask_volume
 
         return {
-            'total_bid_volume': bid_volume,
-            'total_ask_volume': ask_volume,
-            'total_volume': total_volume,
-            'bid_ask_ratio': bid_volume / ask_volume if ask_volume > 0 else float('inf'),
-            'volume_imbalance': (bid_volume - ask_volume) / total_volume if total_volume > 0 else 0,
-            'price_levels_count': {
-                'bid_levels': len(bids),
-                'ask_levels': len(asks),
-                'total_levels': len(bids) + len(asks)
-            }
+            "total_bid_volume": bid_volume,
+            "total_ask_volume": ask_volume,
+            "total_volume": total_volume,
+            "bid_ask_ratio": bid_volume / ask_volume
+            if ask_volume > 0
+            else float("inf"),
+            "volume_imbalance": (bid_volume - ask_volume) / total_volume
+            if total_volume > 0
+            else 0,
+            "price_levels_count": {
+                "bid_levels": len(bids),
+                "ask_levels": len(asks),
+                "total_levels": len(bids) + len(asks),
+            },
         }
 
 
-def _convert_aggregated_data(aggregated_data: Dict[str, float]) -> Dict[Decimal, Decimal]:
+def _convert_aggregated_data(
+    aggregated_data: Dict[str, float],
+) -> Dict[Decimal, Decimal]:
     """Convert aggregated data to Decimal format.
 
     Args:
@@ -370,11 +385,11 @@ def _convert_spread_analysis(spread_analysis: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
     return {
-        'best_bid': Decimal(str(spread_analysis.get('best_bid', 0))),
-        'best_ask': Decimal(str(spread_analysis.get('best_ask', 0))),
-        'spread': Decimal(str(spread_analysis.get('spread', 0))),
-        'mid_price': Decimal(str(spread_analysis.get('mid_price', 0))),
-        'spread_percentage': float(spread_analysis.get('spread_percentage', 0))
+        "best_bid": Decimal(str(spread_analysis.get("best_bid", 0))),
+        "best_ask": Decimal(str(spread_analysis.get("best_ask", 0))),
+        "spread": Decimal(str(spread_analysis.get("spread", 0))),
+        "mid_price": Decimal(str(spread_analysis.get("mid_price", 0))),
+        "spread_percentage": float(spread_analysis.get("spread_percentage", 0)),
     }
 
 
@@ -392,27 +407,27 @@ def _convert_peak_analysis(peak_analysis: Dict[str, Any]) -> Dict[str, Any]:
 
     decimal_peak_analysis = {}
 
-    for side in ['bids', 'asks']:
+    for side in ["bids", "asks"]:
         if side not in peak_analysis:
             continue
 
         side_data = peak_analysis[side].copy()
 
         # Convert mean price
-        if side_data.get('mean_price') is not None:
-            side_data['mean_price'] = Decimal(str(side_data['mean_price']))
+        if side_data.get("mean_price") is not None:
+            side_data["mean_price"] = Decimal(str(side_data["mean_price"]))
 
         # Convert peak interval
-        if side_data.get('peak_interval'):
-            lower, upper = side_data['peak_interval']
-            side_data['peak_interval'] = (
+        if side_data.get("peak_interval"):
+            lower, upper = side_data["peak_interval"]
+            side_data["peak_interval"] = (
                 Decimal(str(lower)) if lower is not None else None,
-                Decimal(str(upper)) if upper is not None else None
+                Decimal(str(upper)) if upper is not None else None,
             )
 
         # Convert volumes
-        side_data['total_volume'] = Decimal(str(side_data.get('total_volume', 0)))
-        side_data['peak_volume'] = Decimal(str(side_data.get('peak_volume', 0)))
+        side_data["total_volume"] = Decimal(str(side_data.get("total_volume", 0)))
+        side_data["peak_volume"] = Decimal(str(side_data.get("peak_volume", 0)))
 
         decimal_peak_analysis[side] = side_data
 
@@ -428,36 +443,36 @@ def convert_to_decimal_format(analysis_result: Dict[str, Any]) -> Dict[str, Any]
     Returns:
         Analysis result with Decimal values for key fields
     """
-    if 'error' in analysis_result:
+    if "error" in analysis_result:
         return analysis_result
 
     decimal_result = analysis_result.copy()
 
     # Ensure all required fields exist
-    if 'aggregated_bids' not in decimal_result:
-        decimal_result['aggregated_bids'] = {}
-    if 'aggregated_asks' not in decimal_result:
-        decimal_result['aggregated_asks'] = {}
-    if 'spread_analysis' not in decimal_result:
-        decimal_result['spread_analysis'] = {}
-    if 'peak_analysis' not in decimal_result:
-        decimal_result['peak_analysis'] = {}
+    if "aggregated_bids" not in decimal_result:
+        decimal_result["aggregated_bids"] = {}
+    if "aggregated_asks" not in decimal_result:
+        decimal_result["aggregated_asks"] = {}
+    if "spread_analysis" not in decimal_result:
+        decimal_result["spread_analysis"] = {}
+    if "peak_analysis" not in decimal_result:
+        decimal_result["peak_analysis"] = {}
 
     # Convert each component using helper functions
-    decimal_result['aggregated_bids'] = _convert_aggregated_data(
-        analysis_result.get('aggregated_bids', {})
+    decimal_result["aggregated_bids"] = _convert_aggregated_data(
+        analysis_result.get("aggregated_bids", {})
     )
 
-    decimal_result['aggregated_asks'] = _convert_aggregated_data(
-        analysis_result.get('aggregated_asks', {})
+    decimal_result["aggregated_asks"] = _convert_aggregated_data(
+        analysis_result.get("aggregated_asks", {})
     )
 
-    decimal_result['spread_analysis'] = _convert_spread_analysis(
-        analysis_result.get('spread_analysis', {})
+    decimal_result["spread_analysis"] = _convert_spread_analysis(
+        analysis_result.get("spread_analysis", {})
     )
 
-    decimal_result['peak_analysis'] = _convert_peak_analysis(
-        analysis_result.get('peak_analysis', {})
+    decimal_result["peak_analysis"] = _convert_peak_analysis(
+        analysis_result.get("peak_analysis", {})
     )
 
     return decimal_result

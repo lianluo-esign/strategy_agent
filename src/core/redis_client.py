@@ -97,12 +97,16 @@ class RedisDataStore:
             try:
                 timestamp = datetime.fromisoformat(data["timestamp"])
             except (ValueError, KeyError) as e:
-                logger.warning(f"Invalid timestamp format in snapshot: {data.get('timestamp', 'missing')}, using current time: {e}")
+                logger.warning(
+                    f"Invalid timestamp format in snapshot: {data.get('timestamp', 'missing')}, using current time: {e}"
+                )
                 timestamp = datetime.now()
 
             # Validate timestamp is reasonable (not in 1970s)
             if timestamp.year < 2000:
-                logger.warning(f"Suspicious timestamp detected: {timestamp}, using current time")
+                logger.warning(
+                    f"Suspicious timestamp detected: {timestamp}, using current time"
+                )
                 timestamp = datetime.now()
 
             return DepthSnapshot(
@@ -221,10 +225,14 @@ class RedisDataStore:
                         timestamp = datetime.fromisoformat(data["timestamp"])
                         # Validate timestamp is reasonable
                         if timestamp.year < 2000:
-                            logger.warning(f"Suspicious trade data timestamp detected: {timestamp}, using current time")
+                            logger.warning(
+                                f"Suspicious trade data timestamp detected: {timestamp}, using current time"
+                            )
                             timestamp = datetime.now()
                     except (ValueError, KeyError) as e:
-                        logger.warning(f"Invalid timestamp format in trade data: {data.get('timestamp', 'missing')}, using current time: {e}")
+                        logger.warning(
+                            f"Invalid timestamp format in trade data: {data.get('timestamp', 'missing')}, using current time: {e}"
+                        )
                         timestamp = datetime.now()
 
                     trade_data = MinuteTradeData(timestamp=timestamp)
@@ -250,9 +258,9 @@ class RedisDataStore:
         """Custom JSON serializer to handle Decimal and numpy objects."""
         if isinstance(obj, Decimal):
             return float(obj)
-        elif hasattr(obj, 'tolist'):  # numpy arrays
+        elif hasattr(obj, "tolist"):  # numpy arrays
             return obj.tolist()
-        elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+        elif hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
             try:
                 return list(obj)
             except TypeError:
@@ -266,7 +274,9 @@ class RedisDataStore:
             data = result.to_dict()
 
             # Store the result with custom Decimal serializer
-            self.redis.setex(key, 3600, json.dumps(data, default=self._serialize_decimal))  # Expire after 1 hour
+            self.redis.setex(
+                key, 3600, json.dumps(data, default=self._serialize_decimal)
+            )  # Expire after 1 hour
 
             logger.debug(
                 f"Stored analysis result for {result.symbol} at {result.timestamp}"

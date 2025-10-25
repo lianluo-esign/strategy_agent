@@ -25,11 +25,10 @@ class DataCollectorAgent:
             host=settings.redis.host,
             port=settings.redis.port,
             db=settings.redis.db,
-            storage_dir=settings.redis.storage_dir
+            storage_dir=settings.redis.storage_dir,
         )
         self.api_client = BinanceAPIClient(
-            base_url=settings.binance.rest_api_base,
-            timeout=settings.binance.timeout
+            base_url=settings.binance.rest_api_base, timeout=settings.binance.timeout
         )
         self.websocket_client = BinanceWebSocketClient(symbol=settings.binance.symbol)
 
@@ -113,7 +112,7 @@ class DataCollectorAgent:
         )
         snapshot = await self.api_client.get_depth_snapshot(
             symbol=self.settings.binance.symbol,
-            limit=self.settings.data_collector.depth_snapshot.limit
+            limit=self.settings.data_collector.depth_snapshot.limit,
         )
 
         if snapshot:
@@ -131,7 +130,7 @@ class DataCollectorAgent:
                 logger.debug("Collecting depth snapshot")
                 snapshot = await self.api_client.get_depth_snapshot(
                     symbol=self.settings.binance.symbol,
-                    limit=self.settings.data_collector.depth_snapshot.limit
+                    limit=self.settings.data_collector.depth_snapshot.limit,
                 )
 
                 if snapshot:
@@ -142,7 +141,9 @@ class DataCollectorAgent:
 
                 # Wait for next collection with cancellation support
                 try:
-                    await asyncio.sleep(interval)  # asyncio.sleep is already cancellable
+                    await asyncio.sleep(
+                        interval
+                    )  # asyncio.sleep is already cancellable
                 except asyncio.CancelledError:
                     logger.info("Depth snapshot collector cancelled during sleep")
                     break
@@ -169,12 +170,16 @@ class DataCollectorAgent:
 
                 if not connected:
                     retry_count += 1
-                    wait_time = min(2 ** retry_count, 30)  # Exponential backoff
-                    logger.warning(f"WebSocket connection failed, retrying in {wait_time}s...")
+                    wait_time = min(2**retry_count, 30)  # Exponential backoff
+                    logger.warning(
+                        f"WebSocket connection failed, retrying in {wait_time}s..."
+                    )
 
                     # Use asyncio.sleep with cancellation support
                     try:
-                        await asyncio.sleep(wait_time)  # asyncio.sleep is already cancellable
+                        await asyncio.sleep(
+                            wait_time
+                        )  # asyncio.sleep is already cancellable
                     except asyncio.CancelledError:
                         logger.info("WebSocket retry cancelled during sleep")
                         break
@@ -208,13 +213,14 @@ class DataCollectorAgent:
         """Listen for trades with proper cancellation support."""
         try:
             # Create a cancellation-aware task for WebSocket listening
-            listen_task = asyncio.create_task(self.websocket_client.listen_trades(self._handle_trade))
+            listen_task = asyncio.create_task(
+                self.websocket_client.listen_trades(self._handle_trade)
+            )
             shutdown_task = asyncio.create_task(self.shutdown_event.wait())
 
             # Wait for either the task to complete or shutdown to be requested
             done, pending = await asyncio.wait(
-                [listen_task, shutdown_task],
-                return_when=asyncio.FIRST_COMPLETED
+                [listen_task, shutdown_task], return_when=asyncio.FIRST_COMPLETED
             )
 
             # Cancel pending tasks
@@ -262,7 +268,9 @@ class DataCollectorAgent:
                 current_time = datetime.now()
 
                 # Check if we should aggregate current minute's data
-                if current_time >= self.last_aggregation_time + timedelta(seconds=interval):
+                if current_time >= self.last_aggregation_time + timedelta(
+                    seconds=interval
+                ):
                     await self._aggregate_and_store_minute_data()
 
                     # Reset for next minute
@@ -296,10 +304,12 @@ class DataCollectorAgent:
             await self.redis_store.store_minute_trade_data(self.current_minute_data)
 
             total_trades = sum(
-                level.trade_count for level in self.current_minute_data.price_levels.values()
+                level.trade_count
+                for level in self.current_minute_data.price_levels.values()
             )
             total_volume = sum(
-                level.total_volume for level in self.current_minute_data.price_levels.values()
+                level.total_volume
+                for level in self.current_minute_data.price_levels.values()
             )
 
             logger.debug(
@@ -319,7 +329,9 @@ class DataCollectorAgent:
         # Store any remaining aggregated data
         if self.current_minute_data.price_levels:
             try:
-                await asyncio.wait_for(self._aggregate_and_store_minute_data(), timeout=5)
+                await asyncio.wait_for(
+                    self._aggregate_and_store_minute_data(), timeout=5
+                )
             except TimeoutError:
                 logger.warning("Timeout storing remaining aggregated data")
             except Exception as e:
@@ -348,8 +360,7 @@ class DataCollectorAgent:
         # Wait for tasks to complete with timeout
         try:
             await asyncio.wait_for(
-                asyncio.gather(*self.tasks, return_exceptions=True),
-                timeout=10
+                asyncio.gather(*self.tasks, return_exceptions=True), timeout=10
             )
         except TimeoutError:
             logger.warning("Timeout waiting for tasks to cancel")
@@ -389,12 +400,12 @@ class DataCollectorAgent:
     def get_status(self) -> dict:
         """Get current agent status."""
         return {
-            'is_running': self.is_running,
-            'websocket_connected': self.websocket_client.is_connected,
-            'current_minute_trades': len(self.current_minute_data.price_levels),
-            'depth_snapshot_available': self.redis_store.depth_snapshot_exists(),
-            'trade_window_count': self.redis_store.get_trade_window_count(),
-            'last_update': datetime.now().isoformat()
+            "is_running": self.is_running,
+            "websocket_connected": self.websocket_client.is_connected,
+            "current_minute_trades": len(self.current_minute_data.price_levels),
+            "depth_snapshot_available": self.redis_store.depth_snapshot_exists(),
+            "trade_window_count": self.redis_store.get_trade_window_count(),
+            "last_update": datetime.now().isoformat(),
         }
 
 
@@ -404,9 +415,7 @@ async def main() -> None:
 
     parser = argparse.ArgumentParser(description="Strategy Agent Data Collector")
     parser.add_argument(
-        "--config",
-        default="config/development.yaml",
-        help="Configuration file path"
+        "--config", default="config/development.yaml", help="Configuration file path"
     )
     args = parser.parse_args()
 
@@ -419,7 +428,9 @@ async def main() -> None:
 
     try:
         # Start with timeout protection for graceful shutdown
-        await asyncio.wait_for(agent.start(), timeout=None)  # No timeout for normal operation
+        await asyncio.wait_for(
+            agent.start(), timeout=None
+        )  # No timeout for normal operation
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
         # The signal handler will trigger graceful shutdown

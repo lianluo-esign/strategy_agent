@@ -9,7 +9,7 @@ from src.core.models import DepthLevel, DepthSnapshot
 from src.core.sklearn_cluster_analyzer import (
     SklearnClusterAnalyzer,
     ClusterVisualizer,
-    print_clustering_results
+    print_clustering_results,
 )
 
 
@@ -30,8 +30,9 @@ def create_realistic_btc_order_book():
         if i in [8, 9, 10]:  # Another liquidity cluster
             volume *= 2.5
 
-        bids.append(DepthLevel(price=Decimal(f"{price:.2f}"),
-                              quantity=Decimal(f"{volume:.4f}")))
+        bids.append(
+            DepthLevel(price=Decimal(f"{price:.2f}"), quantity=Decimal(f"{volume:.4f}"))
+        )
 
     # Create ask levels (ascending prices)
     asks = []
@@ -45,8 +46,9 @@ def create_realistic_btc_order_book():
         if i in [7, 8, 9]:  # Another liquidity cluster
             volume *= 2.0
 
-        asks.append(DepthLevel(price=Decimal(f"{price:.2f}"),
-                              quantity=Decimal(f"{volume:.4f}")))
+        asks.append(
+            DepthLevel(price=Decimal(f"{price:.2f}"), quantity=Decimal(f"{volume:.4f}"))
+        )
 
     return bids, asks
 
@@ -63,10 +65,7 @@ def main():
 
     # Create depth snapshot
     snapshot = DepthSnapshot(
-        symbol="BTCFDUSD",
-        timestamp=pd.Timestamp.now(),
-        bids=bids,
-        asks=asks
+        symbol="BTCFDUSD", timestamp=pd.Timestamp.now(), bids=bids, asks=asks
     )
 
     print(f"订单簿数据: {len(bids)}个买盘, {len(asks)}个卖盘")
@@ -75,10 +74,7 @@ def main():
     # Initialize cluster analyzer
     print("\n初始化聚类分析器...")
     analyzer = SklearnClusterAnalyzer(
-        min_samples=3,
-        eps_multiplier=0.02,
-        max_clusters=8,
-        volume_weight=2.0
+        min_samples=3, eps_multiplier=0.02, max_clusters=8, volume_weight=2.0
     )
 
     # Perform clustering analysis
@@ -93,18 +89,20 @@ def main():
     print(f"- 总共识别出 {len(results['liquidity_peaks'])} 个流动性峰值")
     print(f"- 聚类质量评估: 轮廓系数 {results['silhouette_score']:.3f}")
 
-    if results['silhouette_score'] > 0.5:
+    if results["silhouette_score"] > 0.5:
         print("- 聚类质量: 优秀")
-    elif results['silhouette_score'] > 0.25:
+    elif results["silhouette_score"] > 0.25:
         print("- 聚类质量: 良好")
     else:
         print("- 聚类质量: 需要改进")
 
     # Print dominant sides analysis
-    bid_dominant = sum(1 for peak in results['liquidity_peaks']
-                      if peak['dominant_side'] == 'bid')
-    ask_dominant = sum(1 for peak in results['liquidity_peaks']
-                      if peak['dominant_side'] == 'ask')
+    bid_dominant = sum(
+        1 for peak in results["liquidity_peaks"] if peak["dominant_side"] == "bid"
+    )
+    ask_dominant = sum(
+        1 for peak in results["liquidity_peaks"] if peak["dominant_side"] == "ask"
+    )
 
     print(f"- 买盘主导峰值: {bid_dominant}个")
     print(f"- 卖盘主导峰值: {ask_dominant}个")
@@ -123,7 +121,7 @@ def main():
 
     # Save the plot
     try:
-        plt.savefig('clustering_analysis_results.png', dpi=300, bbox_inches='tight')
+        plt.savefig("clustering_analysis_results.png", dpi=300, bbox_inches="tight")
         print("图表已保存为 clustering_analysis_results.png")
     except Exception as e:
         print(f"保存图表时出错: {e}")
@@ -137,6 +135,7 @@ if __name__ == "__main__":
 
     # Set matplotlib to use a backend that works in headless mode if needed
     import matplotlib
-    matplotlib.use('Agg')  # Uncomment if running in headless environment
+
+    matplotlib.use("Agg")  # Uncomment if running in headless environment
 
     main()

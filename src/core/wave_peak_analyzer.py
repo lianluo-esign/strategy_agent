@@ -528,7 +528,9 @@ def validate_peak_detection_quality(
     )
 
     # Calculate coverage (how many significant levels were captured)
-    significant_volume_levels = len([v for v in price_volume_data.values() if v >= Decimal("5.0")])
+    significant_volume_levels = len(
+        [v for v in price_volume_data.values() if v >= Decimal("5.0")]
+    )
     coverage_rate = (
         len(detected_peaks) / significant_volume_levels
         if significant_volume_levels > 0

@@ -44,11 +44,7 @@ class TestExpandEnvVars:
     def test_expand_nested_dict(self):
         """Test expanding environment variables in nested dictionary."""
         os.environ["NESTED_VAR"] = "nested_value"
-        config_data = {
-            "level1": {
-                "level2": "${NESTED_VAR}"
-            }
-        }
+        config_data = {"level1": {"level2": "${NESTED_VAR}"}}
         result = _expand_env_vars(config_data)
         assert result["level1"]["level2"] == "nested_value"
         del os.environ["NESTED_VAR"]
@@ -68,9 +64,7 @@ class TestExpandEnvVars:
             "string": "${STRING_VAR}",
             "number": 42,
             "boolean": True,
-            "nested": {
-                "value": "${STRING_VAR}"
-            }
+            "nested": {"value": "${STRING_VAR}"},
         }
         result = _expand_env_vars(config_data)
         assert result["string"] == "string"
@@ -95,13 +89,7 @@ class TestSettings:
 
     def test_default_initialization(self):
         """Test settings initialization with default values."""
-        settings = Settings(
-            analyzer={
-                "deepseek": {
-                    "api_key": "test_key"
-                }
-            }
-        )
+        settings = Settings(analyzer={"deepseek": {"api_key": "test_key"}})
 
         assert settings.app.name == "strategy-agent"
         assert settings.redis.host == "localhost"
@@ -114,19 +102,13 @@ class TestSettings:
         os.environ["DEEPSEEK_API_KEY"] = "loaded_key"
 
         config_data = {
-            "app": {
-                "name": "test-app",
-                "environment": "test"
-            },
+            "app": {"name": "test-app", "environment": "test"},
             "analyzer": {
-                "deepseek": {
-                    "api_key": "${DEEPSEEK_API_KEY}",
-                    "model": "deepseek-chat"
-                }
-            }
+                "deepseek": {"api_key": "${DEEPSEEK_API_KEY}", "model": "deepseek-chat"}
+            },
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             config_path = f.name
 
@@ -149,13 +131,7 @@ class TestSettings:
         """Test successful validation of required environment variables."""
         os.environ["DEEPSEEK_API_KEY"] = "valid_key"
 
-        settings = Settings(
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
-        )
+        settings = Settings(analyzer={"deepseek": {"api_key": "valid_key"}})
 
         # Should not raise any exception
         settings.validate_required_env_vars()
@@ -167,13 +143,7 @@ class TestSettings:
         if "DEEPSEEK_API_KEY" in os.environ:
             del os.environ["DEEPSEEK_API_KEY"]
 
-        settings = Settings(
-            analyzer={
-                "deepseek": {
-                    "api_key": ""
-                }
-            }
-        )
+        settings = Settings(analyzer={"deepseek": {"api_key": ""}})
 
         with pytest.raises(ValueError, match="Missing required environment variables"):
             settings.validate_required_env_vars()
@@ -181,12 +151,7 @@ class TestSettings:
     def test_validate_config_values_success(self):
         """Test successful configuration value validation."""
         settings = Settings(
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key",
-                    "max_tokens": 1000
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key", "max_tokens": 1000}}
         )
 
         # Should not raise any exception
@@ -196,11 +161,7 @@ class TestSettings:
         """Test validation failure with invalid Redis port."""
         settings = Settings(
             redis={"port": 70000},  # Invalid port
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         with pytest.raises(ValueError, match="Redis port must be 1-65535"):
@@ -210,11 +171,7 @@ class TestSettings:
         """Test validation failure with invalid Binance timeout."""
         settings = Settings(
             binance={"timeout": -1},  # Invalid timeout
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         with pytest.raises(ValueError, match="Binance timeout must be positive"):
@@ -224,42 +181,27 @@ class TestSettings:
         """Test validation failure with invalid symbol format."""
         settings = Settings(
             binance={"symbol": "invalid-symbol"},
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         with pytest.raises(ValueError, match="Invalid symbol format"):
             settings.validate_config_values()
 
     def test_validate_empty_deepseek_api_key(self):
-        """Test validation failure with empty DeepSeek API key."""
-        settings = Settings(
-            analyzer={
-                "deepseek": {
-                    "api_key": ""
-                }
-            }
-        )
+        """Test validation failure with empty DeepSeek API key when enabled."""
+        settings = Settings(analyzer={"deepseek": {"api_key": "", "enable": True}})
 
-        with pytest.raises(ValueError, match="DeepSeek API key cannot be empty"):
+        with pytest.raises(
+            ValueError,
+            match="DeepSeek API key cannot be empty when DeepSeek is enabled",
+        ):
             settings.validate_config_values()
 
     def test_validate_invalid_depth_limit(self):
         """Test validation failure with invalid depth snapshot limit."""
         settings = Settings(
-            data_collector={
-                "depth_snapshot": {
-                    "limit": 0
-                }
-            },
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            data_collector={"depth_snapshot": {"limit": 0}},
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         with pytest.raises(ValueError, match="Depth snapshot limit must be positive"):
@@ -268,15 +210,8 @@ class TestSettings:
     def test_validate_invalid_log_config(self):
         """Test validation failure with invalid logging configuration."""
         settings = Settings(
-            logging={
-                "max_file_size_mb": -1,
-                "backup_count": -1
-            },
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            logging={"max_file_size_mb": -1, "backup_count": -1},
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         # Test each validation separately since the method only raises on first error
@@ -287,13 +222,9 @@ class TestSettings:
         settings_valid_size = Settings(
             logging={
                 "max_file_size_mb": 10,  # Valid size
-                "backup_count": -1  # Invalid backup count
+                "backup_count": -1,  # Invalid backup count
             },
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         with pytest.raises(ValueError, match="Log backup count cannot be negative"):
@@ -307,13 +238,9 @@ class TestSettings:
                 "format": "%(levelname)s - %(message)s",
                 "file_path": "test.log",
                 "max_file_size_mb": 1,
-                "backup_count": 1
+                "backup_count": 1,
             },
-            analyzer={
-                "deepseek": {
-                    "api_key": "valid_key"
-                }
-            }
+            analyzer={"deepseek": {"api_key": "valid_key"}},
         )
 
         # Should not raise any exception and create log file directory
@@ -379,7 +306,7 @@ class TestConfigModels:
             base_url="https://custom.api.com",
             model="custom-model",
             max_tokens=2000,
-            temperature=0.5
+            temperature=0.5,
         )
 
         assert config.api_key == "custom_key"
@@ -387,3 +314,69 @@ class TestConfigModels:
         assert config.model == "custom-model"
         assert config.max_tokens == 2000
         assert config.temperature == 0.5
+
+    def test_deepseek_config_enable_default(self):
+        """Test DeepSeekConfig enable field defaults to True."""
+        config = DeepSeekConfig(api_key="test_key")
+        assert config.enable is True
+
+    def test_deepseek_config_enable_false(self):
+        """Test DeepSeekConfig with enable set to False."""
+        config = DeepSeekConfig(api_key="test_key", enable=False)
+        assert config.enable is False
+
+    def test_deepseek_config_enable_true(self):
+        """Test DeepSeekConfig with enable explicitly set to True."""
+        config = DeepSeekConfig(api_key="test_key", enable=True)
+        assert config.enable is True
+
+    def test_backward_compatibility_missing_enable_field(self):
+        """Test that configurations without enable field default to enabled."""
+        # Simulate old configuration format without enable field
+        config_data = {
+            "analyzer": {"deepseek": {"api_key": "test_key", "model": "deepseek-chat"}}
+        }
+
+        settings = Settings(**config_data)
+        assert settings.analyzer.deepseek.enable is True
+        assert settings.analyzer.deepseek.api_key == "test_key"
+        assert settings.analyzer.deepseek.model == "deepseek-chat"
+
+    def test_validate_disabled_deepseek_no_api_key_required(self):
+        """Test that validation passes when DeepSeek is disabled even without API key."""
+        settings = Settings(analyzer={"deepseek": {"api_key": "", "enable": False}})
+
+        # Should not raise any exception
+        settings.validate_config_values()
+
+    def test_validate_disabled_deepseek_no_env_var_required(self):
+        """Test that environment validation passes when DeepSeek is disabled."""
+        # Ensure DEEPSEEK_API_KEY is not set
+        if "DEEPSEEK_API_KEY" in os.environ:
+            del os.environ["DEEPSEEK_API_KEY"]
+
+        settings = Settings(analyzer={"deepseek": {"api_key": "", "enable": False}})
+
+        # Should not raise any exception
+        settings.validate_required_env_vars()
+
+    def test_validate_enabled_deepseek_requires_api_key(self):
+        """Test that validation fails when DeepSeek is enabled but API key is empty."""
+        settings = Settings(analyzer={"deepseek": {"api_key": "", "enable": True}})
+
+        with pytest.raises(
+            ValueError,
+            match="DeepSeek API key cannot be empty when DeepSeek is enabled",
+        ):
+            settings.validate_config_values()
+
+    def test_validate_enabled_deepseek_requires_env_var(self):
+        """Test that environment validation fails when DeepSeek is enabled but env var is missing."""
+        # Ensure DEEPSEEK_API_KEY is not set
+        if "DEEPSEEK_API_KEY" in os.environ:
+            del os.environ["DEEPSEEK_API_KEY"]
+
+        settings = Settings(analyzer={"deepseek": {"api_key": "", "enable": True}})
+
+        with pytest.raises(ValueError, match="Missing required environment variables"):
+            settings.validate_required_env_vars()

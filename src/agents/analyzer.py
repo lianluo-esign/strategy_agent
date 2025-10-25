@@ -22,6 +22,7 @@ try:
     from ..core.analyzers_normal import (
         MarketAnalyzer as NormalDistributionMarketAnalyzer,
     )
+
     logger.info("Using normal distribution market analyzer")
     use_normal_distribution = True
 except ImportError:
@@ -31,9 +32,11 @@ except ImportError:
 # Fall back to enhanced analyzer
 try:
     from ..core.analyzers_enhanced import MarketAnalyzer as EnhancedMarketAnalyzer
+
     logger.info("Using enhanced market analyzer with wave peak detection")
 except ImportError:
     from ..core.analyzers import MarketAnalyzer
+
     logger.warning("Enhanced analyzer not available, falling back to basic analyzer")
     EnhancedMarketAnalyzer = MarketAnalyzer
 
@@ -47,9 +50,7 @@ class AnalyzerAgent:
 
         # Initialize components
         self.redis_store = RedisDataStore(
-            host=settings.redis.host,
-            port=settings.redis.port,
-            db=settings.redis.db
+            host=settings.redis.host, port=settings.redis.port, db=settings.redis.db
         )
 
         # Use normal distribution analyzer if available
@@ -59,20 +60,26 @@ class AnalyzerAgent:
                 analysis_window_minutes=180,  # 3 hours
                 enhanced_mode=True,
                 use_normal_distribution=True,
-                confidence_level=getattr(settings.analyzer, 'confidence_level', 0.95)
+                confidence_level=getattr(settings.analyzer, "confidence_level", 0.95),
             )
         else:
             self.market_analyzer = EnhancedMarketAnalyzer(
                 min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
-                analysis_window_minutes=180  # 3 hours
+                analysis_window_minutes=180,  # 3 hours
             )
-        self.ai_client = DeepSeekClient(
-            api_key=settings.analyzer.deepseek.api_key,
-            base_url=settings.analyzer.deepseek.base_url,
-            model=settings.analyzer.deepseek.model,
-            max_tokens=settings.analyzer.deepseek.max_tokens,
-            temperature=settings.analyzer.deepseek.temperature
-        )
+        # Initialize AI client only if DeepSeek is enabled
+        self.ai_client = None
+        if settings.analyzer.deepseek.enable:
+            self.ai_client = DeepSeekClient(
+                api_key=settings.analyzer.deepseek.api_key,
+                base_url=settings.analyzer.deepseek.base_url,
+                model=settings.analyzer.deepseek.model,
+                max_tokens=settings.analyzer.deepseek.max_tokens,
+                temperature=settings.analyzer.deepseek.temperature,
+            )
+            logger.info("DeepSeek AI client initialized")
+        else:
+            logger.info("DeepSeek AI analysis is disabled")
 
         # Control flags
         self.is_running = False
@@ -135,10 +142,7 @@ class AnalyzerAgent:
 
                 # Wait for next cycle with cancellation support
                 try:
-                    await asyncio.wait_for(
-                        self.shutdown_event.wait(),
-                        timeout=interval
-                    )
+                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=interval)
                     # If wait completed without timeout, shutdown was requested
                     logger.info("Shutdown event triggered, exiting analysis loop")
                     break
@@ -150,7 +154,9 @@ class AnalyzerAgent:
                 logger.error(f"Analysis cycle error: {e}")
                 # Wait before retry, but respect shutdown
                 try:
-                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=RETRY_DELAY_ON_ERROR)
+                    await asyncio.wait_for(
+                        self.shutdown_event.wait(), timeout=RETRY_DELAY_ON_ERROR
+                    )
                 except TimeoutError:
                     # Normal timeout, continue retry
                     continue
@@ -166,31 +172,35 @@ class AnalyzerAgent:
                 logger.debug("No depth snapshot available")
                 return
 
-            logger.info(f"Analyzing depth snapshot: {snapshot.symbol} from {snapshot.timestamp}")
+            logger.info(
+                f"Analyzing depth snapshot: {snapshot.symbol} from {snapshot.timestamp}"
+            )
 
             # Step 2: Perform analysis using only depth snapshot data (no trade data)
             analysis_result = self.market_analyzer.analyze_market(
                 snapshot=snapshot,
                 trade_data_list=[],  # Empty list - only using depth snapshot
                 symbol=self.settings.binance.symbol,
-                enhanced_mode=True
+                enhanced_mode=True,
             )
 
-            # Step 4: Get AI-driven recommendation
-            recommendation = await self.ai_client.analyze_market_data(
-                analysis_result=analysis_result,
-                symbol=self.settings.binance.symbol
-            )
-
-            if recommendation:
-                # Step 5: Store results
-                await self.redis_store.store_analysis_result(analysis_result)
-
-                # Step 6: Log recommendation (for now, until we implement trading)
-                await self._log_trading_recommendation(recommendation, analysis_result)
-
+            # Step 4: Get AI-driven recommendation (if enabled)
+            recommendation = None
+            if self.ai_client:
+                recommendation = await self.ai_client.analyze_market_data(
+                    analysis_result=analysis_result, symbol=self.settings.binance.symbol
+                )
+                if not recommendation:
+                    logger.warning("AI analysis failed to produce recommendation")
             else:
-                logger.warning("AI analysis failed to produce recommendation")
+                logger.info("AI analysis is disabled, skipping AI recommendation")
+
+            # Step 5: Store results (always store analysis results)
+            await self.redis_store.store_analysis_result(analysis_result)
+
+            # Step 6: Log recommendation (if available)
+            if recommendation:
+                await self._log_trading_recommendation(recommendation, analysis_result)
 
         except Exception as e:
             logger.error(f"Analysis cycle failed: {e}")
@@ -198,36 +208,41 @@ class AnalyzerAgent:
     async def _log_trading_recommendation(
         self,
         recommendation: TradingRecommendation,
-        analysis_result: MarketAnalysisResult
+        analysis_result: MarketAnalysisResult,
     ) -> None:
         """Log trading recommendation to file for debugging."""
         try:
             log_entry = {
-                'timestamp': recommendation.timestamp.isoformat(),
-                'symbol': recommendation.symbol,
-                'action': recommendation.action,
-                'price_range': [float(recommendation.price_range[0]), float(recommendation.price_range[1])],
-                'confidence': recommendation.confidence,
-                'reasoning': recommendation.reasoning,
-                'risk_level': recommendation.risk_level,
-                'market_context': {
-                    'support_count': len(analysis_result.support_levels),
-                    'resistance_count': len(analysis_result.resistance_levels),
-                    'resonance_zones_count': len(analysis_result.resonance_zones),
-                    'poc_count': len(analysis_result.poc_levels)
-                }
+                "timestamp": recommendation.timestamp.isoformat(),
+                "symbol": recommendation.symbol,
+                "action": recommendation.action,
+                "price_range": [
+                    float(recommendation.price_range[0]),
+                    float(recommendation.price_range[1]),
+                ],
+                "confidence": recommendation.confidence,
+                "reasoning": recommendation.reasoning,
+                "risk_level": recommendation.risk_level,
+                "market_context": {
+                    "support_count": len(analysis_result.support_levels),
+                    "resistance_count": len(analysis_result.resistance_levels),
+                    "resonance_zones_count": len(analysis_result.resonance_zones),
+                    "poc_count": len(analysis_result.poc_levels),
+                },
             }
 
             # Write to log file
-            log_file_path = f"logs/trading_recommendations_{recommendation.symbol.lower()}.log"
+            log_file_path = (
+                f"logs/trading_recommendations_{recommendation.symbol.lower()}.log"
+            )
             import json
             from pathlib import Path
 
             log_dir = Path(log_file_path).parent
             log_dir.mkdir(parents=True, exist_ok=True)
 
-            with open(log_file_path, 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
+            with open(log_file_path, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
 
             logger.info(
                 f"Trading recommendation logged: {recommendation.action} "
@@ -245,7 +260,9 @@ class AnalyzerAgent:
         self._shutdown_requested = True
 
         # Cancel all pending tasks
-        tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+        tasks = [
+            task for task in asyncio.all_tasks() if task is not asyncio.current_task()
+        ]
         if tasks:
             logger.info(f"Cancelling {len(tasks)} pending tasks...")
             for task in tasks:
@@ -253,16 +270,22 @@ class AnalyzerAgent:
 
             # Wait for tasks to complete with timeout
             try:
-                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=SHUTDOWN_TASK_TIMEOUT)
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=SHUTDOWN_TASK_TIMEOUT,
+                )
             except TimeoutError:
                 logger.warning("Some tasks did not complete within timeout")
 
         # Close connections
-        try:
-            await self.ai_client.close()
-            logger.info("AI client closed")
-        except Exception as e:
-            logger.error(f"Error closing AI client: {e}")
+        if self.ai_client:
+            try:
+                await self.ai_client.close()
+                logger.info("AI client closed")
+            except Exception as e:
+                logger.error(f"Error closing AI client: {e}")
+        else:
+            logger.debug("No AI client to close")
 
         try:
             await self.redis_store.close()
@@ -275,11 +298,11 @@ class AnalyzerAgent:
     def get_status(self) -> dict:
         """Get current agent status."""
         return {
-            'is_running': self.is_running,
-            'redis_connected': self.redis_store.test_connection(),
-            'last_analysis': datetime.now().isoformat(),
-            'depth_snapshot_available': self.redis_store.depth_snapshot_exists(),
-            'trade_window_count': self.redis_store.get_trade_window_count()
+            "is_running": self.is_running,
+            "redis_connected": self.redis_store.test_connection(),
+            "last_analysis": datetime.now().isoformat(),
+            "depth_snapshot_available": self.redis_store.depth_snapshot_exists(),
+            "trade_window_count": self.redis_store.get_trade_window_count(),
         }
 
 
@@ -289,9 +312,7 @@ async def main() -> None:
 
     parser = argparse.ArgumentParser(description="Strategy Agent Market Analyzer")
     parser.add_argument(
-        "--config",
-        default="config/development.yaml",
-        help="Configuration file path"
+        "--config", default="config/development.yaml", help="Configuration file path"
     )
     args = parser.parse_args()
 
@@ -299,9 +320,11 @@ async def main() -> None:
     settings = Settings.load_from_file(args.config)
     settings.setup_logging()
 
-    # Validate DeepSeek API key
-    if not settings.analyzer.deepseek.api_key:
-        logger.error("DeepSeek API key is required. Please set DEEPSEEK_API_KEY environment variable.")
+    # Validate DeepSeek API key (only if enabled)
+    if settings.analyzer.deepseek.enable and not settings.analyzer.deepseek.api_key:
+        logger.error(
+            "DeepSeek API key is required when DeepSeek is enabled. Please set DEEPSEEK_API_KEY environment variable or set enable: false in configuration."
+        )
         sys.exit(1)
 
     # Create and start agent
