@@ -10,6 +10,7 @@ from ..core.models import MarketAnalysisResult, TradingRecommendation
 from ..core.redis_client import RedisDataStore
 from ..utils.ai_client import DeepSeekClient
 from ..utils.config import Settings
+from ..visualization.order_book_visualizer import OrderBookVisualizer
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,20 @@ class AnalyzerAgent:
             logger.info("DeepSeek AI client initialized")
         else:
             logger.info("DeepSeek AI analysis is disabled")
+
+        # Initialize order book visualizer
+        self.order_book_visualizer = None
+        if settings.analyzer.visualization.enabled:
+            try:
+                self.order_book_visualizer = OrderBookVisualizer(
+                    config=settings.analyzer.visualization
+                )
+                logger.info("Order book visualizer initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize order book visualizer: {e}")
+                self.order_book_visualizer = None
+        else:
+            logger.info("Order book visualization is disabled")
 
         # Control flags
         self.is_running = False
@@ -198,7 +213,11 @@ class AnalyzerAgent:
             # Step 5: Store results (always store analysis results)
             await self.redis_store.store_analysis_result(analysis_result)
 
-            # Step 6: Log recommendation (if available)
+            # Step 6: Create order book visualization (if enabled)
+            if self.order_book_visualizer:
+                await self._create_order_book_visualization(snapshot)
+
+            # Step 7: Log recommendation (if available)
             if recommendation:
                 await self._log_trading_recommendation(recommendation, analysis_result)
 
@@ -252,6 +271,43 @@ class AnalyzerAgent:
         except Exception as e:
             logger.error(f"Failed to log trading recommendation: {e}")
 
+    async def _create_order_book_visualization(self, snapshot) -> None:
+        """Create order book distribution visualization from depth snapshot.
+
+        Args:
+            snapshot: Depth snapshot object
+        """
+        if not self.order_book_visualizer:
+            logger.debug("Order book visualizer not available")
+            return
+
+        try:
+            # Run visualization in thread pool to avoid blocking event loop
+            loop = asyncio.get_running_loop()
+            output_file = await loop.run_in_executor(
+                None,
+                self.order_book_visualizer.create_order_book_distribution_chart,
+                snapshot
+            )
+            logger.info(f"Order book visualization created: {output_file}")
+
+            # Cleanup old files periodically (every 10th visualization)
+            if hasattr(self, '_visualization_counter'):
+                self._visualization_counter += 1
+            else:
+                self._visualization_counter = 1
+
+            if self._visualization_counter % 10 == 0:
+                removed_count = await loop.run_in_executor(
+                    None,
+                    self.order_book_visualizer.cleanup_old_files
+                )
+                if removed_count > 0:
+                    logger.info(f"Cleaned up {removed_count} old visualization files")
+
+        except Exception as e:
+            logger.error(f"Failed to create order book visualization: {e}")
+
     async def _shutdown(self) -> None:
         """Cleanup and shutdown the agent."""
         logger.info("Shutting down Market Analyzer Agent")
@@ -297,13 +353,38 @@ class AnalyzerAgent:
 
     def get_status(self) -> dict:
         """Get current agent status."""
-        return {
+        status = {
             "is_running": self.is_running,
             "redis_connected": self.redis_store.test_connection(),
             "last_analysis": datetime.now().isoformat(),
             "depth_snapshot_available": self.redis_store.depth_snapshot_exists(),
             "trade_window_count": self.redis_store.get_trade_window_count(),
         }
+
+        # Add visualization status
+        if self.order_book_visualizer:
+            try:
+                viz_stats = self.order_book_visualizer.get_visualization_stats()
+                status["visualization"] = {
+                    "enabled": True,
+                    "stats": viz_stats
+                }
+            except Exception as e:
+                status["visualization"] = {
+                    "enabled": True,
+                    "error": str(e)
+                }
+        else:
+            status["visualization"] = {
+                "enabled": False
+            }
+
+        # Add AI status
+        status["ai_analysis"] = {
+            "enabled": self.ai_client is not None
+        }
+
+        return status
 
 
 async def main() -> None:

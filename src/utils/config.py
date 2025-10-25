@@ -127,11 +127,27 @@ class AnalysisConfig(BaseModel):
     support_resistance_threshold: float = 0.1
 
 
+class VisualizationConfig(BaseModel):
+    """Order book visualization configuration."""
+
+    enabled: bool = True
+    price_aggregation_precision: float = 1.0  # $1 precision
+    max_price_levels: int = 5000
+    chart_width: int = 1920
+    chart_height: int = 1080
+    chart_dpi: int = 300
+    chart_style: str = "seaborn-v0_8"
+    output_base_path: str = "./visualizations/order_book/"
+    retention_days: int = 7
+    auto_cleanup: bool = True
+
+
 class AnalyzerConfig(BaseModel):
     """Analyzer configuration."""
 
     deepseek: DeepSeekConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
 
 
 class LoggingConfig(BaseModel):

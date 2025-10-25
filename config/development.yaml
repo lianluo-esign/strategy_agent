@@ -50,6 +50,17 @@ analyzer:
     interval_seconds: 1800
     min_order_volume_threshold: 0.01
     support_resistance_threshold: 0.1
+  visualization:
+    enabled: true
+    price_aggregation_precision: 1.0  # $1 precision
+    max_price_levels: 5000
+    chart_width: 1920
+    chart_height: 1080
+    chart_dpi: 300
+    chart_style: "seaborn-v0_8"
+    output_base_path: "./visualizations/order_book/"
+    retention_days: 7
+    auto_cleanup: true
 
 logging:
   level: "INFO"
