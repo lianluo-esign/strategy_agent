@@ -477,7 +477,7 @@ def test_print_liquidity_peaks_results(capsys):
     assert "流动性峰值区域" in captured.out
     assert "买盘支撑区域" in captured.out
     assert "支撑 1: $95,000" in captured.out
-    assert "挂单量: 15" in captured.out
+    assert "挂单量: 15.00" in captured.out
     assert "纯度: 0.80" in captured.out
 
 

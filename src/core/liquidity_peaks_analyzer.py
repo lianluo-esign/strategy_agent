@@ -415,7 +415,7 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
         for i, peak in enumerate(ask_peaks):
             print(
                 f"  阻力 {i + 1}: ${peak.price:,.0f} | "
-                f"挂单量: {peak.volume_at_level:,.0f} | "
+                f"挂单量: {float(peak.volume_at_level):.2f} | "
                 f"纯度: {peak.strength:.2f}"
             )
 
@@ -425,6 +425,6 @@ def print_liquidity_peaks_results(results: dict[str, Any]) -> None:
         for i, peak in enumerate(bid_peaks):
             print(
                 f"  支撑 {i + 1}: ${peak.price:,.0f} | "
-                f"挂单量: {peak.volume_at_level:,.0f} | "
+                f"挂单量: {float(peak.volume_at_level):.2f} | "
                 f"纯度: {peak.strength:.2f}"
             )
