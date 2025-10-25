@@ -2,8 +2,9 @@
 
 import asyncio
 import signal
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.analyzer import AnalyzerAgent
 from src.utils.config import Settings
@@ -148,7 +149,7 @@ class TestAnalyzerGracefulShutdown:
         ):
             with patch("asyncio.gather", new_callable=AsyncMock) as mock_gather:
                 # Simulate timeout
-                mock_gather.side_effect = asyncio.TimeoutError()
+                mock_gather.side_effect = TimeoutError()
 
                 await agent._shutdown()
 
@@ -223,7 +224,7 @@ class TestAnalyzerGracefulShutdown:
                 await start_task
 
             with patch("asyncio.get_running_loop") as mock_loop:
-                mock_signal_handler = MagicMock()
+                MagicMock()
                 mock_loop.add_signal_handler = MagicMock()
 
                 await start_and_shutdown()

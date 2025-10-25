@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Test script for sklearn clustering analysis."""
 
+from decimal import Decimal
+
 import matplotlib.pyplot as plt
 import numpy as np
-from decimal import Decimal
 
 from src.core.models import DepthLevel, DepthSnapshot
 from src.core.sklearn_cluster_analyzer import (
-    SklearnClusterAnalyzer,
     ClusterVisualizer,
+    SklearnClusterAnalyzer,
     print_clustering_results,
 )
 
@@ -85,7 +86,7 @@ def main():
     print_clustering_results(results)
 
     # Additional analysis insights
-    print(f"\n分析洞察:")
+    print("\n分析洞察:")
     print(f"- 总共识别出 {len(results['liquidity_peaks'])} 个流动性峰值")
     print(f"- 聚类质量评估: 轮廓系数 {results['silhouette_score']:.3f}")
 
@@ -131,10 +132,9 @@ def main():
 
 
 if __name__ == "__main__":
-    import pandas as pd
-
     # Set matplotlib to use a backend that works in headless mode if needed
     import matplotlib
+    import pandas as pd
 
     matplotlib.use("Agg")  # Uncomment if running in headless environment
 

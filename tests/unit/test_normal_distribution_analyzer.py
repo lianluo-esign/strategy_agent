@@ -1,11 +1,11 @@
 """Unit tests for normal distribution analyzer."""
 
-import pytest
 from decimal import Decimal
+
 from src.core.normal_distribution_analyzer import (
-    OrderBookAggregator,
     NormalDistributionAnalyzer,
     NormalDistributionPeakAnalyzer,
+    OrderBookAggregator,
     convert_to_decimal_format,
 )
 

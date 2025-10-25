@@ -345,7 +345,9 @@ class PriceAggregator:
     and validation, supporting various aggregation strategies.
     """
 
-    def __init__(self, precision: float = 1.0, enabled: bool = True, max_price_levels: int = 5000):
+    def __init__(
+        self, precision: float = 1.0, enabled: bool = True, max_price_levels: int = 5000
+    ):
         """Initialize the price aggregator.
 
         Args:
@@ -356,19 +358,21 @@ class PriceAggregator:
         if precision <= 0:
             raise ValueError(f"Precision must be positive, got {precision}")
         if max_price_levels <= 0:
-            raise ValueError(f"Max price levels must be positive, got {max_price_levels}")
+            raise ValueError(
+                f"Max price levels must be positive, got {max_price_levels}"
+            )
 
         self.precision = Decimal(str(precision))
         self.enabled = enabled
         self.max_price_levels = max_price_levels
 
-        logger.info(f"Initialized PriceAggregator with precision={precision}, "
-                   f"enabled={enabled}, max_levels={max_price_levels}")
+        logger.info(
+            f"Initialized PriceAggregator with precision={precision}, "
+            f"enabled={enabled}, max_levels={max_price_levels}"
+        )
 
     def aggregate_order_book_levels(
-        self,
-        bids: list[DepthLevel],
-        asks: list[DepthLevel]
+        self, bids: list[DepthLevel], asks: list[DepthLevel]
     ) -> tuple[dict[Decimal, Decimal], dict[Decimal, Decimal]]:
         """Aggregate order book levels using configured precision.
 
@@ -384,11 +388,13 @@ class PriceAggregator:
             logger.debug("Aggregation disabled, returning original data")
             return (
                 {bid.price: bid.quantity for bid in bids},
-                {ask.price: ask.quantity for ask in asks}
+                {ask.price: ask.quantity for ask in asks},
             )
 
-        logger.debug(f"Aggregating {len(bids)} bid levels and {len(asks)} ask levels "
-                    f"with precision {self.precision}")
+        logger.debug(
+            f"Aggregating {len(bids)} bid levels and {len(asks)} ask levels "
+            f"with precision {self.precision}"
+        )
 
         aggregated_bids: dict[Decimal, Decimal] = defaultdict(Decimal)
         aggregated_asks: dict[Decimal, Decimal] = defaultdict(Decimal)
@@ -409,8 +415,10 @@ class PriceAggregator:
         aggregated_bids = self._limit_price_levels(aggregated_bids, is_bids=True)
         aggregated_asks = self._limit_price_levels(aggregated_asks, is_bids=False)
 
-        logger.debug(f"Aggregated to {len(aggregated_bids)} bid levels, "
-                    f"{len(aggregated_asks)} ask levels")
+        logger.debug(
+            f"Aggregated to {len(aggregated_bids)} bid levels, "
+            f"{len(aggregated_asks)} ask levels"
+        )
 
         return dict(aggregated_bids), dict(aggregated_asks)
 
@@ -423,7 +431,9 @@ class PriceAggregator:
         Returns:
             True if valid, False otherwise
         """
-        if not isinstance(level.price, Decimal) or not isinstance(level.quantity, Decimal):
+        if not isinstance(level.price, Decimal) or not isinstance(
+            level.quantity, Decimal
+        ):
             return False
 
         if level.price <= 0 or level.quantity <= 0:
@@ -450,9 +460,7 @@ class PriceAggregator:
         return rounded
 
     def _limit_price_levels(
-        self,
-        price_data: dict[Decimal, Decimal],
-        is_bids: bool
+        self, price_data: dict[Decimal, Decimal], is_bids: bool
     ) -> dict[Decimal, Decimal]:
         """Limit the number of price levels based on configuration.
 
@@ -474,9 +482,11 @@ class PriceAggregator:
             # For asks, sort by price ascending (keep lowest prices)
             sorted_items = sorted(price_data.items(), key=lambda x: x[0])
 
-        limited_items = sorted_items[:self.max_price_levels]
-        logger.debug(f"Limited {'bids' if is_bids else 'asks'} from {len(price_data)} "
-                    f"to {len(limited_items)} levels")
+        limited_items = sorted_items[: self.max_price_levels]
+        logger.debug(
+            f"Limited {'bids' if is_bids else 'asks'} from {len(price_data)} "
+            f"to {len(limited_items)} levels"
+        )
 
         return dict(limited_items)
 
@@ -485,7 +495,7 @@ class PriceAggregator:
         original_bids: list[DepthLevel],
         original_asks: list[DepthLevel],
         aggregated_bids: dict[Decimal, Decimal],
-        aggregated_asks: dict[Decimal, Decimal]
+        aggregated_asks: dict[Decimal, Decimal],
     ) -> dict[str, Decimal | int]:
         """Get statistics about the aggregation process.
 
@@ -502,11 +512,16 @@ class PriceAggregator:
         aggregated_count = len(aggregated_bids) + len(aggregated_asks)
 
         # Calculate volume preservation
-        original_volume = sum(bid.quantity for bid in original_bids) + \
-                         sum(ask.quantity for ask in original_asks)
-        aggregated_volume = sum(aggregated_bids.values()) + sum(aggregated_asks.values())
+        original_volume = sum(bid.quantity for bid in original_bids) + sum(
+            ask.quantity for ask in original_asks
+        )
+        aggregated_volume = sum(aggregated_bids.values()) + sum(
+            aggregated_asks.values()
+        )
 
-        volume_preservation = (aggregated_volume / (original_volume + Decimal("0.01"))) * 100
+        volume_preservation = (
+            aggregated_volume / (original_volume + Decimal("0.01"))
+        ) * 100
 
         return {
             "original_levels": original_count,
@@ -517,5 +532,5 @@ class PriceAggregator:
             "volume_preservation_percent": float(volume_preservation),
             "precision": float(self.precision),
             "enabled": self.enabled,
-            "max_levels": self.max_price_levels
+            "max_levels": self.max_price_levels,
         }

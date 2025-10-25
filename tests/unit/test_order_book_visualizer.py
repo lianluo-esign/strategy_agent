@@ -32,7 +32,7 @@ class TestOrderBookVisualizer:
             chart_style="default",  # Use default style for testing
             output_base_path=self.temp_dir,
             retention_days=7,
-            auto_cleanup=True
+            auto_cleanup=True,
         )
 
         # Create visualizer instance
@@ -42,6 +42,7 @@ class TestOrderBookVisualizer:
     def teardown_method(self):
         """Clean up after each test method."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_initialization_with_valid_config(self):
@@ -53,7 +54,9 @@ class TestOrderBookVisualizer:
     def test_initialization_with_invalid_config(self):
         """Test visualizer initialization with invalid configuration."""
         # Test with negative precision
-        with pytest.raises(ValueError, match="Price aggregation precision must be positive"):
+        with pytest.raises(
+            ValueError, match="Price aggregation precision must be positive"
+        ):
             config = VisualizationConfig(price_aggregation_precision=-1.0)
             OrderBookVisualizer(config)
 
@@ -81,7 +84,9 @@ class TestOrderBookVisualizer:
         ]
 
         # Test aggregation
-        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(bids, asks)
+        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(
+            bids, asks
+        )
 
         # Verify bid aggregation (all should round down to 50001)
         assert 50001.0 in aggregated_bids
@@ -106,7 +111,9 @@ class TestOrderBookVisualizer:
             DepthLevel(price=Decimal("-100"), quantity=Decimal("1.0")),
         ]
 
-        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(bids, [])
+        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(
+            bids, []
+        )
 
         # Should filter out invalid prices
         assert aggregated_bids == {}
@@ -147,10 +154,12 @@ class TestOrderBookVisualizer:
         assert prices == []
         assert volumes == []
 
-    @patch('matplotlib.pyplot.savefig')
-    @patch('matplotlib.pyplot.close')
-    @patch('matplotlib.pyplot.subplots')
-    def test_create_order_book_distribution_chart_success(self, mock_subplots, mock_close, mock_savefig):
+    @patch("matplotlib.pyplot.savefig")
+    @patch("matplotlib.pyplot.close")
+    @patch("matplotlib.pyplot.subplots")
+    def test_create_order_book_distribution_chart_success(
+        self, mock_subplots, mock_close, mock_savefig
+    ):
         """Test successful chart creation."""
         # Create mock figure and axes
         mock_fig = MagicMock()
@@ -169,16 +178,16 @@ class TestOrderBookVisualizer:
             asks=[
                 DepthLevel(price=Decimal("50003.20"), quantity=Decimal("1.5")),
                 DepthLevel(price=Decimal("50004.90"), quantity=Decimal("0.7")),
-            ]
+            ],
         )
 
         # Create chart
         output_file = self.visualizer.create_order_book_distribution_chart(snapshot)
 
         # Verify output file path format
-        assert output_file.endswith('.png')
-        assert 'BTCFDUSD' in output_file
-        assert 'order_book_distribution' in output_file
+        assert output_file.endswith(".png")
+        assert "BTCFDUSD" in output_file
+        assert "order_book_distribution" in output_file
 
         # Verify matplotlib functions were called
         mock_subplots.assert_called_once()
@@ -191,10 +200,12 @@ class TestOrderBookVisualizer:
             symbol="BTCFDUSD",
             timestamp=datetime(2024, 1, 15, 10, 30, 0),
             bids=[],
-            asks=[]
+            asks=[],
         )
 
-        with pytest.raises(ValueError, match="Depth snapshot contains no bid or ask data"):
+        with pytest.raises(
+            ValueError, match="Depth snapshot contains no bid or ask data"
+        ):
             self.visualizer.create_order_book_distribution_chart(snapshot)
 
     def test_cleanup_old_files(self):
@@ -208,10 +219,12 @@ class TestOrderBookVisualizer:
 
         # Mock file modification times
         import time
+
         old_time = time.time() - (8 * 24 * 60 * 60)  # 8 days ago
-        recent_time = time.time() - (1 * 60 * 60)     # 1 hour ago
+        recent_time = time.time() - (1 * 60 * 60)  # 1 hour ago
 
         import os
+
         os.utime(old_file, (old_time, old_time))
         os.utime(recent_file, (recent_time, recent_time))
 
@@ -267,35 +280,38 @@ class TestOrderBookVisualizer:
             for i in range(200)
         ]
 
-        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(bids, asks)
+        aggregated_bids, aggregated_asks = self.visualizer._aggregate_depth_data(
+            bids, asks
+        )
 
         # Should limit to max_price_levels
         assert len(aggregated_bids) <= 100
         assert len(aggregated_asks) <= 100
 
-    @patch('matplotlib.pyplot.style.use')
+    @patch("matplotlib.pyplot.style.use")
     def test_matplotlib_style_fallback(self, mock_style_use):
         """Test fallback to default style when specified style is not found."""
         # Mock style.use to raise OSError for invalid style
         mock_style_use.side_effect = [OSError("Style not found"), None]
 
         config = VisualizationConfig(
-            chart_style="nonexistent_style",
-            output_base_path=self.temp_dir
+            chart_style="nonexistent_style", output_base_path=self.temp_dir
         )
 
         # Should not raise exception, should fallback to default
-        visualizer = OrderBookVisualizer(config)
+        OrderBookVisualizer(config)
 
         # Verify both styles were attempted
         assert mock_style_use.call_count == 2
         mock_style_use.assert_any_call("nonexistent_style")
-        mock_style_use.assert_any_call('default')
+        mock_style_use.assert_any_call("default")
 
-    @patch('matplotlib.pyplot.savefig')
-    @patch('matplotlib.pyplot.close')
-    @patch('matplotlib.pyplot.subplots')
-    def test_chart_creation_with_custom_symbol(self, mock_subplots, mock_close, mock_savefig):
+    @patch("matplotlib.pyplot.savefig")
+    @patch("matplotlib.pyplot.close")
+    @patch("matplotlib.pyplot.subplots")
+    def test_chart_creation_with_custom_symbol(
+        self, mock_subplots, mock_close, mock_savefig
+    ):
         """Test chart creation with custom symbol override."""
         # Create mock figure and axes
         mock_fig = MagicMock()
@@ -307,11 +323,13 @@ class TestOrderBookVisualizer:
             symbol="ORIGINAL",
             timestamp=datetime(2024, 1, 15, 10, 30, 0),
             bids=[DepthLevel(price=Decimal("50001.50"), quantity=Decimal("1.2"))],
-            asks=[DepthLevel(price=Decimal("50003.20"), quantity=Decimal("1.5"))]
+            asks=[DepthLevel(price=Decimal("50003.20"), quantity=Decimal("1.5"))],
         )
 
         # Create chart with custom symbol
-        output_file = self.visualizer.create_order_book_distribution_chart(snapshot, symbol="CUSTOM")
+        output_file = self.visualizer.create_order_book_distribution_chart(
+            snapshot, symbol="CUSTOM"
+        )
 
         # Verify savefig was called
         mock_savefig.assert_called_once()

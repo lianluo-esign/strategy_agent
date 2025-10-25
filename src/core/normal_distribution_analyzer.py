@@ -8,7 +8,7 @@ import logging
 import math
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class OrderBookAggregator:
         self.price_precision = price_precision
 
     def aggregate_to_dollar_precision(
-        self, order_book_data: Dict[str, List[Tuple[float, float]]]
-    ) -> Tuple[Dict[float, float], Dict[float, float]]:
+        self, order_book_data: dict[str, list[tuple[float, float]]]
+    ) -> tuple[dict[float, float], dict[float, float]]:
         """Aggregate order book data to 1-dollar precision (floor rounding).
 
         Args:
@@ -35,8 +35,8 @@ class OrderBookAggregator:
         Returns:
             Tuple of (aggregated_bids, aggregated_asks) dictionaries
         """
-        aggregated_bids: Dict[float, float] = defaultdict(float)
-        aggregated_asks: Dict[float, float] = defaultdict(float)
+        aggregated_bids: dict[float, float] = defaultdict(float)
+        aggregated_asks: dict[float, float] = defaultdict(float)
 
         # Process bids (buy orders)
         for price, quantity in order_book_data.get("bids", []):
@@ -96,8 +96,8 @@ class NormalDistributionAnalyzer:
             return abs(4.0 * (confidence_level - 0.5))
 
     def find_peak_interval(
-        self, price_quantities: Dict[float, float]
-    ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+        self, price_quantities: dict[float, float]
+    ) -> tuple[float | None, float | None, float | None]:
         """Find the peak interval using normal distribution analysis.
 
         Args:
@@ -118,7 +118,7 @@ class NormalDistributionAnalyzer:
             return None, None, None
 
         mean_price = (
-            sum(price * quantity for price, quantity in zip(prices, quantities))
+            sum(price * quantity for price, quantity in zip(prices, quantities, strict=False))
             / total_quantity
         )
 
@@ -126,7 +126,7 @@ class NormalDistributionAnalyzer:
         variance = (
             sum(
                 quantity * ((price - mean_price) ** 2)
-                for price, quantity in zip(prices, quantities)
+                for price, quantity in zip(prices, quantities, strict=False)
             )
             / total_quantity
         )
@@ -144,8 +144,8 @@ class NormalDistributionAnalyzer:
         return mean_price, lower_bound, upper_bound
 
     def analyze_distribution_peaks(
-        self, aggregated_bids: Dict[float, float], aggregated_asks: Dict[float, float]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, aggregated_bids: dict[float, float], aggregated_asks: dict[float, float]
+    ) -> dict[str, dict[str, Any]]:
         """Analyze distribution peaks for both bids and asks.
 
         Args:
@@ -155,7 +155,7 @@ class NormalDistributionAnalyzer:
         Returns:
             Dictionary containing peak analysis results
         """
-        results: Dict[str, Dict[str, Any]] = {}
+        results: dict[str, dict[str, Any]] = {}
 
         # Analyze bid distribution
         if aggregated_bids:
@@ -197,9 +197,9 @@ class NormalDistributionAnalyzer:
 
     def _get_volume_in_interval(
         self,
-        price_quantities: Dict[float, float],
-        lower: Optional[float],
-        upper: Optional[float],
+        price_quantities: dict[float, float],
+        lower: float | None,
+        upper: float | None,
     ) -> float:
         """Get total volume within the specified price interval.
 
@@ -235,8 +235,8 @@ class NormalDistributionPeakAnalyzer:
         self.distribution_analyzer = NormalDistributionAnalyzer(confidence_level)
 
     def analyze_order_book(
-        self, order_book_data: Dict[str, List[Tuple[float, float]]]
-    ) -> Dict[str, Any]:
+        self, order_book_data: dict[str, list[tuple[float, float]]]
+    ) -> dict[str, Any]:
         """Perform complete order book analysis using normal distribution methods.
 
         Args:
@@ -295,8 +295,8 @@ class NormalDistributionPeakAnalyzer:
             }
 
     def _analyze_spread(
-        self, bids: Dict[float, float], asks: Dict[float, float]
-    ) -> Dict[str, Any]:
+        self, bids: dict[float, float], asks: dict[float, float]
+    ) -> dict[str, Any]:
         """Analyze bid-ask spread.
 
         Args:
@@ -322,8 +322,8 @@ class NormalDistributionPeakAnalyzer:
         }
 
     def _calculate_market_metrics(
-        self, bids: Dict[float, float], asks: Dict[float, float]
-    ) -> Dict[str, Any]:
+        self, bids: dict[float, float], asks: dict[float, float]
+    ) -> dict[str, Any]:
         """Calculate additional market metrics.
 
         Args:
@@ -356,8 +356,8 @@ class NormalDistributionPeakAnalyzer:
 
 
 def _convert_aggregated_data(
-    aggregated_data: Dict[str, float],
-) -> Dict[Decimal, Decimal]:
+    aggregated_data: dict[str, float],
+) -> dict[Decimal, Decimal]:
     """Convert aggregated data to Decimal format.
 
     Args:
@@ -372,7 +372,7 @@ def _convert_aggregated_data(
     }
 
 
-def _convert_spread_analysis(spread_analysis: Dict[str, Any]) -> Dict[str, Any]:
+def _convert_spread_analysis(spread_analysis: dict[str, Any]) -> dict[str, Any]:
     """Convert spread analysis to Decimal format.
 
     Args:
@@ -393,7 +393,7 @@ def _convert_spread_analysis(spread_analysis: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _convert_peak_analysis(peak_analysis: Dict[str, Any]) -> Dict[str, Any]:
+def _convert_peak_analysis(peak_analysis: dict[str, Any]) -> dict[str, Any]:
     """Convert peak analysis to Decimal format.
 
     Args:
@@ -434,7 +434,7 @@ def _convert_peak_analysis(peak_analysis: Dict[str, Any]) -> Dict[str, Any]:
     return decimal_peak_analysis
 
 
-def convert_to_decimal_format(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
+def convert_to_decimal_format(analysis_result: dict[str, Any]) -> dict[str, Any]:
     """Convert analysis results to use Decimal objects for precision.
 
     Args:

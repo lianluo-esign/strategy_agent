@@ -268,7 +268,7 @@ class TestTradeDataPersistence:
 
         try:
             # Initialize Redis store with non-existent directory
-            store = RedisDataStore(
+            RedisDataStore(
                 host="localhost", port=6379, db=0, storage_dir=str(test_storage_dir)
             )
 

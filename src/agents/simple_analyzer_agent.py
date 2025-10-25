@@ -43,9 +43,7 @@ class SimpleAnalyzerAgent:
 
         # 初始化Redis连接
         self.redis_store = RedisDataStore(
-            host=settings.redis.host,
-            port=settings.redis.port,
-            db=settings.redis.db
+            host=settings.redis.host, port=settings.redis.port, db=settings.redis.db
         )
 
         # 初始化可视化工具
@@ -63,14 +61,14 @@ class SimpleAnalyzerAgent:
         deepseek_config = None
         if settings.analyzer.deepseek.enable and settings.analyzer.deepseek.api_key:
             deepseek_config = {
-                'enable': True,
-                'api_key': settings.analyzer.deepseek.api_key,
-                'base_url': settings.analyzer.deepseek.base_url,
-                'model': settings.analyzer.deepseek.model,
-                'max_tokens': settings.analyzer.deepseek.max_tokens,
-                'temperature': settings.analyzer.deepseek.temperature,
-                'timeout': 60,  # 60秒超时
-                'max_retries': 3,
+                "enable": True,
+                "api_key": settings.analyzer.deepseek.api_key,
+                "base_url": settings.analyzer.deepseek.base_url,
+                "model": settings.analyzer.deepseek.model,
+                "max_tokens": settings.analyzer.deepseek.max_tokens,
+                "temperature": settings.analyzer.deepseek.temperature,
+                "timeout": 60,  # 60秒超时
+                "max_retries": 3,
             }
         else:
             logger.info("DeepSeek LLM analysis is disabled")
@@ -195,8 +193,7 @@ class SimpleAnalyzerAgent:
 
         # 取消所有待处理的任务
         tasks = [
-            task for task in asyncio.all_tasks()
-            if task is not asyncio.current_task()
+            task for task in asyncio.all_tasks() if task is not asyncio.current_task()
         ]
         if tasks:
             logger.info(f"Cancelling {len(tasks)} pending tasks...")
@@ -213,7 +210,7 @@ class SimpleAnalyzerAgent:
                 logger.warning("Some tasks did not complete within timeout")
 
         # 关闭连接
-        if self.market_analyzer and hasattr(self.market_analyzer, 'deepseek_analyzer'):
+        if self.market_analyzer and hasattr(self.market_analyzer, "deepseek_analyzer"):
             if self.market_analyzer.deepseek_analyzer:
                 try:
                     self.market_analyzer.deepseek_analyzer.close()
@@ -249,7 +246,9 @@ async def main() -> None:
     """简化分析器代理的主入口点。"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Simple Strategy Agent Market Analyzer")
+    parser = argparse.ArgumentParser(
+        description="Simple Strategy Agent Market Analyzer"
+    )
     parser.add_argument(
         "--config", default="config/development.yaml", help="Configuration file path"
     )

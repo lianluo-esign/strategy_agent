@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """测试DeepSeek分析结果打印功能"""
 
-import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+import sys
 
-from decimal import Decimal
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
 from datetime import datetime
+from decimal import Decimal
+
 from src.core.analyzers_normal import NormalDistributionMarketAnalyzer
-from src.core.models import DepthSnapshot, DepthLevel
+from src.core.models import DepthLevel, DepthSnapshot
 from src.utils.config import Settings
+
 
 def test_deepseek_analysis_printing():
     """测试DeepSeek分析结果打印功能"""
@@ -17,10 +20,12 @@ def test_deepseek_analysis_printing():
 
     # 加载配置
     try:
-        settings = Settings.load_from_file('config/development.yaml')
-        print(f"✅ 配置加载成功")
+        settings = Settings.load_from_file("config/development.yaml")
+        print("✅ 配置加载成功")
         print(f"   DeepSeek启用: {settings.analyzer.deepseek.enable}")
-        print(f"   API密钥: {'已设置' if settings.analyzer.deepseek.api_key else '未设置'}")
+        print(
+            f"   API密钥: {'已设置' if settings.analyzer.deepseek.api_key else '未设置'}"
+        )
     except Exception as e:
         print(f"❌ 配置加载失败: {e}")
         return False
@@ -28,36 +33,33 @@ def test_deepseek_analysis_printing():
     # 创建测试数据
     print("\n📊 创建测试订单簿数据...")
     bids = [
-        DepthLevel(price=Decimal('111960.00'), quantity=Decimal('0.25')),
-        DepthLevel(price=Decimal('111959.00'), quantity=Decimal('0.15')),
-        DepthLevel(price=Decimal('111958.00'), quantity=Decimal('0.35')),
-        DepthLevel(price=Decimal('111957.00'), quantity=Decimal('0.22')),
-        DepthLevel(price=Decimal('111956.00'), quantity=Decimal('0.18')),
-        DepthLevel(price=Decimal('111955.00'), quantity=Decimal('0.42')),
-        DepthLevel(price=Decimal('111954.00'), quantity=Decimal('0.28')),
-        DepthLevel(price=Decimal('111953.00'), quantity=Decimal('0.31')),
-        DepthLevel(price=Decimal('111952.00'), quantity=Decimal('0.19')),
-        DepthLevel(price=Decimal('111951.00'), quantity=Decimal('0.26')),
+        DepthLevel(price=Decimal("111960.00"), quantity=Decimal("0.25")),
+        DepthLevel(price=Decimal("111959.00"), quantity=Decimal("0.15")),
+        DepthLevel(price=Decimal("111958.00"), quantity=Decimal("0.35")),
+        DepthLevel(price=Decimal("111957.00"), quantity=Decimal("0.22")),
+        DepthLevel(price=Decimal("111956.00"), quantity=Decimal("0.18")),
+        DepthLevel(price=Decimal("111955.00"), quantity=Decimal("0.42")),
+        DepthLevel(price=Decimal("111954.00"), quantity=Decimal("0.28")),
+        DepthLevel(price=Decimal("111953.00"), quantity=Decimal("0.31")),
+        DepthLevel(price=Decimal("111952.00"), quantity=Decimal("0.19")),
+        DepthLevel(price=Decimal("111951.00"), quantity=Decimal("0.26")),
     ]
 
     asks = [
-        DepthLevel(price=Decimal('112015.00'), quantity=Decimal('0.77')),
-        DepthLevel(price=Decimal('112016.00'), quantity=Decimal('0.45')),
-        DepthLevel(price=Decimal('112017.00'), quantity=Decimal('0.33')),
-        DepthLevel(price=Decimal('112018.00'), quantity=Decimal('0.58')),
-        DepthLevel(price=Decimal('112019.00'), quantity=Decimal('0.41')),
-        DepthLevel(price=Decimal('112020.00'), quantity=Decimal('0.29')),
-        DepthLevel(price=Decimal('112021.00'), quantity=Decimal('0.36')),
-        DepthLevel(price=Decimal('112022.00'), quantity=Decimal('0.24')),
-        DepthLevel(price=Decimal('112023.00'), quantity=Decimal('0.52')),
-        DepthLevel(price=Decimal('112024.00'), quantity=Decimal('0.38')),
+        DepthLevel(price=Decimal("112015.00"), quantity=Decimal("0.77")),
+        DepthLevel(price=Decimal("112016.00"), quantity=Decimal("0.45")),
+        DepthLevel(price=Decimal("112017.00"), quantity=Decimal("0.33")),
+        DepthLevel(price=Decimal("112018.00"), quantity=Decimal("0.58")),
+        DepthLevel(price=Decimal("112019.00"), quantity=Decimal("0.41")),
+        DepthLevel(price=Decimal("112020.00"), quantity=Decimal("0.29")),
+        DepthLevel(price=Decimal("112021.00"), quantity=Decimal("0.36")),
+        DepthLevel(price=Decimal("112022.00"), quantity=Decimal("0.24")),
+        DepthLevel(price=Decimal("112023.00"), quantity=Decimal("0.52")),
+        DepthLevel(price=Decimal("112024.00"), quantity=Decimal("0.38")),
     ]
 
     snapshot = DepthSnapshot(
-        symbol='BTCFDUSD',
-        timestamp=datetime.now(),
-        bids=bids,
-        asks=asks
+        symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
     )
 
     print(f"   买盘数据: {len(bids)} 级")
@@ -68,16 +70,14 @@ def test_deepseek_analysis_printing():
     analyzer = NormalDistributionMarketAnalyzer(
         min_volume_threshold=Decimal("1.0"),
         analysis_window_minutes=180,
-        confidence_level=0.95
+        confidence_level=0.95,
     )
 
     # 启用DeepSeek分析
     print("\n🤖 启用DeepSeek分析...")
     try:
         analyzer.enable_deepseek_analysis(
-            api_key=settings.analyzer.deepseek.api_key,
-            timeout=30,
-            max_retries=2
+            api_key=settings.analyzer.deepseek.api_key, timeout=30, max_retries=2
         )
         print("✅ DeepSeek分析器启用成功")
     except Exception as e:
@@ -88,13 +88,13 @@ def test_deepseek_analysis_printing():
     print("\n📈 执行市场分析...")
     try:
         print("🔄 开始分析...")
-        result = analyzer.analyze_market(snapshot, [], 'BTCFDUSD', enhanced_mode=True)
+        result = analyzer.analyze_market(snapshot, [], "BTCFDUSD", enhanced_mode=True)
 
-        print(f"\n✅ 分析完成！")
+        print("\n✅ 分析完成！")
         print(f"   流动性峰值数量: {len(result.liquidity_peaks)}")
 
         # 检查DeepSeek结果
-        if hasattr(result, 'deepseek_analysis_result'):
+        if hasattr(result, "deepseek_analysis_result"):
             print(f"   DeepSeek分析结果: {result.deepseek_analysis_result}")
         else:
             print("   DeepSeek分析结果: 未包含在结果对象中")
@@ -104,8 +104,10 @@ def test_deepseek_analysis_printing():
     except Exception as e:
         print(f"❌ 分析执行失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     success = test_deepseek_analysis_printing()

@@ -1,11 +1,10 @@
 """Integration tests for normal distribution analyzer."""
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 
-from src.core.models import DepthLevel, DepthSnapshot, MinuteTradeData
 from src.core.analyzers_normal import NormalDistributionMarketAnalyzer
+from src.core.models import DepthLevel, DepthSnapshot, MinuteTradeData
 
 
 class TestNormalDistributionIntegration:

@@ -57,7 +57,9 @@ class LiquidityPeaksAnalyzer:
 
         # Initialize price aggregator with configuration
         if price_aggregation_config:
-            self.price_aggregator = self._create_price_aggregator(price_aggregation_config)
+            self.price_aggregator = self._create_price_aggregator(
+                price_aggregation_config
+            )
         else:
             # Default configuration for backward compatibility
             self.price_aggregator = self._create_default_price_aggregator()
@@ -68,7 +70,9 @@ class LiquidityPeaksAnalyzer:
             f"price_aggregation={'enabled' if self.price_aggregator else 'disabled'}"
         )
 
-    def _create_price_aggregator(self, config: dict[str, Any]) -> Union["PriceAggregator", None]:
+    def _create_price_aggregator(
+        self, config: dict[str, Any]
+    ) -> Union["PriceAggregator", None]:
         """Create a price aggregator from configuration.
 
         Args:
@@ -86,10 +90,12 @@ class LiquidityPeaksAnalyzer:
             return PriceAggregator(
                 precision=config.get("precision", 1.0),
                 enabled=config.get("enabled", True),
-                max_price_levels=config.get("max_price_levels", 5000)
+                max_price_levels=config.get("max_price_levels", 5000),
             )
         except ImportError as e:
-            logger.warning(f"Failed to import PriceAggregator, falling back to default: {e}")
+            logger.warning(
+                f"Failed to import PriceAggregator, falling back to default: {e}"
+            )
             return self._create_default_price_aggregator()
 
     def _create_default_price_aggregator(self) -> Union["PriceAggregator", None]:
@@ -188,14 +194,18 @@ class LiquidityPeaksAnalyzer:
         """
         if self.price_aggregator:
             # Use configured price aggregator
-            logger.debug(f"Using configured price aggregator with precision {self.price_aggregator.precision}")
-            return self.price_aggregator.aggregate_order_book_levels(snapshot.bids, snapshot.asks)
+            logger.debug(
+                f"Using configured price aggregator with precision {self.price_aggregator.precision}"
+            )
+            return self.price_aggregator.aggregate_order_book_levels(
+                snapshot.bids, snapshot.asks
+            )
         else:
             # No aggregation configured - return original data as dictionaries
             logger.debug("No price aggregation configured, returning original data")
             return (
                 {level.price: level.quantity for level in snapshot.bids},
-                {level.price: level.quantity for level in snapshot.asks}
+                {level.price: level.quantity for level in snapshot.asks},
             )
 
     def _identify_peaks_from_data(

@@ -113,7 +113,7 @@ class TestAnalyzerFixes:
         from src.core.models import SupportResistanceLevel
 
         # Create a support level that might cause issues
-        bad_support = SupportResistanceLevel(
+        SupportResistanceLevel(
             price=Decimal("50000"),
             strength=0.5,
             level_type="support",

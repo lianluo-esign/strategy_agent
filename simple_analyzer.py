@@ -17,7 +17,6 @@ sys.path.insert(0, str(project_root))
 
 from src.agents.simple_analyzer_agent import main
 
-
 if __name__ == "__main__":
     print("🚀 Starting Simple Market Analyzer...")
     print("📊 Core Features:")

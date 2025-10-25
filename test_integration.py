@@ -57,8 +57,8 @@ async def test_basic_functionality():
     start_time = time.time()
 
     # 运行10次分析以测试性能
-    for i in range(10):
-        result = enhanced_analyzer.analyze_market(
+    for _i in range(10):
+        enhanced_analyzer.analyze_market(
             snapshot=snapshot, trade_data_list=[], symbol="BTCFDUSD", enhanced_mode=True
         )
 

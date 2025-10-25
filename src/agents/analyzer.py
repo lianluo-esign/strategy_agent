@@ -1,154 +1,119 @@
-"""Market analyzer agent for data analysis and AI-driven insights."""
+"""增强型市场分析器代理 - 集成静态和动态双AI分析功能。
+
+这个代理提供简化的市场分析流程：
+1. Redis深度快照数据读取和聚合处理
+2. DeepSeek LLM深度快照支撑阻力分析
+3. 24小时交易数据Volume Profile分析
+4. DeepSeek LLM动态市场分析
+5. 挂单分布可视化
+"""
 
 import asyncio
 import logging
 import signal
 import sys
 from datetime import datetime
-from decimal import Decimal
 
-from ..core.models import MarketAnalysisResult, TradingRecommendation
+from ..core.enhanced_market_analyzer import EnhancedMarketAnalyzer
 from ..core.redis_client import RedisDataStore
-from ..utils.ai_client import DeepSeekClient
 from ..utils.config import Settings
 from ..visualization.order_book_visualizer import OrderBookVisualizer
 
 logger = logging.getLogger(__name__)
 
-# Configuration constants
-SHUTDOWN_TASK_TIMEOUT = 5.0  # Timeout for task cancellation during shutdown
-RETRY_DELAY_ON_ERROR = 10  # Seconds to wait before retry after error
-
-# Try to import normal distribution analyzer first
-try:
-    from ..core.analyzers_normal import (
-        NormalDistributionMarketAnalyzer,
-    )
-
-    logger.info("Using normal distribution market analyzer")
-    use_normal_distribution = True
-except ImportError:
-    use_normal_distribution = False
-    logger.warning("Normal distribution analyzer not available")
-
-# Fall back to enhanced analyzer
-try:
-    from ..core.analyzers_enhanced import MarketAnalyzer as EnhancedMarketAnalyzer
-
-    logger.info("Using enhanced market analyzer with wave peak detection")
-except ImportError:
-    from ..core.analyzers import MarketAnalyzer
-
-    logger.warning("Enhanced analyzer not available, falling back to basic analyzer")
-    EnhancedMarketAnalyzer = MarketAnalyzer
+# 配置常量
+SHUTDOWN_TASK_TIMEOUT = 5.0
+RETRY_DELAY_ON_ERROR = 10
 
 
 class AnalyzerAgent:
-    """Agent responsible for market analysis and trading recommendations."""
+    """增强型分析器代理，集成静态和动态双AI分析功能。
+
+    这个代理执行增强的市场分析流程：
+    - 静态深度快照数据的支撑阻力分析
+    - 动态Volume Profile数据的市场分析
+    - 统一的可视化输出
+    """
 
     def __init__(self, settings: Settings):
-        """Initialize the analyzer agent."""
+        """初始化增强型分析器代理。
+
+        Args:
+            settings: 配置设置
+        """
         self.settings = settings
 
-        # Initialize components
+        # 初始化Redis连接
         self.redis_store = RedisDataStore(
             host=settings.redis.host, port=settings.redis.port, db=settings.redis.db
         )
 
-        # Use normal distribution analyzer if available
-        if use_normal_distribution:
-            # Convert price aggregation config to dict
-            price_aggregation_config = None
-            if hasattr(settings.analyzer, 'price_aggregation'):
-                price_aggregation_config = {
-                    "precision": settings.analyzer.price_aggregation.precision,
-                    "enabled": settings.analyzer.price_aggregation.enabled,
-                    "max_price_levels": settings.analyzer.price_aggregation.max_price_levels
-                }
-
-            self.market_analyzer = NormalDistributionMarketAnalyzer(
-                min_volume_threshold=Decimal(str(settings.analyzer.analysis.min_order_volume_threshold)),
-                analysis_window_minutes=180,  # 3 hours
-                confidence_level=getattr(settings.analyzer, "confidence_level", 0.95),
-                price_aggregation_config=price_aggregation_config
-            )
-
-            # Enable DeepSeek analysis if configured
-            if settings.analyzer.deepseek.enable and settings.analyzer.deepseek.api_key:
-                try:
-                    self.market_analyzer.enable_deepseek_analysis(
-                        api_key=settings.analyzer.deepseek.api_key,
-                        base_url=settings.analyzer.deepseek.base_url,
-                        model=settings.analyzer.deepseek.model,
-                        max_tokens=settings.analyzer.deepseek.max_tokens,
-                        temperature=settings.analyzer.deepseek.temperature,
-                        timeout=30,
-                        max_retries=3,
-                    )
-                    logger.info("DeepSeek LLM analysis enabled in analyzer agent")
-                except Exception as e:
-                    logger.error(f"Failed to enable DeepSeek analysis in analyzer agent: {e}")
-            else:
-                logger.info("DeepSeek LLM analysis is disabled in analyzer agent")
-        else:
-            self.market_analyzer = EnhancedMarketAnalyzer(
-                min_volume_threshold=settings.analyzer.analysis.min_order_volume_threshold,
-                analysis_window_minutes=180,  # 3 hours
-            )
-        # Initialize AI client only if DeepSeek is enabled
-        self.ai_client = None
-        if settings.analyzer.deepseek.enable:
-            self.ai_client = DeepSeekClient(
-                api_key=settings.analyzer.deepseek.api_key,
-                base_url=settings.analyzer.deepseek.base_url,
-                model=settings.analyzer.deepseek.model,
-                max_tokens=settings.analyzer.deepseek.max_tokens,
-                temperature=settings.analyzer.deepseek.temperature,
-            )
-            logger.info("DeepSeek AI client initialized")
-        else:
-            logger.info("DeepSeek AI analysis is disabled")
-
-        # Initialize order book visualizer
-        self.order_book_visualizer = None
+        # 初始化可视化工具
+        self.visualizer = None
         if settings.analyzer.visualization.enabled:
             try:
-                self.order_book_visualizer = OrderBookVisualizer(
+                self.visualizer = OrderBookVisualizer(
                     config=settings.analyzer.visualization
                 )
                 logger.info("Order book visualizer initialized")
             except Exception as e:
                 logger.error(f"Failed to initialize order book visualizer: {e}")
-                self.order_book_visualizer = None
-        else:
-            logger.info("Order book visualization is disabled")
 
-        # Control flags
+        # 初始化DeepSeek配置
+        deepseek_config = None
+        if settings.analyzer.deepseek.enable and settings.analyzer.deepseek.api_key:
+            deepseek_config = {
+                "enable": True,
+                "api_key": settings.analyzer.deepseek.api_key,
+                "base_url": settings.analyzer.deepseek.base_url,
+                "model": settings.analyzer.deepseek.model,
+                "max_tokens": settings.analyzer.deepseek.max_tokens,
+                "temperature": settings.analyzer.deepseek.temperature,
+                "timeout": settings.analyzer.deepseek.timeout,
+                "max_retries": 3,
+            }
+        else:
+            logger.info("DeepSeek LLM analysis is disabled")
+
+        # 初始化增强型市场分析器
+        self.market_analyzer = EnhancedMarketAnalyzer(
+            redis_store=self.redis_store,
+            price_aggregation_precision=settings.analyzer.price_aggregation.precision,
+            vp_aggregation_precision=getattr(
+                settings.analyzer, "volume_profile_aggregation_precision", 10.0
+            ),
+            deepseek_config=deepseek_config,
+            visualizer=self.visualizer,
+        )
+
+        logger.info(
+            "Enhanced analyzer agent initialized with dual AI analysis capabilities"
+        )
+
+        # 控制标志
         self.is_running = False
         self.shutdown_event = asyncio.Event()
 
     def setup_signal_handlers(self) -> None:
-        """Setup asyncio-compatible signal handlers."""
-        # Initialize shutdown state
+        """设置异步兼容的信号处理器。"""
         self._shutdown_requested = False
 
     def _signal_handler(self) -> None:
-        """Handle shutdown signals - direct synchronous handler."""
+        """处理关闭信号的直接同步处理器。"""
         logger.info("Signal received, triggering shutdown...")
         self._shutdown_requested = True
         self.is_running = False
         self.shutdown_event.set()
 
     async def start(self) -> None:
-        """Start the analysis process."""
-        logger.info("Starting Market Analyzer Agent")
+        """启动增强型分析流程。"""
+        logger.info("Starting Enhanced Market Analyzer Agent")
 
-        # Setup signal handlers in async context
+        # 设置信号处理器
         self.setup_signal_handlers()
 
-        # Add signal handlers for graceful shutdown
+        # 添加信号处理器用于优雅关闭
         loop = asyncio.get_running_loop()
-
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 loop.add_signal_handler(sig, self._signal_handler)
@@ -157,192 +122,150 @@ class AnalyzerAgent:
                 logger.error(f"Failed to register signal handler for {sig}: {e}")
                 raise RuntimeError(f"Signal handler registration failed: {e}") from e
 
-        # Test Redis connection
+        # 测试Redis连接
         if not self.redis_store.test_connection():
             logger.error("Failed to connect to Redis. Exiting...")
             return
 
-        # Main analysis loop
+        # 主分析循环
         try:
             self.is_running = True
             await self._analysis_loop()
         except asyncio.CancelledError:
             logger.info("Analysis loop cancelled")
         except Exception as e:
-            logger.error(f"Analyzer agent error: {e}")
+            logger.error(f"Enhanced analyzer agent error: {e}")
         finally:
             await self._shutdown()
 
     async def _analysis_loop(self) -> None:
-        """Main analysis loop."""
+        """主分析循环。"""
         interval = self.settings.analyzer.analysis.interval_seconds
 
         while self.is_running:
             try:
-                logger.debug("Starting market analysis cycle")
-                await self._perform_analysis_cycle()
+                logger.debug("Starting enhanced market analysis cycle")
+                await self._perform_enhanced_analysis_cycle()
 
-                # Wait for next cycle with cancellation support
+                # 等待下一个周期，支持取消
                 try:
                     await asyncio.wait_for(self.shutdown_event.wait(), timeout=interval)
-                    # If wait completed without timeout, shutdown was requested
                     logger.info("Shutdown event triggered, exiting analysis loop")
                     break
                 except TimeoutError:
-                    # Normal timeout, continue to next cycle
+                    # 正常超时，继续下一个周期
                     continue
 
             except Exception as e:
-                logger.error(f"Analysis cycle error: {e}")
-                # Wait before retry, but respect shutdown
+                logger.error(f"Enhanced analysis cycle error: {e}")
+                # 重试前等待，但尊重关闭信号
                 try:
                     await asyncio.wait_for(
                         self.shutdown_event.wait(), timeout=RETRY_DELAY_ON_ERROR
                     )
                 except TimeoutError:
-                    # Normal timeout, continue retry
+                    # 正常超时，继续重试
                     continue
-                # If wait completed, shutdown was requested
+                # 如果等待完成，表示请求关闭
                 break
 
-    async def _perform_analysis_cycle(self) -> None:
-        """Perform a complete analysis cycle using only depth snapshot data."""
+    async def _perform_enhanced_analysis_cycle(self) -> None:
+        """执行增强型分析周期。"""
         try:
-            # Step 1: Get latest depth snapshot
-            snapshot = self.redis_store.get_latest_depth_snapshot()
-            if not snapshot:
-                logger.debug("No depth snapshot available")
-                return
+            # 执行双重分析：静态深度快照 + 动态Volume Profile
+            symbol = self.settings.binance.symbol
+            analysis_result = self.market_analyzer.perform_dual_analysis(symbol)
 
-            logger.info(
-                f"Analyzing depth snapshot: {snapshot.symbol} from {snapshot.timestamp}"
-            )
-
-            # Step 2: Perform analysis using only depth snapshot data (no trade data)
-            analysis_result = self.market_analyzer.analyze_market(
-                snapshot=snapshot,
-                trade_data_list=[],  # Empty list - only using depth snapshot
-                symbol=self.settings.binance.symbol,
-                enhanced_mode=True,
-            )
-
-            # Step 4: Get AI-driven recommendation (if enabled)
-            recommendation = None
-            if self.ai_client:
-                recommendation = await self.ai_client.analyze_market_data(
-                    analysis_result=analysis_result, symbol=self.settings.binance.symbol
+            if analysis_result["status"] == "success":
+                logger.info(
+                    f"Enhanced dual analysis completed successfully for {symbol}"
                 )
-                if not recommendation:
-                    logger.warning("AI analysis failed to produce recommendation")
+
+                # 打印分析摘要
+                await self._log_analysis_summary(analysis_result)
+
+                # 可以在这里添加其他处理逻辑
+                # 比如发送通知、更新仪表板等
+
+            elif analysis_result["status"] == "no_data":
+                logger.info("No data available for enhanced analysis")
             else:
-                logger.info("AI analysis is disabled, skipping AI recommendation")
-
-            # Step 5: Store results (always store analysis results)
-            await self.redis_store.store_analysis_result(analysis_result)
-
-            # Step 6: Create order book visualization (if enabled)
-            if self.order_book_visualizer:
-                await self._create_order_book_visualization(snapshot)
-
-            # Step 7: Log recommendation (if available)
-            if recommendation:
-                await self._log_trading_recommendation(recommendation, analysis_result)
+                logger.error(
+                    f"Enhanced analysis failed: {analysis_result.get('error', 'Unknown error')}"
+                )
 
         except Exception as e:
-            logger.error(f"Analysis cycle failed: {e}")
+            logger.error(f"Enhanced analysis cycle failed: {e}")
 
-    async def _log_trading_recommendation(
-        self,
-        recommendation: TradingRecommendation,
-        analysis_result: MarketAnalysisResult,
-    ) -> None:
-        """Log trading recommendation to file for debugging."""
-        try:
-            log_entry = {
-                "timestamp": recommendation.timestamp.isoformat(),
-                "symbol": recommendation.symbol,
-                "action": recommendation.action,
-                "price_range": [
-                    float(recommendation.price_range[0]),
-                    float(recommendation.price_range[1]),
-                ],
-                "confidence": recommendation.confidence,
-                "reasoning": recommendation.reasoning,
-                "risk_level": recommendation.risk_level,
-                "market_context": {
-                    "support_count": len(analysis_result.support_levels),
-                    "resistance_count": len(analysis_result.resistance_levels),
-                    "resonance_zones_count": len(analysis_result.resonance_zones),
-                    "poc_count": len(analysis_result.poc_levels),
-                },
-            }
-
-            # Write to log file
-            log_file_path = (
-                f"logs/trading_recommendations_{recommendation.symbol.lower()}.log"
-            )
-            import json
-            from pathlib import Path
-
-            log_dir = Path(log_file_path).parent
-            log_dir.mkdir(parents=True, exist_ok=True)
-
-            with open(log_file_path, "a") as f:
-                f.write(json.dumps(log_entry) + "\n")
-
-            logger.info(
-                f"Trading recommendation logged: {recommendation.action} "
-                f"with {recommendation.confidence:.2f} confidence"
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to log trading recommendation: {e}")
-
-    async def _create_order_book_visualization(self, snapshot) -> None:
-        """Create order book distribution visualization from depth snapshot.
+    async def _log_analysis_summary(self, analysis_result: dict) -> None:
+        """记录分析摘要。
 
         Args:
-            snapshot: Depth snapshot object
+            analysis_result: 分析结果字典
         """
-        if not self.order_book_visualizer:
-            logger.debug("Order book visualizer not available")
-            return
+        symbol = analysis_result.get("symbol", "UNKNOWN")
+        logger.info(f"=== {symbol} Enhanced Analysis Summary ===")
 
-        try:
-            # Run visualization in thread pool to avoid blocking event loop
-            loop = asyncio.get_running_loop()
-            output_file = await loop.run_in_executor(
-                None,
-                self.order_book_visualizer.create_order_book_distribution_chart,
-                snapshot
+        # 深度快照分析摘要
+        depth_analysis = analysis_result.get("depth_analysis", {})
+        if depth_analysis.get("status") == "success":
+            aggregated_bids = depth_analysis.get("aggregated_bids", {})
+            aggregated_asks = depth_analysis.get("aggregated_asks", {})
+            logger.info(
+                f"📊 Depth Snapshot: {len(aggregated_bids)} bid levels, "
+                f"{len(aggregated_asks)} ask levels"
             )
-            logger.info(f"Order book visualization created: {output_file}")
 
-            # Cleanup old files periodically (every 10th visualization)
-            if hasattr(self, '_visualization_counter'):
-                self._visualization_counter += 1
+            depth_deepseek = depth_analysis.get("deepseek_analysis")
+            if depth_deepseek and depth_deepseek.get("status") == "success":
+                logger.info("✅ DeepSeek depth snapshot analysis completed")
             else:
-                self._visualization_counter = 1
+                logger.info("❌ DeepSeek depth snapshot analysis failed")
+        else:
+            logger.info(
+                f"❌ Depth snapshot analysis failed: {depth_analysis.get('error', 'Unknown error')}"
+            )
 
-            if self._visualization_counter % 10 == 0:
-                removed_count = await loop.run_in_executor(
-                    None,
-                    self.order_book_visualizer.cleanup_old_files
-                )
-                if removed_count > 0:
-                    logger.info(f"Cleaned up {removed_count} old visualization files")
+        # Volume Profile分析摘要
+        vp_analysis = analysis_result.get("volume_profile_analysis", {})
+        if vp_analysis.get("status") == "success":
+            vp_data = vp_analysis.get("vp_analysis", {})
+            logger.info(
+                f"📈 Volume Profile: {vp_data.get('price_levels_count', 0)} price levels, "
+                f"total_volume={vp_data.get('total_volume', 0):.2f}"
+            )
 
-        except Exception as e:
-            logger.error(f"Failed to create order book visualization: {e}")
+            vp_deepseek = vp_analysis.get("deepseek_analysis")
+            if vp_deepseek and vp_deepseek.get("status") == "success":
+                logger.info("✅ DeepSeek Volume Profile analysis completed")
+            else:
+                logger.info("❌ DeepSeek Volume Profile analysis failed")
+        else:
+            logger.info(
+                f"❌ Volume Profile analysis failed: {vp_analysis.get('error', 'Unknown error')}"
+            )
+
+        # 可视化摘要
+        visualization = analysis_result.get("visualization", {})
+        if visualization and visualization.get("status") == "success":
+            logger.info(
+                f"📊 Visualization: {visualization.get('output_file', 'Generated')}"
+            )
+        elif visualization:
+            logger.info(
+                f"❌ Visualization failed: {visualization.get('error', 'Unknown error')}"
+            )
+
+        logger.info("=" * 50)
 
     async def _shutdown(self) -> None:
-        """Cleanup and shutdown the agent."""
-        logger.info("Shutting down Market Analyzer Agent")
+        """清理和关闭增强型代理。"""
+        logger.info("Shutting down Enhanced Market Analyzer Agent")
 
         self.is_running = False
         self._shutdown_requested = True
 
-        # Cancel all pending tasks
+        # 取消所有待处理的任务
         tasks = [
             task for task in asyncio.all_tasks() if task is not asyncio.current_task()
         ]
@@ -351,7 +274,7 @@ class AnalyzerAgent:
             for task in tasks:
                 task.cancel()
 
-            # Wait for tasks to complete with timeout
+            # 等待任务完成，带超时
             try:
                 await asyncio.wait_for(
                     asyncio.gather(*tasks, return_exceptions=True),
@@ -360,27 +283,26 @@ class AnalyzerAgent:
             except TimeoutError:
                 logger.warning("Some tasks did not complete within timeout")
 
-        # Close connections
-        if self.ai_client:
+        # 关闭增强型分析器资源
+        if self.market_analyzer:
             try:
-                await self.ai_client.close()
-                logger.info("AI client closed")
+                self.market_analyzer.close()
+                logger.info("Enhanced market analyzer closed")
             except Exception as e:
-                logger.error(f"Error closing AI client: {e}")
-        else:
-            logger.debug("No AI client to close")
+                logger.error(f"Error closing enhanced market analyzer: {e}")
 
+        # 关闭Redis连接
         try:
             await self.redis_store.close()
             logger.info("Redis connection closed")
         except Exception as e:
             logger.error(f"Error closing Redis connection: {e}")
 
-        logger.info("Market Analyzer Agent shutdown complete")
+        logger.info("Enhanced Market Analyzer Agent shutdown complete")
 
     def get_status(self) -> dict:
-        """Get current agent status."""
-        status = {
+        """获取当前增强型代理状态。"""
+        base_status = {
             "is_running": self.is_running,
             "redis_connected": self.redis_store.test_connection(),
             "last_analysis": datetime.now().isoformat(),
@@ -388,62 +310,46 @@ class AnalyzerAgent:
             "trade_window_count": self.redis_store.get_trade_window_count(),
         }
 
-        # Add visualization status
-        if self.order_book_visualizer:
-            try:
-                viz_stats = self.order_book_visualizer.get_visualization_stats()
-                status["visualization"] = {
-                    "enabled": True,
-                    "stats": viz_stats
-                }
-            except Exception as e:
-                status["visualization"] = {
-                    "enabled": True,
-                    "error": str(e)
-                }
-        else:
-            status["visualization"] = {
-                "enabled": False
-            }
+        # 添加增强型分析器状态
+        if self.market_analyzer:
+            analyzer_status = self.market_analyzer.get_status()
+            base_status.update(analyzer_status)
 
-        # Add AI status
-        status["ai_analysis"] = {
-            "enabled": self.ai_client is not None
-        }
-
-        return status
+        return base_status
 
 
 async def main() -> None:
-    """Main entry point for the analyzer agent."""
+    """增强型分析器代理的主入口点。"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Strategy Agent Market Analyzer")
+    parser = argparse.ArgumentParser(
+        description="Enhanced Strategy Agent Market Analyzer"
+    )
     parser.add_argument(
         "--config", default="config/development.yaml", help="Configuration file path"
     )
     args = parser.parse_args()
 
-    # Load settings
+    # 加载设置
     settings = Settings.load_from_file(args.config)
     settings.setup_logging()
 
-    # Validate DeepSeek API key (only if enabled)
+    # 验证DeepSeek API密钥（如果启用）
     if settings.analyzer.deepseek.enable and not settings.analyzer.deepseek.api_key:
         logger.error(
-            "DeepSeek API key is required when DeepSeek is enabled. Please set DEEPSEEK_API_KEY environment variable or set enable: false in configuration."
+            "DeepSeek API key is required when DeepSeek is enabled. "
+            "Please set DEEPSEEK_API_KEY environment variable or set enable: false in configuration."
         )
         sys.exit(1)
 
-    # Create and start agent
+    # 创建并启动增强型代理
     agent = AnalyzerAgent(settings)
 
     try:
         await agent.start()
-        logger.info("Agent startup completed successfully")
+        logger.info("Enhanced agent startup completed successfully")
     except KeyboardInterrupt:
         logger.info("Interrupted by user - initiating shutdown")
-        # Graceful shutdown is handled by signal handlers
     except asyncio.CancelledError:
         logger.info("Tasks cancelled - shutting down")
     except Exception as e:

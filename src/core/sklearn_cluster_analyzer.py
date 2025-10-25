@@ -807,7 +807,7 @@ def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
         for cluster_id, stats in ask_clusters_sorted:
             price_range = stats["price_range"]
             total_volume = abs(stats["total_volume"])
-            avg_volume = abs(stats.get("avg_volume", 0))
+            abs(stats.get("avg_volume", 0))
 
             print(
                 f"  聚类 {cluster_id}: {stats['size']}个订单, 价格区间: ${price_range[1]:,.0f}-${price_range[0]:,.0f}, 总挂单量: {total_volume:,.0f}"
@@ -823,7 +823,7 @@ def _print_detailed_cluster_analysis(results: dict[str, Any]) -> None:
         for cluster_id, stats in bid_clusters_sorted:
             price_range = stats["price_range"]
             total_volume = abs(stats["total_volume"])
-            avg_volume = abs(stats.get("avg_volume", 0))
+            abs(stats.get("avg_volume", 0))
 
             print(
                 f"  聚类 {cluster_id}: {stats['size']}个订单, 价格区间: ${price_range[0]:,.0f}-${price_range[1]:,.0f}, 总挂单量: {total_volume:,.0f}"

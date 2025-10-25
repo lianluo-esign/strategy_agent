@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """集成测试：验证可配置聚合精度的端到端功能"""
 
-import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+import sys
 
-from decimal import Decimal
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
 from datetime import datetime
-from src.core.models import DepthSnapshot, DepthLevel
+from decimal import Decimal
+
+from src.core.models import DepthLevel, DepthSnapshot
 from src.utils.config import Settings
+
 
 def test_different_precision_configurations():
     """测试不同精度配置下的聚合效果"""
@@ -17,25 +20,22 @@ def test_different_precision_configurations():
     # 创建测试订单簿数据
     print("\n📊 创建测试订单簿数据...")
     bids = [
-        DepthLevel(price=Decimal('95000.30'), quantity=Decimal('1.2')),
-        DepthLevel(price=Decimal('95000.80'), quantity=Decimal('2.1')),
-        DepthLevel(price=Decimal('95001.20'), quantity=Decimal('0.8')),
-        DepthLevel(price=Decimal('95001.70'), quantity=Decimal('1.5')),
-        DepthLevel(price=Decimal('95002.40'), quantity=Decimal('0.9')),
+        DepthLevel(price=Decimal("95000.30"), quantity=Decimal("1.2")),
+        DepthLevel(price=Decimal("95000.80"), quantity=Decimal("2.1")),
+        DepthLevel(price=Decimal("95001.20"), quantity=Decimal("0.8")),
+        DepthLevel(price=Decimal("95001.70"), quantity=Decimal("1.5")),
+        DepthLevel(price=Decimal("95002.40"), quantity=Decimal("0.9")),
     ]
     asks = [
-        DepthLevel(price=Decimal('95100.60'), quantity=Decimal('1.4')),
-        DepthLevel(price=Decimal('95101.10'), quantity=Decimal('2.3')),
-        DepthLevel(price=Decimal('95101.80'), quantity=Decimal('1.1')),
-        DepthLevel(price=Decimal('95102.30'), quantity=Decimal('0.7')),
-        DepthLevel(price=Decimal('95102.90'), quantity=Decimal('1.8')),
+        DepthLevel(price=Decimal("95100.60"), quantity=Decimal("1.4")),
+        DepthLevel(price=Decimal("95101.10"), quantity=Decimal("2.3")),
+        DepthLevel(price=Decimal("95101.80"), quantity=Decimal("1.1")),
+        DepthLevel(price=Decimal("95102.30"), quantity=Decimal("0.7")),
+        DepthLevel(price=Decimal("95102.90"), quantity=Decimal("1.8")),
     ]
 
     snapshot = DepthSnapshot(
-        symbol='BTCFDUSD',
-        timestamp=datetime.now(),
-        bids=bids,
-        asks=asks
+        symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
     )
 
     print(f"   原始买盘数据: {len(bids)} 级")
@@ -56,6 +56,7 @@ def test_different_precision_configurations():
     print("\n🎉 可配置聚合精度集成测试完成！")
     return True
 
+
 def test_aggregation_with_config(snapshot, config):
     """使用指定配置测试聚合功能"""
     try:
@@ -65,12 +66,11 @@ def test_aggregation_with_config(snapshot, config):
         aggregation_config = {
             "precision": config["precision"],
             "enabled": config["enabled"],
-            "max_price_levels": 5000
+            "max_price_levels": 5000,
         }
 
         analyzer = LiquidityPeaksAnalyzer(
-            min_volume_threshold=0.1,
-            price_aggregation_config=aggregation_config
+            min_volume_threshold=0.1, price_aggregation_config=aggregation_config
         )
 
         result = analyzer.analyze_liquidity_peaks(snapshot)
@@ -100,8 +100,10 @@ def test_aggregation_with_config(snapshot, config):
     except Exception as e:
         print(f"   ❌ 测试失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_configuration_loading():
     """测试配置文件加载功能"""
@@ -109,12 +111,12 @@ def test_configuration_loading():
 
     try:
         # 加载开发配置
-        settings = Settings.load_from_file('config/development.yaml')
+        settings = Settings.load_from_file("config/development.yaml")
 
         # 检查价格聚合配置
-        if hasattr(settings.analyzer, 'price_aggregation'):
+        if hasattr(settings.analyzer, "price_aggregation"):
             price_agg = settings.analyzer.price_aggregation
-            print(f"   ✅ 配置加载成功:")
+            print("   ✅ 配置加载成功:")
             print(f"      精度: {price_agg.precision}")
             print(f"      启用: {price_agg.enabled}")
             print(f"      最大级别: {price_agg.max_price_levels}")
@@ -127,6 +129,7 @@ def test_configuration_loading():
         print(f"   ❌ 配置加载失败: {e}")
         return False
 
+
 def test_normal_distribution_analyzer_integration():
     """测试NormalDistributionMarketAnalyzer集成"""
     print("\n🔧 测试正态分布分析器集成...")
@@ -138,37 +141,34 @@ def test_normal_distribution_analyzer_integration():
         price_aggregation_config = {
             "precision": 1.0,
             "enabled": True,
-            "max_price_levels": 5000
+            "max_price_levels": 5000,
         }
 
         analyzer = NormalDistributionMarketAnalyzer(
             min_volume_threshold=Decimal("1.0"),
             analysis_window_minutes=180,
             confidence_level=0.95,
-            price_aggregation_config=price_aggregation_config
+            price_aggregation_config=price_aggregation_config,
         )
 
         # 创建测试数据
         bids = [
-            DepthLevel(price=Decimal('95000.50'), quantity=Decimal('1.5')),
-            DepthLevel(price=Decimal('95001.20'), quantity=Decimal('2.3')),
+            DepthLevel(price=Decimal("95000.50"), quantity=Decimal("1.5")),
+            DepthLevel(price=Decimal("95001.20"), quantity=Decimal("2.3")),
         ]
         asks = [
-            DepthLevel(price=Decimal('95100.30'), quantity=Decimal('1.8')),
-            DepthLevel(price=Decimal('95101.70'), quantity=Decimal('2.1')),
+            DepthLevel(price=Decimal("95100.30"), quantity=Decimal("1.8")),
+            DepthLevel(price=Decimal("95101.70"), quantity=Decimal("2.1")),
         ]
 
         snapshot = DepthSnapshot(
-            symbol='BTCFDUSD',
-            timestamp=datetime.now(),
-            bids=bids,
-            asks=asks
+            symbol="BTCFDUSD", timestamp=datetime.now(), bids=bids, asks=asks
         )
 
         # 执行分析
-        result = analyzer.analyze_market(snapshot, [], 'BTCFDUSD', enhanced_mode=True)
+        result = analyzer.analyze_market(snapshot, [], "BTCFDUSD", enhanced_mode=True)
 
-        print(f"   ✅ 正态分布分析器集成成功:")
+        print("   ✅ 正态分布分析器集成成功:")
         print(f"      聚合买盘级别: {len(result.aggregated_bids)}")
         print(f"      聚合卖盘级别: {len(result.aggregated_asks)}")
         print(f"      流动性峰值: {len(result.liquidity_peaks)}")
@@ -178,8 +178,10 @@ def test_normal_distribution_analyzer_integration():
     except Exception as e:
         print(f"   ❌ 正态分布分析器集成失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_full_analyzer_agent_integration():
     """测试完整的analyzer agent集成"""
@@ -190,15 +192,15 @@ def test_full_analyzer_agent_integration():
         from src.utils.config import Settings
 
         # 加载配置
-        settings = Settings.load_from_file('config/development.yaml')
+        settings = Settings.load_from_file("config/development.yaml")
 
         # 创建代理
         agent = AnalyzerAgent(settings)
 
         # 检查市场分析器配置
-        if hasattr(agent.market_analyzer, 'price_aggregation_config'):
+        if hasattr(agent.market_analyzer, "price_aggregation_config"):
             config = agent.market_analyzer.price_aggregation_config
-            print(f"   ✅ 分析器代理配置成功:")
+            print("   ✅ 分析器代理配置成功:")
             print(f"      价格聚合配置: {config}")
         else:
             print("   ⚠️  分析器代理未使用价格聚合配置")
@@ -208,8 +210,10 @@ def test_full_analyzer_agent_integration():
     except Exception as e:
         print(f"   ❌ 分析器代理集成失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     success = True

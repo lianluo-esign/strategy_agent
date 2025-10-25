@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any
 
 from .liquidity_peaks_analyzer import LiquidityPeaksAnalyzer
 from .models import (
@@ -67,7 +67,7 @@ class NormalDistributionMarketAnalyzer:
             min_volume_threshold=1.0,
             peak_detection_window=5,
             volume_weight=2.0,
-            price_aggregation_config=self.price_aggregation_config
+            price_aggregation_config=self.price_aggregation_config,
         )
 
         # Initialize DeepSeek analyzer placeholder (will be configured via enable_deepseek_analysis)
@@ -85,7 +85,7 @@ class NormalDistributionMarketAnalyzer:
         trade_data_list: list[MinuteTradeData],
         symbol: str,
         enhanced_mode: bool = True,
-    ) -> Union[MarketAnalysisResult, EnhancedMarketAnalysisResult]:
+    ) -> MarketAnalysisResult | EnhancedMarketAnalysisResult:
         """
         Perform comprehensive market analysis using normal distribution methods.
 
@@ -191,15 +191,18 @@ class NormalDistributionMarketAnalyzer:
         if self.deepseek_analyzer:
             try:
                 logger.info("Starting DeepSeek LLM analysis")
-                deepseek_analysis_result = self.deepseek_analyzer.analyze_order_book_with_llm(
-                    nd_analysis_decimal.get("aggregated_bids", {}),
-                    nd_analysis_decimal.get("aggregated_asks", {}),
-                    symbol
+                deepseek_analysis_result = (
+                    self.deepseek_analyzer.analyze_order_book_with_llm(
+                        nd_analysis_decimal.get("aggregated_bids", {}),
+                        nd_analysis_decimal.get("aggregated_asks", {}),
+                        symbol,
+                    )
                 )
                 logger.info("DeepSeek LLM analysis completed successfully")
 
                 # Print DeepSeek analysis results
                 from .deepseek_analyzer import print_deepseek_analysis_results
+
                 print_deepseek_analysis_results(deepseek_analysis_result)
 
             except Exception as e:
@@ -599,7 +602,9 @@ class NormalDistributionMarketAnalyzer:
             from .deepseek_analyzer import DeepSeekOrderBookAnalyzer
 
             self.deepseek_analyzer = DeepSeekOrderBookAnalyzer(**kwargs)
-            logger.info("DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer")
+            logger.info(
+                "DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer"
+            )
         except ImportError as e:
             logger.error(f"Failed to import DeepSeek analyzer: {e}")
             self.deepseek_analyzer = None
@@ -692,7 +697,9 @@ class MarketAnalyzer:
             from .deepseek_analyzer import DeepSeekOrderBookAnalyzer
 
             self.deepseek_analyzer = DeepSeekOrderBookAnalyzer(**kwargs)
-            logger.info("DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer")
+            logger.info(
+                "DeepSeek LLM analysis enabled in NormalDistributionMarketAnalyzer"
+            )
         except ImportError as e:
             logger.error(f"Failed to import DeepSeek analyzer: {e}")
             self.deepseek_analyzer = None

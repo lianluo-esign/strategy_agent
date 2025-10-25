@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Integration test for sklearn clustering in the actual analyzer system."""
 
-import matplotlib.pyplot as plt
-import numpy as np
 from decimal import Decimal
+
+import numpy as np
 
 from src.core.models import DepthLevel, DepthSnapshot
 from src.core.sklearn_cluster_analyzer import (
@@ -33,7 +33,7 @@ def create_test_order_book():
         volume = cluster["volume"]
 
         # Create multiple orders around the cluster center
-        for i in range(10):
+        for _i in range(10):
             price_offset = np.random.uniform(-spread / 2, spread / 2)
             price = center + price_offset
             order_volume = volume * np.random.uniform(0.5, 1.5)
@@ -57,7 +57,7 @@ def create_test_order_book():
         spread = cluster["spread"]
         volume = cluster["volume"]
 
-        for i in range(8):
+        for _i in range(8):
             price_offset = np.random.uniform(-spread / 2, spread / 2)
             price = center + price_offset
             order_volume = volume * np.random.uniform(0.5, 1.5)
@@ -110,7 +110,7 @@ def main():
     print_clustering_results(results)
 
     # Additional insights
-    print(f"\n=== 聚类分析洞察 ===")
+    print("\n=== 聚类分析洞察 ===")
     liquidity_peaks = results["liquidity_peaks"]
 
     if liquidity_peaks:

@@ -90,8 +90,8 @@ def test_comprehensive_functionality():
 
     # 运行100次性能测试
     start_time = time.time()
-    for i in range(100):
-        result_perf = analyzer1.analyze_market(
+    for _i in range(100):
+        analyzer1.analyze_market(
             snapshot=performance_snapshot,
             trade_data_list=[],
             symbol="BTCFDUSD",

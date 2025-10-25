@@ -146,10 +146,10 @@ class TestDataPipelineIntegration:
         with patch("src.core.redis_client.redis.Redis") as mock_redis:
             mock_redis.ping.return_value = True
 
-            with patch("src.utils.binance_client.BinanceAPIClient") as mock_api:
+            with patch("src.utils.binance_client.BinanceAPIClient"):
                 with patch(
                     "src.utils.binance_client.BinanceWebSocketClient"
-                ) as mock_ws:
+                ):
                     agent = DataCollectorAgent(test_settings)
 
                     # Check that components are initialized
@@ -248,7 +248,7 @@ class TestDataPipelineIntegration:
             )
 
             # Test connection failure handling
-            assert redis_store.test_connection() == True  # First call succeeds
+            assert redis_store.test_connection()  # First call succeeds
 
             # Test storage failure handling
             snapshot = DepthSnapshot(
@@ -312,7 +312,7 @@ class TestDataPipelineIntegration:
             assert isinstance(trade_data, list)
 
             # Test counters and existence check
-            assert redis_store.depth_snapshot_exists() == True
+            assert redis_store.depth_snapshot_exists()
             assert redis_store.get_trade_window_count() == 1
 
     async def test_data_format_validation(self, test_settings, mock_redis):

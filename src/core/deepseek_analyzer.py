@@ -8,7 +8,7 @@ analysis and market structure insights, not trading recommendations.
 import json
 import logging
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -31,7 +31,7 @@ class DeepSeekOrderBookAnalyzer:
         model: str = "deepseek-chat",
         max_tokens: int = 4000,
         temperature: float = 0.1,
-        timeout: int = 60*1000,
+        timeout: int = 60 * 1000,
         max_retries: int = 3,
     ):
         """Initialize DeepSeek order book analyzer.
@@ -73,10 +73,10 @@ class DeepSeekOrderBookAnalyzer:
     )
     def analyze_order_book_with_llm(
         self,
-        aggregated_bids: Dict[Decimal, Decimal],
-        aggregated_asks: Dict[Decimal, Decimal],
+        aggregated_bids: dict[Decimal, Decimal],
+        aggregated_asks: dict[Decimal, Decimal],
         symbol: str = "BTCFDUSD",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze aggregated order book data using DeepSeek LLM.
 
         Args:
@@ -182,8 +182,8 @@ class DeepSeekOrderBookAnalyzer:
 
     def _format_order_book_prompt(
         self,
-        aggregated_bids: Dict[Decimal, Decimal],
-        aggregated_asks: Dict[Decimal, Decimal],
+        aggregated_bids: dict[Decimal, Decimal],
+        aggregated_asks: dict[Decimal, Decimal],
         symbol: str,
     ) -> str:
         """Format order book data for LLM analysis.
@@ -207,19 +207,23 @@ class DeepSeekOrderBookAnalyzer:
         # Format order book data
         bid_data = []
         for price, volume in top_bids:
-            bid_data.append({
-                "价格": f"${float(price):,.2f}",
-                "挂单量": f"{float(volume):.2f}",
-                "价格等级": self._get_price_level(float(price))
-            })
+            bid_data.append(
+                {
+                    "价格": f"${float(price):,.2f}",
+                    "挂单量": f"{float(volume):.2f}",
+                    "价格等级": self._get_price_level(float(price)),
+                }
+            )
 
         ask_data = []
         for price, volume in top_asks:
-            ask_data.append({
-                "价格": f"${float(price):,.2f}",
-                "挂单量": f"{float(volume):.2f}",
-                "价格等级": self._get_price_level(float(price))
-            })
+            ask_data.append(
+                {
+                    "价格": f"${float(price):,.2f}",
+                    "挂单量": f"{float(volume):.2f}",
+                    "价格等级": self._get_price_level(float(price)),
+                }
+            )
 
         # Calculate summary statistics
         total_bid_volume = sum(float(v) for _, v in top_bids)
@@ -274,7 +278,7 @@ class DeepSeekOrderBookAnalyzer:
         else:
             return "十价位以下"
 
-    def _make_api_request(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+    def _make_api_request(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
         """Make synchronous API request to DeepSeek.
 
         Args:
@@ -298,7 +302,9 @@ class DeepSeekOrderBookAnalyzer:
         response.raise_for_status()
         return response.json()
 
-    def _parse_llm_analysis(self, response_data: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+    def _parse_llm_analysis(
+        self, response_data: dict[str, Any], symbol: str
+    ) -> dict[str, Any]:
         """Parse LLM analysis response.
 
         Args:
@@ -325,10 +331,12 @@ class DeepSeekOrderBookAnalyzer:
                         "raw_content": content,
                         "structured_analysis": analysis_json,
                         "status": "success",
-                        "timestamp": None  # Will be set by caller
+                        "timestamp": None,  # Will be set by caller
                     }
                 except json.JSONDecodeError:
-                    logger.warning("Failed to parse JSON from LLM response, using raw content")
+                    logger.warning(
+                        "Failed to parse JSON from LLM response, using raw content"
+                    )
 
             # Fallback: return raw content
             return {
@@ -337,14 +345,14 @@ class DeepSeekOrderBookAnalyzer:
                 "raw_content": content,
                 "structured_analysis": None,
                 "status": "success",
-                "timestamp": None  # Will be set by caller
+                "timestamp": None,  # Will be set by caller
             }
 
         except Exception as e:
             logger.error(f"Failed to parse LLM analysis response: {e}")
             return self._create_error_analysis(symbol, f"解析失败: {str(e)}")
 
-    def _create_error_analysis(self, symbol: str, error_message: str) -> Dict[str, Any]:
+    def _create_error_analysis(self, symbol: str, error_message: str) -> dict[str, Any]:
         """Create error analysis result.
 
         Args:
@@ -361,7 +369,7 @@ class DeepSeekOrderBookAnalyzer:
             "structured_analysis": None,
             "status": "error",
             "error": error_message,
-            "timestamp": None  # Will be set by caller
+            "timestamp": None,  # Will be set by caller
         }
 
     def close(self) -> None:
@@ -370,7 +378,7 @@ class DeepSeekOrderBookAnalyzer:
         logger.info("DeepSeekOrderBookAnalyzer HTTP client closed")
 
 
-def print_deepseek_analysis_results(results: Dict[str, Any]) -> None:
+def print_deepseek_analysis_results(results: dict[str, Any]) -> None:
     """Print DeepSeek analysis results in a clean, organized format.
 
     Args:
@@ -389,45 +397,59 @@ def print_deepseek_analysis_results(results: Dict[str, Any]) -> None:
         if "支撑区域" in structured_analysis:
             print("\n🟢 买盘支撑区域:")
             for i, support in enumerate(structured_analysis["支撑区域"], 1):
-                print(f"  支撑 {i}: {support.get('价格区间', 'N/A')} | "
-                      f"强度: {support.get('强度', 'N/A')} | "
-                      f"特征: {support.get('特征', 'N/A')[:50]}{'...' if len(support.get('特征', '')) > 50 else ''}")
+                print(
+                    f"  支撑 {i}: {support.get('价格区间', 'N/A')} | "
+                    f"强度: {support.get('强度', 'N/A')} | "
+                    f"特征: {support.get('特征', 'N/A')[:50]}{'...' if len(support.get('特征', '')) > 50 else ''}"
+                )
 
         if "阻力区域" in structured_analysis:
             print("\n🔻 卖盘阻力区域:")
             for i, resistance in enumerate(structured_analysis["阻力区域"], 1):
-                print(f"  阻力 {i}: {resistance.get('价格区间', 'N/A')} | "
-                      f"强度: {resistance.get('强度', 'N/A')} | "
-                      f"特征: {resistance.get('特征', 'N/A')[:50]}{'...' if len(resistance.get('特征', '')) > 50 else ''}")
+                print(
+                    f"  阻力 {i}: {resistance.get('价格区间', 'N/A')} | "
+                    f"强度: {resistance.get('强度', 'N/A')} | "
+                    f"特征: {resistance.get('特征', 'N/A')[:50]}{'...' if len(resistance.get('特征', '')) > 50 else ''}"
+                )
 
         if "市场平衡" in structured_analysis:
             balance = structured_analysis["市场平衡"]
             print(f"\n⚖️  市场平衡状态: {balance.get('状态', 'N/A')}")
-            if balance.get('分析'):
-                print(f"   分析: {balance['分析'][:100]}{'...' if len(balance['分析']) > 100 else ''}")
+            if balance.get("分析"):
+                print(
+                    f"   分析: {balance['分析'][:100]}{'...' if len(balance['分析']) > 100 else ''}"
+                )
 
         if "关键价位" in structured_analysis:
             print("\n📍 关键价位:")
             for i, key_level in enumerate(structured_analysis["关键价位"], 1):
-                print(f"  关键价位 {i}: ${key_level.get('价格', 'N/A')} | "
-                      f"作用: {key_level.get('作用', 'N/A')} | "
-                      f"重要性: {key_level.get('重要性', 'N/A')[:30]}{'...' if len(key_level.get('重要性', '')) > 30 else ''}")
+                print(
+                    f"  关键价位 {i}: ${key_level.get('价格', 'N/A')} | "
+                    f"作用: {key_level.get('作用', 'N/A')} | "
+                    f"重要性: {key_level.get('重要性', 'N/A')[:30]}{'...' if len(key_level.get('重要性', '')) > 30 else ''}"
+                )
 
         if "流动性特征" in structured_analysis:
             liquidity = structured_analysis["流动性特征"]
-            print(f"\n💧 流动性特征:")
-            if liquidity.get('分布'):
-                print(f"   分布: {liquidity['分布'][:80]}{'...' if len(liquidity['分布']) > 80 else ''}")
-            if liquidity.get('质量'):
-                print(f"   质量: {liquidity['质量'][:80]}{'...' if len(liquidity['质量']) > 80 else ''}")
-            if liquidity.get('风险点'):
-                print(f"   风险点: {liquidity['风险点'][:80]}{'...' if len(liquidity['风险点']) > 80 else ''}")
+            print("\n💧 流动性特征:")
+            if liquidity.get("分布"):
+                print(
+                    f"   分布: {liquidity['分布'][:80]}{'...' if len(liquidity['分布']) > 80 else ''}"
+                )
+            if liquidity.get("质量"):
+                print(
+                    f"   质量: {liquidity['质量'][:80]}{'...' if len(liquidity['质量']) > 80 else ''}"
+                )
+            if liquidity.get("风险点"):
+                print(
+                    f"   风险点: {liquidity['风险点'][:80]}{'...' if len(liquidity['风险点']) > 80 else ''}"
+                )
 
     else:
         # Print raw content if structured analysis is not available
         raw_content = results.get("raw_content")
         if raw_content:
-            print(f"\n📋 原始分析内容:")
+            print("\n📋 原始分析内容:")
             print(raw_content[:500] + "..." if len(raw_content) > 500 else raw_content)
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)

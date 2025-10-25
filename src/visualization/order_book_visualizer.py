@@ -83,27 +83,27 @@ class OrderBookVisualizer:
             plt.style.use(self.config.chart_style)
         except OSError:
             # Fallback to default style if specified style not found
-            logger.warning(f"Style '{self.config.chart_style}' not found, using default")
-            plt.style.use('default')
+            logger.warning(
+                f"Style '{self.config.chart_style}' not found, using default"
+            )
+            plt.style.use("default")
 
         # Configure matplotlib for better quality
-        plt.rcParams['figure.figsize'] = (
+        plt.rcParams["figure.figsize"] = (
             self.config.chart_width / 100,
-            self.config.chart_height / 100
+            self.config.chart_height / 100,
         )
-        plt.rcParams['figure.dpi'] = self.config.chart_dpi
-        plt.rcParams['savefig.dpi'] = self.config.chart_dpi
-        plt.rcParams['font.size'] = 10
-        plt.rcParams['axes.titlesize'] = 14
-        plt.rcParams['axes.labelsize'] = 12
-        plt.rcParams['xtick.labelsize'] = 10
-        plt.rcParams['ytick.labelsize'] = 10
-        plt.rcParams['legend.fontsize'] = 11
+        plt.rcParams["figure.dpi"] = self.config.chart_dpi
+        plt.rcParams["savefig.dpi"] = self.config.chart_dpi
+        plt.rcParams["font.size"] = 10
+        plt.rcParams["axes.titlesize"] = 14
+        plt.rcParams["axes.labelsize"] = 12
+        plt.rcParams["xtick.labelsize"] = 10
+        plt.rcParams["ytick.labelsize"] = 10
+        plt.rcParams["legend.fontsize"] = 11
 
     def create_order_book_distribution_chart(
-        self,
-        depth_snapshot: DepthSnapshot,
-        symbol: str | None = None
+        self, depth_snapshot: DepthSnapshot, symbol: str | None = None
     ) -> str:
         """Create and save order book depth distribution chart.
 
@@ -133,14 +133,21 @@ class OrderBookVisualizer:
                 raise ValueError("No valid data after aggregation")
 
             # Sort prices from high to low as required
-            prices_bids, volumes_bids = self._prepare_sorted_data(aggregated_bids, reverse=True)
-            prices_asks, volumes_asks = self._prepare_sorted_data(aggregated_asks, reverse=True)
+            prices_bids, volumes_bids = self._prepare_sorted_data(
+                aggregated_bids, reverse=True
+            )
+            prices_asks, volumes_asks = self._prepare_sorted_data(
+                aggregated_asks, reverse=True
+            )
 
             # Create the chart
             fig = self._create_distribution_chart(
-                prices_bids, volumes_bids,
-                prices_asks, volumes_asks,
-                symbol, depth_snapshot.timestamp
+                prices_bids,
+                volumes_bids,
+                prices_asks,
+                volumes_asks,
+                symbol,
+                depth_snapshot.timestamp,
             )
 
             # Save the chart
@@ -175,11 +182,15 @@ class OrderBookVisualizer:
             # Limit number of price levels if configured
             if self.config.max_price_levels > 0:
                 # Sort by volume and keep top levels
-                bids_items = sorted(bids_float.items(), key=lambda x: x[1], reverse=True)
-                asks_items = sorted(asks_float.items(), key=lambda x: x[1], reverse=True)
+                bids_items = sorted(
+                    bids_float.items(), key=lambda x: x[1], reverse=True
+                )
+                asks_items = sorted(
+                    asks_float.items(), key=lambda x: x[1], reverse=True
+                )
 
-                bids_float = dict(bids_items[:self.config.max_price_levels])
-                asks_float = dict(asks_items[:self.config.max_price_levels])
+                bids_float = dict(bids_items[: self.config.max_price_levels])
+                asks_float = dict(asks_items[: self.config.max_price_levels])
 
             logger.debug(f"Aggregated {len(bids)} bids to {len(bids_float)} levels")
             logger.debug(f"Aggregated {len(asks)} asks to {len(asks_float)} levels")
@@ -218,7 +229,7 @@ class OrderBookVisualizer:
         prices_asks: list[float],
         volumes_asks: list[float],
         symbol: str,
-        timestamp: datetime
+        timestamp: datetime,
     ) -> Figure:
         """Create the order book distribution chart.
 
@@ -234,20 +245,26 @@ class OrderBookVisualizer:
             matplotlib Figure object
         """
         # Create figure with subplots
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(
-            self.config.chart_width / 100,
-            self.config.chart_height / 100
-        ))
+        fig, (ax1, ax2) = plt.subplots(
+            2,
+            1,
+            figsize=(self.config.chart_width / 100, self.config.chart_height / 100),
+        )
         fig.suptitle(
-            f'{symbol} Order Book Depth Distribution\n{timestamp.strftime("%Y-%m-%d %H:%M:%S")}',
-            fontsize=16, fontweight='bold'
+            f"{symbol} Order Book Depth Distribution\n{timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
+            fontsize=16,
+            fontweight="bold",
         )
 
         # Plot 1: Side-by-side bars for bids and asks
-        self._plot_side_by_side_distribution(ax1, prices_bids, volumes_bids, prices_asks, volumes_asks)
+        self._plot_side_by_side_distribution(
+            ax1, prices_bids, volumes_bids, prices_asks, volumes_asks
+        )
 
         # Plot 2: Overlay chart with different scaling
-        self._plot_overlay_distribution(ax2, prices_bids, volumes_bids, prices_asks, volumes_asks)
+        self._plot_overlay_distribution(
+            ax2, prices_bids, volumes_bids, prices_asks, volumes_asks
+        )
 
         # Adjust layout
         plt.tight_layout()
@@ -259,7 +276,7 @@ class OrderBookVisualizer:
         prices_bids: list[float],
         volumes_bids: list[float],
         prices_asks: list[float],
-        volumes_asks: list[float]
+        volumes_asks: list[float],
     ) -> None:
         """Plot side-by-side bid/ask distribution.
 
@@ -298,10 +315,10 @@ class OrderBookVisualizer:
                 bid_volumes_aligned,
                 width=0.8,
                 alpha=0.7,
-                color='green',
-                label='Bids (Buy Orders)',
-                edgecolor='darkgreen',
-                linewidth=0.5
+                color="green",
+                label="Bids (Buy Orders)",
+                edgecolor="darkgreen",
+                linewidth=0.5,
             )
 
         # Plot asks (red)
@@ -317,15 +334,15 @@ class OrderBookVisualizer:
                 ask_volumes_aligned,
                 width=0.8,
                 alpha=0.7,
-                color='red',
-                label='Asks (Sell Orders)',
-                edgecolor='darkred',
-                linewidth=0.5
+                color="red",
+                label="Asks (Sell Orders)",
+                edgecolor="darkred",
+                linewidth=0.5,
             )
 
-        ax.set_xlabel('Price (USD)')
-        ax.set_ylabel('Volume (BTC)')
-        ax.set_title('Order Book Distribution by Price Level')
+        ax.set_xlabel("Price (USD)")
+        ax.set_ylabel("Volume (BTC)")
+        ax.set_title("Order Book Distribution by Price Level")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
@@ -340,7 +357,7 @@ class OrderBookVisualizer:
         prices_bids: list[float],
         volumes_bids: list[float],
         prices_asks: list[float],
-        volumes_asks: list[float]
+        volumes_asks: list[float],
     ) -> None:
         """Plot overlay distribution with area charts.
 
@@ -354,7 +371,7 @@ class OrderBookVisualizer:
         # Normalize volumes for better visualization
         max_volume = max(
             max(volumes_bids) if volumes_bids else 0,
-            max(volumes_asks) if volumes_asks else 0
+            max(volumes_asks) if volumes_asks else 0,
         )
 
         if max_volume == 0:
@@ -363,32 +380,48 @@ class OrderBookVisualizer:
         # Plot bids as area chart
         if prices_bids and volumes_bids:
             # Sort bids descending (high to low)
-            sorted_bids = sorted(zip(prices_bids, volumes_bids, strict=True), reverse=True)
-            bid_prices, bid_volumes = zip(*sorted_bids, strict=True) if sorted_bids else ([], [])
+            sorted_bids = sorted(
+                zip(prices_bids, volumes_bids, strict=True), reverse=True
+            )
+            bid_prices, bid_volumes = (
+                zip(*sorted_bids, strict=True) if sorted_bids else ([], [])
+            )
 
             normalized_bid_volumes = [v / max_volume * 100 for v in bid_volumes]
             ax.fill_between(
-                bid_prices, 0, normalized_bid_volumes,
-                alpha=0.5, color='green', label='Bids Volume %'
+                bid_prices,
+                0,
+                normalized_bid_volumes,
+                alpha=0.5,
+                color="green",
+                label="Bids Volume %",
             )
-            ax.plot(bid_prices, normalized_bid_volumes, 'g-', linewidth=2)
+            ax.plot(bid_prices, normalized_bid_volumes, "g-", linewidth=2)
 
         # Plot asks as area chart
         if prices_asks and volumes_asks:
             # Sort asks descending (high to low)
-            sorted_asks = sorted(zip(prices_asks, volumes_asks, strict=True), reverse=True)
-            ask_prices, ask_volumes = zip(*sorted_asks, strict=True) if sorted_asks else ([], [])
+            sorted_asks = sorted(
+                zip(prices_asks, volumes_asks, strict=True), reverse=True
+            )
+            ask_prices, ask_volumes = (
+                zip(*sorted_asks, strict=True) if sorted_asks else ([], [])
+            )
 
             normalized_ask_volumes = [v / max_volume * 100 for v in ask_volumes]
             ax.fill_between(
-                ask_prices, 0, normalized_ask_volumes,
-                alpha=0.5, color='red', label='Asks Volume %'
+                ask_prices,
+                0,
+                normalized_ask_volumes,
+                alpha=0.5,
+                color="red",
+                label="Asks Volume %",
             )
-            ax.plot(ask_prices, normalized_ask_volumes, 'r-', linewidth=2)
+            ax.plot(ask_prices, normalized_ask_volumes, "r-", linewidth=2)
 
-        ax.set_xlabel('Price (USD) - High to Low')
-        ax.set_ylabel('Normalized Volume (%)')
-        ax.set_title('Normalized Volume Distribution')
+        ax.set_xlabel("Price (USD) - High to Low")
+        ax.set_ylabel("Normalized Volume (%)")
+        ax.set_title("Normalized Volume Distribution")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
@@ -413,9 +446,9 @@ class OrderBookVisualizer:
             fig.savefig(
                 filepath,
                 dpi=self.config.chart_dpi,
-                bbox_inches='tight',
-                facecolor='white',
-                edgecolor='none'
+                bbox_inches="tight",
+                facecolor="white",
+                edgecolor="none",
             )
 
             # Close the figure to free memory
@@ -475,7 +508,7 @@ class OrderBookVisualizer:
                 "retention_days": self.config.retention_days,
                 "auto_cleanup_enabled": self.config.auto_cleanup,
                 "chart_dimensions": f"{self.config.chart_width}x{self.config.chart_height}",
-                "chart_dpi": self.config.chart_dpi
+                "chart_dpi": self.config.chart_dpi,
             }
         except Exception as e:
             logger.error(f"Failed to get visualization stats: {e}")

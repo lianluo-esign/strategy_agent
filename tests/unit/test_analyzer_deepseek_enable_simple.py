@@ -1,6 +1,6 @@
 """Simplified unit tests for analyzer agent with DeepSeek enable/disable functionality."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -45,7 +45,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
             patch("src.agents.analyzer.DeepSeekClient") as mock_deepseek_client,
         ):
             mock_redis_store.return_value.test_connection.return_value = True
@@ -89,7 +89,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
             patch("src.agents.analyzer.DeepSeekClient") as mock_deepseek_client,
         ):
             mock_redis_store.return_value.test_connection.return_value = True
@@ -133,7 +133,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
             patch("src.agents.analyzer.DeepSeekClient") as mock_deepseek_client,
         ):
             mock_redis_store.return_value.test_connection.return_value = True
@@ -181,7 +181,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
             patch("src.agents.analyzer.DeepSeekClient", return_value=mock_ai_client),
         ):
             mock_redis_store.return_value.test_connection.return_value = True
@@ -227,7 +227,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
         ):
             mock_redis_store.return_value.test_connection.return_value = True
             mock_redis_store.return_value.close = AsyncMock()
@@ -267,7 +267,7 @@ class TestAnalyzerDeepSeekEnable:
             patch("src.agents.analyzer.RedisDataStore") as mock_redis_store,
             patch(
                 "src.agents.analyzer.NormalDistributionMarketAnalyzer"
-            ) as mock_market_analyzer,
+            ),
         ):
             mock_redis_store.return_value.test_connection.return_value = True
             mock_redis_store.return_value.depth_snapshot_exists.return_value = True

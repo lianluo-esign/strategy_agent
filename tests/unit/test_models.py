@@ -6,13 +6,13 @@ from decimal import Decimal
 from src.core.models import (
     DepthLevel,
     DepthSnapshot,
+    EnhancedMarketAnalysisResult,
     MarketAnalysisResult,
     MinuteTradeData,
     PriceLevelData,
     SupportResistanceLevel,
     Trade,
     TradingRecommendation,
-    EnhancedMarketAnalysisResult,
 )
 
 

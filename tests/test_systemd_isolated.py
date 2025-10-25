@@ -103,7 +103,6 @@ class TestSystemdConfigIsolated:
         """Test that paths in service file are valid."""
         project_root = Path(__file__).parent.parent
         expected_working_dir = str(project_root)
-        expected_exec_start = f"{project_root}/venv/bin/python agent_data_collector.py"
 
         assert expected_working_dir in service_content, (
             "Working directory should match project root"

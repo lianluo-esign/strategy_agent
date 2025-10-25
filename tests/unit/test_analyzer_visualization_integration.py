@@ -1,6 +1,5 @@
 """Unit tests for analyzer agent visualization integration."""
 
-import asyncio
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,24 +25,25 @@ class TestAnalyzerVisualizationIntegration:
                 deepseek=MagicMock(enable=False),
                 analysis=MagicMock(interval_seconds=60),
                 visualization=VisualizationConfig(
-                    enabled=True,
-                    output_base_path="/tmp/test_visualizations"
-                )
+                    enabled=True, output_base_path="/tmp/test_visualizations"
+                ),
             ),
-            logging=MagicMock()
+            logging=MagicMock(),
         )
 
     @pytest.mark.asyncio
     async def test_analyzer_visualizer_initialization_enabled(self):
         """Test analyzer initializes visualizer when visualization is enabled."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             mock_visualizer = MagicMock()
             mock_visualizer_class.return_value = mock_visualizer
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Verify visualizer was initialized
@@ -57,11 +57,13 @@ class TestAnalyzerVisualizationIntegration:
         """Test analyzer does not initialize visualizer when disabled."""
         self.settings.analyzer.visualization.enabled = False
 
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer, \
-             patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class:
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+        ):
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Verify visualizer was NOT initialized
@@ -71,14 +73,18 @@ class TestAnalyzerVisualizationIntegration:
     @pytest.mark.asyncio
     async def test_analyzer_visualizer_initialization_error(self):
         """Test analyzer handles visualizer initialization errors gracefully."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             # Mock visualizer initialization to raise exception
-            mock_visualizer_class.side_effect = Exception("Visualization initialization failed")
+            mock_visualizer_class.side_effect = Exception(
+                "Visualization initialization failed"
+            )
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Visualizer should be None but agent should still be functional
@@ -87,13 +93,16 @@ class TestAnalyzerVisualizationIntegration:
     @pytest.mark.asyncio
     async def test_create_order_book_visualization_success(self):
         """Test successful visualization creation during analysis cycle."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer") as mock_analyzer,
+        ):
             # Setup mocks
             mock_visualizer = MagicMock()
-            mock_visualizer.create_order_book_distribution_chart.return_value = "/tmp/test_chart.png"
+            mock_visualizer.create_order_book_distribution_chart.return_value = (
+                "/tmp/test_chart.png"
+            )
             mock_visualizer_class.return_value = mock_visualizer
 
             mock_redis_store = AsyncMock()
@@ -101,7 +110,7 @@ class TestAnalyzerVisualizationIntegration:
                 symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[DepthLevel(price=Decimal("50000"), quantity=Decimal("1.0"))],
-                asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))]
+                asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))],
             )
             mock_redis.return_value = mock_redis_store
 
@@ -110,10 +119,11 @@ class TestAnalyzerVisualizationIntegration:
             mock_analyzer.return_value = mock_market_analyzer
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Mock the async event loop run_in_executor
-            with patch('asyncio.get_running_loop') as mock_loop:
+            with patch("asyncio.get_running_loop") as mock_loop:
                 mock_loop_instance = AsyncMock()
                 mock_loop_instance.run_in_executor.return_value = "/tmp/test_chart.png"
                 mock_loop.return_value = mock_loop_instance
@@ -123,7 +133,7 @@ class TestAnalyzerVisualizationIntegration:
                     symbol="BTCFDUSD",
                     timestamp=datetime.now(),
                     bids=[DepthLevel(price=Decimal("50000"), quantity=Decimal("1.0"))],
-                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))]
+                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))],
                 )
 
                 # Test visualization creation
@@ -133,7 +143,10 @@ class TestAnalyzerVisualizationIntegration:
                 mock_loop_instance.run_in_executor.assert_called_once()
                 call_args = mock_loop_instance.run_in_executor.call_args
                 assert call_args[0][0] is None  # Executor
-                assert call_args[0][1] == mock_visualizer.create_order_book_distribution_chart
+                assert (
+                    call_args[0][1]
+                    == mock_visualizer.create_order_book_distribution_chart
+                )
                 assert call_args[0][2] == snapshot
 
     @pytest.mark.asyncio
@@ -142,10 +155,12 @@ class TestAnalyzerVisualizationIntegration:
         # Disable visualization
         self.settings.analyzer.visualization.enabled = False
 
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Create test snapshot
@@ -153,7 +168,7 @@ class TestAnalyzerVisualizationIntegration:
                 symbol="BTCFDUSD",
                 timestamp=datetime.now(),
                 bids=[DepthLevel(price=Decimal("50000"), quantity=Decimal("1.0"))],
-                asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))]
+                asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))],
             )
 
             # Should not raise exception, should simply return
@@ -162,22 +177,28 @@ class TestAnalyzerVisualizationIntegration:
     @pytest.mark.asyncio
     async def test_create_order_book_visualization_error_handling(self):
         """Test error handling in visualization creation."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             # Setup visualizer to raise exception
             mock_visualizer = MagicMock()
-            mock_visualizer.create_order_book_distribution_chart.side_effect = Exception("Chart creation failed")
+            mock_visualizer.create_order_book_distribution_chart.side_effect = (
+                Exception("Chart creation failed")
+            )
             mock_visualizer_class.return_value = mock_visualizer
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Mock the async event loop run_in_executor
-            with patch('asyncio.get_running_loop') as mock_loop:
+            with patch("asyncio.get_running_loop") as mock_loop:
                 mock_loop_instance = AsyncMock()
-                mock_loop_instance.run_in_executor.side_effect = Exception("Chart creation failed")
+                mock_loop_instance.run_in_executor.side_effect = Exception(
+                    "Chart creation failed"
+                )
                 mock_loop.return_value = mock_loop_instance
 
                 # Create test snapshot
@@ -185,7 +206,7 @@ class TestAnalyzerVisualizationIntegration:
                     symbol="BTCFDUSD",
                     timestamp=datetime.now(),
                     bids=[DepthLevel(price=Decimal("50000"), quantity=Decimal("1.0"))],
-                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))]
+                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))],
                 )
 
                 # Should not raise exception, should handle error gracefully
@@ -194,20 +215,22 @@ class TestAnalyzerVisualizationIntegration:
     @pytest.mark.asyncio
     async def test_visualization_cleanup_counter(self):
         """Test periodic cleanup functionality."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore"),
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             # Setup mocks
             mock_visualizer = MagicMock()
             mock_visualizer.cleanup_old_files.return_value = 5  # 5 files removed
             mock_visualizer_class.return_value = mock_visualizer
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             # Mock the async event loop run_in_executor
-            with patch('asyncio.get_running_loop') as mock_loop:
+            with patch("asyncio.get_running_loop") as mock_loop:
                 mock_loop_instance = AsyncMock()
                 mock_loop_instance.run_in_executor.return_value = 5
                 mock_loop.return_value = mock_loop_instance
@@ -217,32 +240,34 @@ class TestAnalyzerVisualizationIntegration:
                     symbol="BTCFDUSD",
                     timestamp=datetime.now(),
                     bids=[DepthLevel(price=Decimal("50000"), quantity=Decimal("1.0"))],
-                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))]
+                    asks=[DepthLevel(price=Decimal("50001"), quantity=Decimal("1.0"))],
                 )
 
                 # Simulate 10 visualization creations to trigger cleanup
-                for i in range(10):
+                for _i in range(10):
                     await agent._create_order_book_visualization(snapshot)
 
                 # Cleanup should have been called once (on 10th call)
                 cleanup_calls = [
-                    call for call in mock_loop_instance.run_in_executor.call_args_list
+                    call
+                    for call in mock_loop_instance.run_in_executor.call_args_list
                     if call[0][1] == mock_visualizer.cleanup_old_files
                 ]
                 assert len(cleanup_calls) == 1
 
     def test_get_status_with_visualization_enabled(self):
         """Test status reporting includes visualization information when enabled."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             # Setup mocks
             mock_visualizer = MagicMock()
             mock_visualizer.get_visualization_stats.return_value = {
                 "total_files": 10,
                 "total_size_mb": 25.5,
-                "output_directory": "/tmp/test"
+                "output_directory": "/tmp/test",
             }
             mock_visualizer_class.return_value = mock_visualizer
 
@@ -253,6 +278,7 @@ class TestAnalyzerVisualizationIntegration:
             mock_redis.return_value = mock_redis_store
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             status = agent.get_status()
@@ -268,9 +294,10 @@ class TestAnalyzerVisualizationIntegration:
         """Test status reporting when visualization is disabled."""
         self.settings.analyzer.visualization.enabled = False
 
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             mock_redis_store = MagicMock()
             mock_redis_store.test_connection.return_value = True
             mock_redis_store.depth_snapshot_exists.return_value = True
@@ -278,6 +305,7 @@ class TestAnalyzerVisualizationIntegration:
             mock_redis.return_value = mock_redis_store
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             status = agent.get_status()
@@ -288,13 +316,16 @@ class TestAnalyzerVisualizationIntegration:
 
     def test_get_status_with_visualization_error(self):
         """Test status reporting when visualization has errors."""
-        with patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.OrderBookVisualizer") as mock_visualizer_class,
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             # Setup visualizer to raise exception when getting stats
             mock_visualizer = MagicMock()
-            mock_visualizer.get_visualization_stats.side_effect = Exception("Stats error")
+            mock_visualizer.get_visualization_stats.side_effect = Exception(
+                "Stats error"
+            )
             mock_visualizer_class.return_value = mock_visualizer
 
             mock_redis_store = MagicMock()
@@ -304,6 +335,7 @@ class TestAnalyzerVisualizationIntegration:
             mock_redis.return_value = mock_redis_store
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             status = agent.get_status()
@@ -319,11 +351,12 @@ class TestAnalyzerVisualizationIntegration:
         # Test with AI enabled
         self.settings.analyzer.deepseek.enable = True
 
-        with patch('src.agents.analyzer.DeepSeekClient') as mock_ai_client, \
-             patch('src.agents.analyzer.OrderBookVisualizer') as mock_visualizer_class, \
-             patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.DeepSeekClient"),
+            patch("src.agents.analyzer.OrderBookVisualizer"),
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             mock_redis_store = MagicMock()
             mock_redis_store.test_connection.return_value = True
             mock_redis_store.depth_snapshot_exists.return_value = True
@@ -331,6 +364,7 @@ class TestAnalyzerVisualizationIntegration:
             mock_redis.return_value = mock_redis_store
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             status = agent.get_status()
@@ -341,9 +375,10 @@ class TestAnalyzerVisualizationIntegration:
         # Test with AI disabled
         self.settings.analyzer.deepseek.enable = False
 
-        with patch('src.agents.analyzer.RedisDataStore') as mock_redis, \
-             patch('src.agents.analyzer.MarketAnalyzer') as mock_analyzer:
-
+        with (
+            patch("src.agents.analyzer.RedisDataStore") as mock_redis,
+            patch("src.agents.analyzer.MarketAnalyzer"),
+        ):
             mock_redis_store = MagicMock()
             mock_redis_store.test_connection.return_value = True
             mock_redis_store.depth_snapshot_exists.return_value = True
@@ -351,6 +386,7 @@ class TestAnalyzerVisualizationIntegration:
             mock_redis.return_value = mock_redis_store
 
             from src.agents.analyzer import AnalyzerAgent
+
             agent = AnalyzerAgent(self.settings)
 
             status = agent.get_status()

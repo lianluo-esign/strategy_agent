@@ -110,6 +110,7 @@ class DeepSeekConfig(BaseModel):
     model: str = "deepseek-chat"
     max_tokens: int = 4000
     temperature: float = 0.1
+    timeout: int = 60
 
     def __init__(self, **data: Any) -> None:
         """Initialize with environment variable support."""
@@ -128,7 +129,7 @@ class PriceAggregationConfig(BaseModel):
 
     model_config = {"validate_assignment": True}
 
-    @field_validator('precision')
+    @field_validator("precision")
     @classmethod
     def validate_precision(cls, v: float) -> float:
         """Validate precision field."""
@@ -136,7 +137,7 @@ class PriceAggregationConfig(BaseModel):
             raise ValueError("Price aggregation precision must be positive")
         return v
 
-    @field_validator('max_price_levels')
+    @field_validator("max_price_levels")
     @classmethod
     def validate_max_price_levels(cls, v: int) -> int:
         """Validate max_price_levels field."""
@@ -173,7 +174,9 @@ class AnalyzerConfig(BaseModel):
 
     deepseek: DeepSeekConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
-    price_aggregation: PriceAggregationConfig = Field(default_factory=PriceAggregationConfig)
+    price_aggregation: PriceAggregationConfig = Field(
+        default_factory=PriceAggregationConfig
+    )
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
 
 

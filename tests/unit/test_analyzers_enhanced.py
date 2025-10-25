@@ -517,7 +517,7 @@ class TestEnhancedAnalyzerEdgeCases:
         initial_memory = process.memory_info().rss
 
         # Run multiple analyses
-        for i in range(10):
+        for _i in range(10):
             snapshot = DepthSnapshot(
                 symbol="BTCFDUSD",
                 timestamp=datetime.now(),

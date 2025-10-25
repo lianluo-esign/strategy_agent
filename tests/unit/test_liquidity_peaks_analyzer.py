@@ -4,17 +4,18 @@ This module contains comprehensive tests for the LiquidityPeaksAnalyzer
 to ensure robustness and correctness of the liquidity peak detection algorithm.
 """
 
-import pytest
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 from src.core.liquidity_peaks_analyzer import (
-    LiquidityPeaksAnalyzer,
-    PEAK_SCORE_NORMALIZATION_FACTOR,
-    MAX_PEAKS_RETURNED,
     LOCAL_DENSITY_WINDOW_SIZE,
+    MAX_PEAKS_RETURNED,
+    PEAK_SCORE_NORMALIZATION_FACTOR,
+    LiquidityPeaksAnalyzer,
 )
-from src.core.models import DepthSnapshot, DepthLevel, SupportResistanceLevel
+from src.core.models import DepthLevel, DepthSnapshot, SupportResistanceLevel
 
 
 class TestLiquidityPeaksAnalyzer:
@@ -62,7 +63,9 @@ class TestLiquidityPeaksAnalyzer:
             LiquidityPeaksAnalyzer(min_volume_threshold=0.0)
 
         # Test invalid peak_detection_window
-        with pytest.raises(ValueError, match="peak_detection_window must be at least 1"):
+        with pytest.raises(
+            ValueError, match="peak_detection_window must be at least 1"
+        ):
             LiquidityPeaksAnalyzer(peak_detection_window=0)
 
         # Test negative volume_weight
@@ -73,8 +76,14 @@ class TestLiquidityPeaksAnalyzer:
     def test_analyze_liquidity_peaks_with_valid_snapshot(self):
         """Test analysis with valid depth snapshot."""
         snapshot = self._create_test_snapshot(
-            bids=[(Decimal('95000'), Decimal('15.5')), (Decimal('94999'), Decimal('20.0'))],
-            asks=[(Decimal('95100'), Decimal('12.2')), (Decimal('95101'), Decimal('18.8'))],
+            bids=[
+                (Decimal("95000"), Decimal("15.5")),
+                (Decimal("94999"), Decimal("20.0")),
+            ],
+            asks=[
+                (Decimal("95100"), Decimal("12.2")),
+                (Decimal("95101"), Decimal("18.8")),
+            ],
         )
 
         result = self.analyzer.analyze_liquidity_peaks(snapshot)
@@ -110,8 +119,8 @@ class TestLiquidityPeaksAnalyzer:
     def test_analyze_liquidity_peaks_with_low_volume(self):
         """Test analysis with snapshot containing low volume data."""
         snapshot = self._create_test_snapshot(
-            bids=[(Decimal('95000'), Decimal('0.5'))],  # Below threshold (1.0)
-            asks=[(Decimal('95100'), Decimal('0.8'))],  # Below threshold (1.0)
+            bids=[(Decimal("95000"), Decimal("0.5"))],  # Below threshold (1.0)
+            asks=[(Decimal("95100"), Decimal("0.8"))],  # Below threshold (1.0)
         )
 
         result = self.analyzer.analyze_liquidity_peaks(snapshot)
@@ -131,8 +140,8 @@ class TestLiquidityPeaksAnalyzer:
 
         # Test with empty symbol
         snapshot = self._create_test_snapshot(
-            bids=[(Decimal('95000'), Decimal('15.5'))],
-            asks=[(Decimal('95100'), Decimal('12.2'))],
+            bids=[(Decimal("95000"), Decimal("15.5"))],
+            asks=[(Decimal("95100"), Decimal("12.2"))],
         )
         snapshot.symbol = ""
         with pytest.raises(ValueError, match="snapshot must have a valid symbol"):
@@ -143,41 +152,43 @@ class TestLiquidityPeaksAnalyzer:
         """Test order book data aggregation."""
         snapshot = self._create_test_snapshot(
             bids=[
-                (Decimal('95001.50'), Decimal('1.2')),
-                (Decimal('95002.30'), Decimal('0.8')),
-                (Decimal('95001.80'), Decimal('2.1')),  # Same price level as first
+                (Decimal("95001.50"), Decimal("1.2")),
+                (Decimal("95002.30"), Decimal("0.8")),
+                (Decimal("95001.80"), Decimal("2.1")),  # Same price level as first
             ],
             asks=[
-                (Decimal('95101.20'), Decimal('1.5')),
-                (Decimal('95102.40'), Decimal('2.0')),
+                (Decimal("95101.20"), Decimal("1.5")),
+                (Decimal("95102.40"), Decimal("2.0")),
             ],
         )
 
-        aggregated_bids, aggregated_asks = self.analyzer._aggregate_order_book_data(snapshot)
+        aggregated_bids, aggregated_asks = self.analyzer._aggregate_order_book_data(
+            snapshot
+        )
 
         # Check that prices are rounded down to nearest dollar
-        assert Decimal('95001') in aggregated_bids
-        assert Decimal('95002') in aggregated_bids
-        assert Decimal('95101') in aggregated_asks
-        assert Decimal('95102') in aggregated_asks
+        assert Decimal("95001") in aggregated_bids
+        assert Decimal("95002") in aggregated_bids
+        assert Decimal("95101") in aggregated_asks
+        assert Decimal("95102") in aggregated_asks
 
         # Check that volumes are summed correctly
         # 95001.50 -> 95001, 95001.80 -> 95001, volumes should be summed
-        assert aggregated_bids[Decimal('95001')] == Decimal('3.3')  # 1.2 + 2.1
+        assert aggregated_bids[Decimal("95001")] == Decimal("3.3")  # 1.2 + 2.1
 
     def test_identify_peaks_from_data(self):
         """Test peak identification from aggregated data."""
         test_data = {
-            Decimal('95000'): Decimal('15.0'),  # High volume
-            Decimal('95001'): Decimal('8.0'),   # Medium volume
-            Decimal('95002'): Decimal('3.0'),   # Low volume
+            Decimal("95000"): Decimal("15.0"),  # High volume
+            Decimal("95001"): Decimal("8.0"),  # Medium volume
+            Decimal("95002"): Decimal("3.0"),  # Low volume
         }
 
         peaks = self.analyzer._identify_peaks_from_data(test_data, "bid")
 
         # Should identify high volume as peak
         assert len(peaks) > 0
-        assert peaks[0]["price"] == Decimal('95000')
+        assert peaks[0]["price"] == Decimal("95000")
         assert peaks[0]["volume"] == 15.0
         assert "peak_score" in peaks[0]
         assert peaks[0]["side"] == "bid"
@@ -190,14 +201,14 @@ class TestLiquidityPeaksAnalyzer:
     def test_calculate_peak_score(self):
         """Test peak score calculation."""
         test_data = {
-            Decimal('95000'): Decimal('10.0'),
-            Decimal('95001'): Decimal('5.0'),
-            Decimal('95002'): Decimal('15.0'),
+            Decimal("95000"): Decimal("10.0"),
+            Decimal("95001"): Decimal("5.0"),
+            Decimal("95002"): Decimal("15.0"),
         }
-        sorted_prices = [Decimal('95002'), Decimal('95001'), Decimal('95000')]
+        sorted_prices = [Decimal("95002"), Decimal("95001"), Decimal("95000")]
 
         score = self.analyzer._calculate_peak_score(
-            Decimal('95002'), 15.0, sorted_prices, test_data, "bid"
+            Decimal("95002"), 15.0, sorted_prices, test_data, "bid"
         )
 
         assert isinstance(score, float)
@@ -206,21 +217,21 @@ class TestLiquidityPeaksAnalyzer:
     def test_calculate_peak_score_with_empty_data(self):
         """Test peak score calculation with empty data."""
         score = self.analyzer._calculate_peak_score(
-            Decimal('95000'), 10.0, [], {}, "bid"
+            Decimal("95000"), 10.0, [], {}, "bid"
         )
         assert score == 0.0
 
     def test_calculate_local_density_score(self):
         """Test local density score calculation."""
         test_data = {
-            Decimal('95000'): Decimal('10.0'),
-            Decimal('95001'): Decimal('8.0'),
-            Decimal('95002'): Decimal('12.0'),
+            Decimal("95000"): Decimal("10.0"),
+            Decimal("95001"): Decimal("8.0"),
+            Decimal("95002"): Decimal("12.0"),
         }
-        sorted_prices = [Decimal('95002'), Decimal('95001'), Decimal('95000')]
+        sorted_prices = [Decimal("95002"), Decimal("95001"), Decimal("95000")]
 
         score = self.analyzer._calculate_local_density_score(
-            Decimal('95001'), sorted_prices, test_data
+            Decimal("95001"), sorted_prices, test_data
         )
 
         assert isinstance(score, float)
@@ -228,58 +239,68 @@ class TestLiquidityPeaksAnalyzer:
 
     def test_calculate_local_density_score_edge_cases(self):
         """Test local density score calculation with edge cases."""
-        test_data = {Decimal('95000'): Decimal('10.0')}
-        sorted_prices = [Decimal('95000')]
+        test_data = {Decimal("95000"): Decimal("10.0")}
+        sorted_prices = [Decimal("95000")]
 
         # Test with price not in list
         score = self.analyzer._calculate_local_density_score(
-            Decimal('95001'), sorted_prices, test_data
+            Decimal("95001"), sorted_prices, test_data
         )
         assert score == 0.0
 
         # Test with empty data
-        score = self.analyzer._calculate_local_density_score(
-            Decimal('95000'), [], {}
-        )
+        score = self.analyzer._calculate_local_density_score(Decimal("95000"), [], {})
         assert score == 0.0
 
     def test_convert_peaks_to_support_resistance(self):
         """Test conversion of peaks to SupportResistanceLevel objects."""
         bid_peaks = [
-            {"price": Decimal('95000'), "volume": 15.0, "peak_score": 2.5, "side": "bid"}
+            {
+                "price": Decimal("95000"),
+                "volume": 15.0,
+                "peak_score": 2.5,
+                "side": "bid",
+            }
         ]
         ask_peaks = [
-            {"price": Decimal('95100'), "volume": 12.0, "peak_score": 2.0, "side": "ask"}
+            {
+                "price": Decimal("95100"),
+                "volume": 12.0,
+                "peak_score": 2.0,
+                "side": "ask",
+            }
         ]
 
-        levels = self.analyzer._convert_peaks_to_support_resistance(bid_peaks, ask_peaks)
+        levels = self.analyzer._convert_peaks_to_support_resistance(
+            bid_peaks, ask_peaks
+        )
 
         assert len(levels) == 2
 
         # Check support level
         support = next(level for level in levels if level.level_type == "support")
-        assert support.price == Decimal('95000')
+        assert support.price == Decimal("95000")
         assert support.level_type == "support"
-        assert support.volume_at_level == Decimal('15.0')
+        assert support.volume_at_level == Decimal("15.0")
         assert support.strength == 2.5 / PEAK_SCORE_NORMALIZATION_FACTOR
 
         # Check resistance level
         resistance = next(level for level in levels if level.level_type == "resistance")
-        assert resistance.price == Decimal('95100')
+        assert resistance.price == Decimal("95100")
         assert resistance.level_type == "resistance"
-        assert resistance.volume_at_level == Decimal('12.0')
+        assert resistance.volume_at_level == Decimal("12.0")
         assert resistance.strength == 2.0 / PEAK_SCORE_NORMALIZATION_FACTOR
 
     def test_generate_analysis_summary(self):
         """Test analysis summary generation."""
-        aggregated_bids = {Decimal('95000'): Decimal('15.0')}
-        aggregated_asks = {Decimal('95100'): Decimal('12.0')}
+        aggregated_bids = {Decimal("95000"): Decimal("15.0")}
+        aggregated_asks = {Decimal("95100"): Decimal("12.0")}
         liquidity_peaks = [
             SupportResistanceLevel(
-                price=Decimal('95000'),
+                price=Decimal("95000"),
                 strength=0.8,
                 level_type="support",
-                volume_at_level=Decimal('15.0'),
+                volume_at_level=Decimal("15.0"),
                 confirmation_count=1,
                 last_confirmed=None,
             )
@@ -316,17 +337,25 @@ class TestLiquidityPeaksAnalyzer:
         """Test analysis with realistic market data structure."""
         # Create realistic order book
         bids = [
-            DepthLevel(price=Decimal('94990.00'), quantity=Decimal('0.5')),
-            DepthLevel(price=Decimal('94991.00'), quantity=Decimal('1.2')),
-            DepthLevel(price=Decimal('94992.00'), quantity=Decimal('25.5')),  # Large order
-            DepthLevel(price=Decimal('94993.00'), quantity=Decimal('2.1')),
-            DepthLevel(price=Decimal('94994.00'), quantity=Decimal('18.8')),  # Large order
+            DepthLevel(price=Decimal("94990.00"), quantity=Decimal("0.5")),
+            DepthLevel(price=Decimal("94991.00"), quantity=Decimal("1.2")),
+            DepthLevel(
+                price=Decimal("94992.00"), quantity=Decimal("25.5")
+            ),  # Large order
+            DepthLevel(price=Decimal("94993.00"), quantity=Decimal("2.1")),
+            DepthLevel(
+                price=Decimal("94994.00"), quantity=Decimal("18.8")
+            ),  # Large order
         ]
         asks = [
-            DepthLevel(price=Decimal('95005.00'), quantity=Decimal('22.3')),  # Large order
-            DepthLevel(price=Decimal('95006.00'), quantity=Decimal('1.5')),
-            DepthLevel(price=Decimal('95007.00'), quantity=Decimal('31.2')),  # Large order
-            DepthLevel(price=Decimal('95008.00'), quantity=Decimal('0.8')),
+            DepthLevel(
+                price=Decimal("95005.00"), quantity=Decimal("22.3")
+            ),  # Large order
+            DepthLevel(price=Decimal("95006.00"), quantity=Decimal("1.5")),
+            DepthLevel(
+                price=Decimal("95007.00"), quantity=Decimal("31.2")
+            ),  # Large order
+            DepthLevel(price=Decimal("95008.00"), quantity=Decimal("0.8")),
         ]
 
         snapshot = DepthSnapshot(
@@ -344,8 +373,12 @@ class TestLiquidityPeaksAnalyzer:
         assert result["total_ask_volume"] > 0
 
         # Check that peaks are properly classified
-        support_levels = [p for p in result["liquidity_peaks"] if p.level_type == "support"]
-        resistance_levels = [p for p in result["liquidity_peaks"] if p.level_type == "resistance"]
+        support_levels = [
+            p for p in result["liquidity_peaks"] if p.level_type == "support"
+        ]
+        resistance_levels = [
+            p for p in result["liquidity_peaks"] if p.level_type == "resistance"
+        ]
 
         assert len(support_levels) > 0
         assert len(resistance_levels) > 0
@@ -359,14 +392,18 @@ class TestLiquidityPeaksAnalyzer:
         asks = []
         for i in range(1000):
             base_price = 95000 - i
-            bids.append(DepthLevel(
-                price=Decimal(str(base_price)),
-                quantity=Decimal(str(i % 20 + 1))  # Varying volumes
-            ))
-            asks.append(DepthLevel(
-                price=Decimal(str(95100 + i)),
-                quantity=Decimal(str(i % 15 + 1))  # Varying volumes
-            ))
+            bids.append(
+                DepthLevel(
+                    price=Decimal(str(base_price)),
+                    quantity=Decimal(str(i % 20 + 1)),  # Varying volumes
+                )
+            )
+            asks.append(
+                DepthLevel(
+                    price=Decimal(str(95100 + i)),
+                    quantity=Decimal(str(i % 15 + 1)),  # Varying volumes
+                )
+            )
 
         snapshot = DepthSnapshot(
             symbol="BTCFDUSD",
@@ -388,8 +425,8 @@ class TestLiquidityPeaksAnalyzer:
     def test_single_price_level(self):
         """Test analysis with single price level."""
         snapshot = self._create_test_snapshot(
-            bids=[(Decimal('95000'), Decimal('15.5'))],
-            asks=[(Decimal('95100'), Decimal('12.2'))],
+            bids=[(Decimal("95000"), Decimal("15.5"))],
+            asks=[(Decimal("95100"), Decimal("12.2"))],
         )
 
         result = self.analyzer.analyze_liquidity_peaks(snapshot)
@@ -402,14 +439,14 @@ class TestLiquidityPeaksAnalyzer:
         """Test analysis with orders at same price levels."""
         snapshot = self._create_test_snapshot(
             bids=[
-                (Decimal('95000.50'), Decimal('5.0')),
-                (Decimal('95000.80'), Decimal('8.0')),
-                (Decimal('95000.20'), Decimal('3.0')),
+                (Decimal("95000.50"), Decimal("5.0")),
+                (Decimal("95000.80"), Decimal("8.0")),
+                (Decimal("95000.20"), Decimal("3.0")),
             ],
             asks=[
-                (Decimal('95100.10'), Decimal('6.0')),
-                (Decimal('95100.90'), Decimal('9.0')),
-                (Decimal('95100.40'), Decimal('4.0')),
+                (Decimal("95100.10"), Decimal("6.0")),
+                (Decimal("95100.90"), Decimal("9.0")),
+                (Decimal("95100.40"), Decimal("4.0")),
             ],
         )
 
@@ -454,10 +491,10 @@ def test_print_liquidity_peaks_results(capsys):
     test_results = {
         "liquidity_peaks": [
             SupportResistanceLevel(
-                price=Decimal('95000'),
+                price=Decimal("95000"),
                 strength=0.8,
                 level_type="support",
-                volume_at_level=Decimal('15.0'),
+                volume_at_level=Decimal("15.0"),
                 confirmation_count=1,
                 last_confirmed=None,
             )

@@ -584,7 +584,7 @@ class TestEdgeCasesAndErrorHandling:
     def test_all_same_price_different_volumes(self):
         """Test with same price but different volumes (edge case)."""
         # This would be aggregated to single price level
-        same_price_data = {
+        {
             Decimal("100"): Decimal("10.0"),
             Decimal("100"): Decimal("20.0"),  # This would overwrite
             Decimal("100"): Decimal("30.0"),

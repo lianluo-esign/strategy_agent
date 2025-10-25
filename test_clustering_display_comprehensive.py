@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Comprehensive test suite for sklearn clustering display optimization."""
 
-import numpy as np
-import pytest
-from decimal import Decimal
 from datetime import datetime
-import pandas as pd
+from decimal import Decimal
+
+import numpy as np
 
 from src.core.models import DepthLevel, DepthSnapshot
 from src.core.sklearn_cluster_analyzer import SklearnClusterAnalyzer
@@ -45,7 +44,7 @@ class TestSklearnClusteringDisplay:
             center = cluster["center"]
             spread = cluster["spread"]
             volume = cluster["volume"]
-            for i in range(8):
+            for _i in range(8):
                 price_offset = np.random.uniform(-spread / 2, spread / 2)
                 price = center + price_offset
                 order_volume = volume * np.random.uniform(0.5, 1.5)
@@ -67,7 +66,7 @@ class TestSklearnClusteringDisplay:
             center = cluster["center"]
             spread = cluster["spread"]
             volume = cluster["volume"]
-            for i in range(10):
+            for _i in range(10):
                 price_offset = np.random.uniform(-spread / 2, spread / 2)
                 price = center + price_offset
                 order_volume = volume * np.random.uniform(0.5, 1.5)
@@ -241,8 +240,8 @@ class TestSklearnClusteringDisplay:
 
     def test_print_clustering_results_output_format(self):
         """Test that print_clustering_results produces the expected output format."""
-        from io import StringIO
         import sys
+        from io import StringIO
 
         # Create a mock results structure to test display formatting
         mock_results = {

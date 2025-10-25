@@ -134,7 +134,7 @@ class TestDepthSnapshotOverwrite:
                 db=test_settings.redis.db,
             )
 
-            assert redis_store.depth_snapshot_exists() == True
+            assert redis_store.depth_snapshot_exists()
             mock_redis.exists.assert_called_once_with("depth_snapshot_5000")
 
         # Reset mock for non-existent case
@@ -142,7 +142,7 @@ class TestDepthSnapshotOverwrite:
         mock_redis.reset_mock()
 
         # Test when snapshot doesn't exist
-        assert redis_store.depth_snapshot_exists() == False
+        assert not redis_store.depth_snapshot_exists()
         mock_redis.exists.assert_called_once_with("depth_snapshot_5000")
 
     async def test_no_snapshot_retrieval(self, test_settings, mock_redis):

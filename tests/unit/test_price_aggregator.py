@@ -353,7 +353,7 @@ class TestIntegrationScenarios:
         # Step 5: Validate quality
         original_total_levels = len(raw_bids) + len(raw_asks)
         original_total_volume = sum(level.quantity for level in raw_bids + raw_asks)
-        aggregated_total_volume = sum(aggregated_bids.values()) + sum(
+        sum(aggregated_bids.values()) + sum(
             aggregated_asks.values()
         )
 

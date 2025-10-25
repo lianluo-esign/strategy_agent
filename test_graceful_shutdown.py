@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test script to verify graceful shutdown functionality."""
 
-import asyncio
 import signal
 import subprocess
 import sys
@@ -34,7 +33,7 @@ def test_graceful_shutdown():
     # Check if process is still running
     if process.poll() is not None:
         stdout, stderr = process.communicate()
-        print(f"❌ Process exited prematurely")
+        print("❌ Process exited prematurely")
         print(f"STDOUT: {stdout}")
         print(f"STDERR: {stderr}")
         return False

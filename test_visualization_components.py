@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Additional tests for visualization components to improve coverage."""
 
-import pytest
-import numpy as np
-from unittest.mock import patch, MagicMock
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pytest
 
 from src.core.models import DepthLevel, DepthSnapshot
 from src.core.sklearn_cluster_analyzer import ClusterVisualizer, SklearnClusterAnalyzer
@@ -214,10 +215,10 @@ class TestVisualizationComponents:
     def test_print_functions_edge_cases(self):
         """Test print functions with edge case data."""
         from src.core.sklearn_cluster_analyzer import (
-            _print_summary_metrics,
-            _print_liquidity_peaks,
             _print_detailed_cluster_analysis,
+            _print_liquidity_peaks,
             _print_market_structure_analysis,
+            _print_summary_metrics,
         )
 
         # Test with empty results
