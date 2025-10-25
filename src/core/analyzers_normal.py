@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from .liquidity_peaks_analyzer import LiquidityPeaksAnalyzer
 from .models import (
     DepthSnapshot,
     EnhancedMarketAnalysisResult,
@@ -21,7 +22,6 @@ from .normal_distribution_analyzer import (
     NormalDistributionPeakAnalyzer,
     convert_to_decimal_format,
 )
-from .sklearn_cluster_analyzer import SklearnClusterAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +58,14 @@ class NormalDistributionMarketAnalyzer:
             price_precision=1.0, confidence_level=confidence_level
         )
 
-        # Initialize sklearn cluster analyzer
-        self.cluster_analyzer = SklearnClusterAnalyzer(
-            min_samples=3, eps_multiplier=0.02, max_clusters=8, volume_weight=2.0
+        # Initialize simplified liquidity peaks analyzer
+        self.liquidity_analyzer = LiquidityPeaksAnalyzer(
+            min_volume_threshold=10.0, peak_detection_window=5, volume_weight=2.0
         )
 
         logger.info(
             f"Initialized NormalDistributionMarketAnalyzer with confidence_level={confidence_level}, "
-            f"window={analysis_window_minutes}min, sklearn clustering enabled"
+            f"window={analysis_window_minutes}min, simplified liquidity peaks enabled"
         )
 
     def analyze_market(
@@ -138,8 +138,8 @@ class NormalDistributionMarketAnalyzer:
         # Step 2: Perform normal distribution peak analysis
         nd_analysis = self.peak_analyzer.analyze_order_book(order_book_data)
 
-        # Step 2.5: Perform sklearn clustering analysis
-        clustering_results = self.cluster_analyzer.analyze_order_book_clustering(
+        # Step 2.5: Perform simplified liquidity peaks analysis
+        liquidity_peaks_results = self.liquidity_analyzer.analyze_liquidity_peaks(
             snapshot
         )
 
@@ -197,13 +197,8 @@ class NormalDistributionMarketAnalyzer:
             ),
             market_metrics=nd_analysis_decimal.get("market_metrics", {}),
             spread_analysis=nd_analysis_decimal.get("spread_analysis", {}),
-            # New fields for sklearn clustering analysis
-            clustering_results=clustering_results,
-            optimal_clusters=clustering_results.get("optimal_clusters", 0),
-            silhouette_score=clustering_results.get("silhouette_score", 0.0),
-            liquidity_peaks=self._convert_clustering_peaks_to_support_resistance(
-                clustering_results.get("liquidity_peaks", [])
-            ),
+            # Simplified liquidity peak identification
+            liquidity_peaks=liquidity_peaks_results.get("liquidity_peaks", []),
         )
 
         logger.info(
@@ -213,20 +208,21 @@ class NormalDistributionMarketAnalyzer:
             f"confidence_level={self.confidence_level}"
         )
 
-        # Log sklearn clustering results
+        # Log liquidity peaks results
+        peak_stats = liquidity_peaks_results.get("peak_detection_stats", {})
         logger.info(
-            f"Sklearn clustering analysis completed: "
-            f"optimal_clusters={clustering_results.get('optimal_clusters', 0)}, "
-            f"silhouette_score={clustering_results.get('silhouette_score', 0.0):.3f}, "
-            f"liquidity_peaks={len(clustering_results.get('liquidity_peaks', []))}"
+            f"Liquidity peaks analysis completed: "
+            f"total_peaks={peak_stats.get('total_peaks_count', 0)}, "
+            f"bid_peaks={peak_stats.get('bid_peaks_count', 0)}, "
+            f"ask_peaks={peak_stats.get('ask_peaks_count', 0)}"
         )
 
-        # Print clustering results in the optimized format
-        if clustering_results.get("optimal_clusters", 0) > 0:
-            # Use the optimized display function from sklearn_cluster_analyzer
-            from .sklearn_cluster_analyzer import print_clustering_results
+        # Print liquidity peaks results in the optimized format
+        if peak_stats.get("total_peaks_count", 0) > 0:
+            # Use the display function from liquidity_peaks_analyzer
+            from .liquidity_peaks_analyzer import print_liquidity_peaks_results
 
-            print_clustering_results(clustering_results)
+            print_liquidity_peaks_results(liquidity_peaks_results)
 
         return result
 
@@ -554,28 +550,6 @@ class NormalDistributionMarketAnalyzer:
             "coverage_rate": coverage_rate,
             "confidence_level": self.confidence_level,
         }
-
-    def _convert_clustering_peaks_to_support_resistance(
-        self, liquidity_peaks: list[dict[str, Any]]
-    ) -> list[SupportResistanceLevel]:
-        """Convert sklearn clustering peaks to SupportResistanceLevel objects."""
-        support_resistance_levels = []
-
-        for peak in liquidity_peaks:
-            level_type = "support" if peak["dominant_side"] == "bid" else "resistance"
-
-            support_resistance_level = SupportResistanceLevel(
-                price=Decimal(str(peak["center_price"])),
-                strength=min(peak["purity"], 1.0),  # Ensure strength doesn't exceed 1.0
-                level_type=level_type,
-                volume_at_level=Decimal(str(abs(peak["total_volume"]))),
-                confirmation_count=1,
-                last_confirmed=datetime.now(),
-            )
-
-            support_resistance_levels.append(support_resistance_level)
-
-        return support_resistance_levels
 
 
 # Keep the existing MarketAnalyzer as fallback
