@@ -204,46 +204,102 @@ class AnalyzerAgent:
             analysis_result: 分析结果字典
         """
         symbol = analysis_result.get("symbol", "UNKNOWN")
+        analysis_type = analysis_result.get("analysis_type", "unknown")
+
         logger.info(f"=== {symbol} Enhanced Analysis Summary ===")
 
-        # 深度快照分析摘要
-        depth_analysis = analysis_result.get("depth_analysis", {})
-        if depth_analysis.get("status") == "success":
-            aggregated_bids = depth_analysis.get("aggregated_bids", {})
-            aggregated_asks = depth_analysis.get("aggregated_asks", {})
-            logger.info(
-                f"📊 Depth Snapshot: {len(aggregated_bids)} bid levels, "
-                f"{len(aggregated_asks)} ask levels"
-            )
+        # 根据分析类型显示不同的摘要
+        if analysis_type == "unified_market_analysis":
+            # 统一分析模式摘要
+            logger.info("🔍 Analysis Mode: Unified AI Analysis")
 
-            depth_deepseek = depth_analysis.get("deepseek_analysis")
-            if depth_deepseek and depth_deepseek.get("status") == "success":
-                logger.info("✅ DeepSeek depth snapshot analysis completed")
+            # 数据摘要
+            depth_analysis = analysis_result.get("depth_analysis", {})
+            vp_analysis = analysis_result.get("volume_profile_analysis", {})
+
+            if depth_analysis.get("status") == "success":
+                aggregated_bids = depth_analysis.get("aggregated_bids", {})
+                aggregated_asks = depth_analysis.get("aggregated_asks", {})
+                logger.info(
+                    f"📊 Depth Snapshot: {len(aggregated_bids)} bid levels, "
+                    f"{len(aggregated_asks)} ask levels"
+                )
             else:
-                logger.info("❌ DeepSeek depth snapshot analysis failed")
-        else:
-            logger.info(
-                f"❌ Depth snapshot analysis failed: {depth_analysis.get('error', 'Unknown error')}"
-            )
+                logger.info(f"❌ Depth snapshot failed: {depth_analysis.get('error', 'Unknown error')}")
 
-        # Volume Profile分析摘要
-        vp_analysis = analysis_result.get("volume_profile_analysis", {})
-        if vp_analysis.get("status") == "success":
-            vp_data = vp_analysis.get("vp_analysis", {})
-            logger.info(
-                f"📈 Volume Profile: {vp_data.get('price_levels_count', 0)} price levels, "
-                f"total_volume={vp_data.get('total_volume', 0):.2f}"
-            )
-
-            vp_deepseek = vp_analysis.get("deepseek_analysis")
-            if vp_deepseek and vp_deepseek.get("status") == "success":
-                logger.info("✅ DeepSeek Volume Profile analysis completed")
+            if vp_analysis.get("status") == "success":
+                vp_data = vp_analysis.get("vp_analysis", {})
+                logger.info(
+                    f"📈 Volume Profile: {vp_data.get('price_levels_count', 0)} price levels, "
+                    f"total_volume={vp_data.get('total_volume', 0):.2f}"
+                )
             else:
-                logger.info("❌ DeepSeek Volume Profile analysis failed")
+                logger.info(f"❌ Volume Profile failed: {vp_analysis.get('error', 'Unknown error')}")
+
+            # 统一AI分析结果摘要
+            unified_analysis = analysis_result.get("unified_analysis", {})
+            if unified_analysis and unified_analysis.get("status") == "success":
+                logger.info("✅ Unified DeepSeek analysis completed successfully")
+
+                # 显示关键结果摘要
+                structured_analysis = unified_analysis.get("structured_analysis")
+                if structured_analysis:
+                    support_levels = structured_analysis.get("短期支撑位", [])
+                    resistance_levels = structured_analysis.get("短期阻力位", [])
+                    liquidity_zone = structured_analysis.get("集中流动性供应区域", {})
+
+                    logger.info(f"🟢 Support Levels Identified: {len(support_levels)}")
+                    logger.info(f"🔻 Resistance Levels Identified: {len(resistance_levels)}")
+                    if liquidity_zone.get("最佳价格区间"):
+                        logger.info(f"💰 Optimal Liquidity Zone: {liquidity_zone['最佳价格区间']}")
+            else:
+                logger.info(f"❌ Unified AI analysis failed: {unified_analysis.get('error', 'Unknown error') if unified_analysis else 'No analysis result'}")
+
+        elif analysis_type == "traditional_dual_analysis":
+            # 传统分离分析模式摘要
+            logger.info("🔍 Analysis Mode: Traditional Dual Analysis")
+
+            # 深度快照分析摘要
+            depth_analysis = analysis_result.get("depth_analysis", {})
+            if depth_analysis.get("status") == "success":
+                aggregated_bids = depth_analysis.get("aggregated_bids", {})
+                aggregated_asks = depth_analysis.get("aggregated_asks", {})
+                logger.info(
+                    f"📊 Depth Snapshot: {len(aggregated_bids)} bid levels, "
+                    f"{len(aggregated_asks)} ask levels"
+                )
+
+                depth_deepseek = depth_analysis.get("deepseek_analysis")
+                if depth_deepseek and depth_deepseek.get("status") == "success":
+                    logger.info("✅ DeepSeek depth snapshot analysis completed")
+                else:
+                    logger.info("❌ DeepSeek depth snapshot analysis failed")
+            else:
+                logger.info(
+                    f"❌ Depth snapshot analysis failed: {depth_analysis.get('error', 'Unknown error')}"
+                )
+
+            # Volume Profile分析摘要
+            vp_analysis = analysis_result.get("volume_profile_analysis", {})
+            if vp_analysis.get("status") == "success":
+                vp_data = vp_analysis.get("vp_analysis", {})
+                logger.info(
+                    f"📈 Volume Profile: {vp_data.get('price_levels_count', 0)} price levels, "
+                    f"total_volume={vp_data.get('total_volume', 0):.2f}"
+                )
+
+                vp_deepseek = vp_analysis.get("deepseek_analysis")
+                if vp_deepseek and vp_deepseek.get("status") == "success":
+                    logger.info("✅ DeepSeek Volume Profile analysis completed")
+                else:
+                    logger.info("❌ DeepSeek Volume Profile analysis failed")
+            else:
+                logger.info(
+                    f"❌ Volume Profile analysis failed: {vp_analysis.get('error', 'Unknown error')}"
+                )
         else:
-            logger.info(
-                f"❌ Volume Profile analysis failed: {vp_analysis.get('error', 'Unknown error')}"
-            )
+            logger.info(f"🔍 Analysis Mode: {analysis_type}")
+            logger.info("❌ Unknown analysis type")
 
         # 可视化摘要
         visualization = analysis_result.get("visualization", {})

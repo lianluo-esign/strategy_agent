@@ -41,12 +41,14 @@ data_collector:
 analyzer:
   deepseek:
     enable: true
-    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b" 
+    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"
     base_url: "https://api.deepseek.com/v1"
     model: "deepseek-chat"
-    max_tokens: 4000
+    max_tokens: 6000  # 增加token限制以支持统一分析
     temperature: 0.1
-    timeout: 60  # 60秒超时
+    timeout: 90  # 增加超时时间以支持统一分析
+    max_retries: 3
+    use_unified_analysis: true  # 启用统一分析模式
   analysis:
     interval_seconds: 300
     min_order_volume_threshold: 0.01

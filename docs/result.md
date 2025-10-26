@@ -42,3 +42,27 @@
 卖盘总量: 370 (47.8%)
 买盘总量: 404 (52.2%)
 买卖比例: 1:1.09
+
+
+
+7:22:50,903 - src.core.enhanced_market_analyzer - INFO - 🟢 短期支撑位（入场机会）:
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   支撑位 1: $$111,974.00 | 可靠性: 85/100 | 入场区间: $111,974.00-$111,976.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿支撑
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   支撑位 2: $$111,978.00 | 可靠性: 75/100 | 入场区间: $111,978.00-$111,980.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿支撑
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   支撑位 3: $$111,986.00 | 可靠性: 70/100 | 入场区间: $111,984.00-$111,986.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿支撑
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO - 🔻 短期阻力位（退出目标）:
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   阻力位 1: $$111,998.00 | 可靠性: 90/100 | 退出区间: $111,998.00-$112,000.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿阻力
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   阻力位 2: $$112,006.00 | 可靠性: 80/100 | 退出区间: $112,006.00-$112,007.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿阻力
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   阻力位 3: $$112,010.00 | 可靠性: 75/100 | 退出区间: $112,010.00-$112,011.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -            原因: 订单簿阻力
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO - 💰 集中流动性供应区域:
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   最佳区间: $111,974.00-$111,998.00
+2025-10-26 17:22:50,903 - src.core.enhanced_market_analyzer - INFO -   备选区间: $111,978.00-$112,006.00, $111,986.00-$112,010.00
+2025-10-26 17:22:50,904 - src.core.enhanced_market_analyzer - INFO -   市场特征: 该区间覆盖了最强的买盘支撑($111,974.00)和最强的卖盘阻力($111,998.00)，价差相对合理，流动性需求集中
+2025-10-26 17:22:50,904 - src.core.enhanced_market_analyzer - INFO - 📋 做市策略要点:
+2025-10-26 17:22:50,904 - src.core.enhanced_market_analyzer - INFO -   主要机会: 利用$5价差在支撑阻力明确区间内进行高频做市，重点在$111,974-$111,998区间部署流动性
+2025-10-26 17:22:50,904 - src.core.enhanced_market_analyzer - INFO -   策略总结: 在当前窄幅震荡区间内，重点围绕$111,974-$111,998进行高频做市，严格控制仓位，利用明确的支撑阻力获取稳定收益
