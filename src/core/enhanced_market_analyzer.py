@@ -15,6 +15,7 @@ from .deepseek_analyzer import (
 )
 from .deepseek_vp_analyzer import DeepSeekVPAnalyzer
 from .price_aggregator import PriceAggregator
+from .unified_deepseek_analyzer import UnifiedDeepSeekAnalyzer
 from .volume_profile_analyzer import VolumeProfileAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -70,41 +71,58 @@ class EnhancedMarketAnalyzer:
         # 初始化DeepSeek分析器
         self.deepseek_orderbook_analyzer = None
         self.deepseek_vp_analyzer = None
+        self.unified_deepseek_analyzer = None
 
         if deepseek_config and deepseek_config.get("enable", False):
             try:
-                # 深度快照分析器
-                self.deepseek_orderbook_analyzer = DeepSeekOrderBookAnalyzer(
-                    api_key=deepseek_config["api_key"],
-                    base_url=deepseek_config.get(
-                        "base_url", "https://api.deepseek.com/v1"
-                    ),
-                    model=deepseek_config.get("model", "deepseek-chat"),
-                    max_tokens=deepseek_config.get("max_tokens", 4000),
-                    temperature=deepseek_config.get("temperature", 0.1),
-                    timeout=deepseek_config.get("timeout", 60),
-                    max_retries=deepseek_config.get("max_retries", 3),
-                )
-                logger.info("DeepSeek order book analyzer initialized successfully")
+                # 优先使用统一分析器
+                if deepseek_config.get("use_unified_analysis", True):
+                    self.unified_deepseek_analyzer = UnifiedDeepSeekAnalyzer(
+                        api_key=deepseek_config["api_key"],
+                        base_url=deepseek_config.get(
+                            "base_url", "https://api.deepseek.com/v1"
+                        ),
+                        model=deepseek_config.get("model", "deepseek-chat"),
+                        max_tokens=deepseek_config.get("max_tokens", 6000),
+                        temperature=deepseek_config.get("temperature", 0.1),
+                        timeout=deepseek_config.get("timeout", 90),
+                        max_retries=deepseek_config.get("max_retries", 3),
+                    )
+                    logger.info("Unified DeepSeek analyzer initialized successfully")
+                else:
+                    # 深度快照分析器（传统分离模式）
+                    self.deepseek_orderbook_analyzer = DeepSeekOrderBookAnalyzer(
+                        api_key=deepseek_config["api_key"],
+                        base_url=deepseek_config.get(
+                            "base_url", "https://api.deepseek.com/v1"
+                        ),
+                        model=deepseek_config.get("model", "deepseek-chat"),
+                        max_tokens=deepseek_config.get("max_tokens", 4000),
+                        temperature=deepseek_config.get("temperature", 0.1),
+                        timeout=deepseek_config.get("timeout", 60),
+                        max_retries=deepseek_config.get("max_retries", 3),
+                    )
+                    logger.info("DeepSeek order book analyzer initialized successfully")
 
-                # Volume Profile分析器
-                self.deepseek_vp_analyzer = DeepSeekVPAnalyzer(
-                    api_key=deepseek_config["api_key"],
-                    base_url=deepseek_config.get(
-                        "base_url", "https://api.deepseek.com/v1"
-                    ),
-                    model=deepseek_config.get("model", "deepseek-chat"),
-                    max_tokens=deepseek_config.get("max_tokens", 4000),
-                    temperature=deepseek_config.get("temperature", 0.1),
-                    timeout=deepseek_config.get("timeout", 60),
-                    max_retries=deepseek_config.get("max_retries", 3),
-                )
-                logger.info("DeepSeek Volume Profile analyzer initialized successfully")
+                    # Volume Profile分析器
+                    self.deepseek_vp_analyzer = DeepSeekVPAnalyzer(
+                        api_key=deepseek_config["api_key"],
+                        base_url=deepseek_config.get(
+                            "base_url", "https://api.deepseek.com/v1"
+                        ),
+                        model=deepseek_config.get("model", "deepseek-chat"),
+                        max_tokens=deepseek_config.get("max_tokens", 4000),
+                        temperature=deepseek_config.get("temperature", 0.1),
+                        timeout=deepseek_config.get("timeout", 60),
+                        max_retries=deepseek_config.get("max_retries", 3),
+                    )
+                    logger.info("DeepSeek Volume Profile analyzer initialized successfully")
 
             except Exception as e:
                 logger.error(f"Failed to initialize DeepSeek analyzers: {e}")
                 self.deepseek_orderbook_analyzer = None
                 self.deepseek_vp_analyzer = None
+                self.unified_deepseek_analyzer = None
         else:
             logger.info("DeepSeek LLM analysis is disabled")
 
@@ -118,6 +136,108 @@ class EnhancedMarketAnalyzer:
             包含两种分析结果的完整字典
         """
         logger.info(f"Starting enhanced dual market analysis for {symbol}")
+
+        try:
+            # 检查是否使用统一分析模式
+            if self.unified_deepseek_analyzer:
+                logger.info("Using unified analysis mode")
+                return self._perform_unified_analysis(symbol)
+            else:
+                logger.info("Using traditional dual analysis mode")
+                return self._perform_tradual_dual_analysis(symbol)
+
+        except Exception as e:
+            logger.error(f"Enhanced dual analysis failed: {e}")
+            return self._create_error_result(symbol, str(e))
+
+    def _perform_unified_analysis(self, symbol: str) -> dict[str, Any]:
+        """执行统一分析：单次AI请求处理深度快照和Volume Profile数据。
+
+        Args:
+            symbol: 交易符号
+
+        Returns:
+            包含统一分析结果的完整字典
+        """
+        logger.info(f"Starting unified market analysis for {symbol}")
+
+        try:
+            # 第一步：获取并处理深度快照数据
+            depth_analysis = self._get_depth_snapshot_data(symbol)
+            if depth_analysis.get("status") != "success":
+                return self._create_error_result(symbol, f"Depth analysis failed: {depth_analysis.get('error')}")
+
+            # 第二步：获取并处理Volume Profile数据
+            vp_analysis = self._get_volume_profile_data(symbol)
+            if vp_analysis.get("status") != "success":
+                return self._create_error_result(symbol, f"Volume Profile analysis failed: {vp_analysis.get('error')}")
+
+            # 第三步：统一AI分析
+            unified_analysis = None
+            if self.unified_deepseek_analyzer:
+                try:
+                    logger.info("Starting unified DeepSeek LLM analysis")
+                    unified_analysis = self.unified_deepseek_analyzer.analyze_unified_market_data(
+                        aggregated_bids=depth_analysis["aggregated_bids"],
+                        aggregated_asks=depth_analysis["aggregated_asks"],
+                        vp_result=vp_analysis["vp_analysis"],
+                        symbol=symbol
+                    )
+                    logger.info("Unified DeepSeek analysis completed successfully")
+
+                    # 在info日志中打印统一分析结果
+                    self._log_unified_analysis(unified_analysis)
+
+                except Exception as e:
+                    logger.error(f"Unified DeepSeek analysis failed: {e}")
+                    unified_analysis = {"status": "error", "error": str(e)}
+
+            # 第四步：可视化处理
+            visualization_result = None
+            if self.visualizer and depth_analysis.get("snapshot"):
+                try:
+                    logger.info("Creating order book visualization")
+                    output_file = self.visualizer.create_order_book_distribution_chart(
+                        depth_analysis["snapshot"]
+                    )
+                    visualization_result = {
+                        "status": "success",
+                        "output_file": output_file,
+                    }
+                    logger.info(f"Order book visualization created: {output_file}")
+                except Exception as e:
+                    logger.error(f"Failed to create visualization: {e}")
+                    visualization_result = {"status": "error", "error": str(e)}
+
+            # 整合统一分析结果
+            result = {
+                "symbol": symbol,
+                "timestamp": datetime.now(),
+                "analysis_type": "unified_market_analysis",
+                "depth_analysis": depth_analysis,
+                "volume_profile_analysis": vp_analysis,
+                "unified_analysis": unified_analysis,
+                "visualization": visualization_result,
+                "status": "success",
+            }
+
+            logger.info(f"Unified market analysis completed for {symbol}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Unified analysis failed: {e}")
+            return self._create_error_result(symbol, str(e))
+
+    def _perform_tradual_dual_analysis(self, symbol: str) -> dict[str, Any]:
+        """执行传统的双重分析模式。
+
+        Args:
+            symbol: 交易符号
+
+        Returns:
+            包含传统双重分析结果的完整字典
+        """
+        logger.info(f"Starting traditional dual analysis for {symbol}")
 
         try:
             # 第一部分：静态深度快照分析
@@ -147,30 +267,30 @@ class EnhancedMarketAnalyzer:
             result = {
                 "symbol": symbol,
                 "timestamp": datetime.now(),
-                "analysis_type": "enhanced_dual_analysis",
+                "analysis_type": "traditional_dual_analysis",
                 "depth_analysis": depth_analysis,
                 "volume_profile_analysis": vp_analysis,
                 "visualization": visualization_result,
                 "status": "success",
             }
 
-            logger.info(f"Enhanced dual analysis completed for {symbol}")
+            logger.info(f"Traditional dual analysis completed for {symbol}")
             return result
 
         except Exception as e:
-            logger.error(f"Enhanced dual analysis failed: {e}")
+            logger.error(f"Traditional dual analysis failed: {e}")
             return self._create_error_result(symbol, str(e))
 
-    def _analyze_depth_snapshot(self, symbol: str) -> dict[str, Any]:
-        """分析深度快照数据。
+    def _get_depth_snapshot_data(self, symbol: str) -> dict[str, Any]:
+        """获取深度快照数据（不包含AI分析）。
 
         Args:
             symbol: 交易符号
 
         Returns:
-            深度快照分析结果
+            深度快照数据结果
         """
-        logger.info("Starting depth snapshot analysis")
+        logger.info("Getting depth snapshot data")
 
         try:
             # 读取深度快照数据
@@ -180,7 +300,6 @@ class EnhancedMarketAnalyzer:
                 return {
                     "status": "no_data",
                     "error": "No depth snapshot available",
-                    "deepseek_analysis": None,
                 }
 
             logger.info(
@@ -199,7 +318,6 @@ class EnhancedMarketAnalyzer:
                 return {
                     "status": "no_data",
                     "error": "No order book data after aggregation",
-                    "deepseek_analysis": None,
                 }
 
             logger.info(
@@ -207,50 +325,68 @@ class EnhancedMarketAnalyzer:
                 f"{len(aggregated_asks)} ask levels"
             )
 
-            # DeepSeek深度快照分析
-            deepseek_analysis = None
-            if self.deepseek_orderbook_analyzer:
-                try:
-                    logger.info("Starting DeepSeek LLM depth snapshot analysis")
-                    deepseek_analysis = (
-                        self.deepseek_orderbook_analyzer.analyze_order_book_with_llm(
-                            aggregated_bids, aggregated_asks, symbol
-                        )
-                    )
-                    logger.info(
-                        "DeepSeek depth snapshot analysis completed successfully"
-                    )
-
-                    # 在info日志中打印分析结果
-                    self._log_deepseek_analysis(deepseek_analysis, "深度快照")
-
-                except Exception as e:
-                    logger.error(f"DeepSeek depth snapshot analysis failed: {e}")
-                    deepseek_analysis = {"status": "error", "error": str(e)}
-
             return {
                 "status": "success",
                 "snapshot": snapshot,
                 "aggregated_bids": aggregated_bids,
                 "aggregated_asks": aggregated_asks,
                 "aggregation_precision": self.price_aggregator.precision,
-                "deepseek_analysis": deepseek_analysis,
             }
 
         except Exception as e:
-            logger.error(f"Depth snapshot analysis failed: {e}")
-            return {"status": "error", "error": str(e), "deepseek_analysis": None}
+            logger.error(f"Depth snapshot data retrieval failed: {e}")
+            return {"status": "error", "error": str(e)}
 
-    def _analyze_volume_profile(self, symbol: str) -> dict[str, Any]:
-        """分析Volume Profile数据。
+    def _analyze_depth_snapshot(self, symbol: str) -> dict[str, Any]:
+        """分析深度快照数据（包含AI分析）。
 
         Args:
             symbol: 交易符号
 
         Returns:
-            Volume Profile分析结果
+            深度快照分析结果
         """
-        logger.info("Starting Volume Profile analysis")
+        logger.info("Starting depth snapshot analysis")
+
+        # 获取基础数据
+        depth_data = self._get_depth_snapshot_data(symbol)
+        if depth_data.get("status") != "success":
+            return depth_data
+
+        # DeepSeek深度快照分析
+        deepseek_analysis = None
+        if self.deepseek_orderbook_analyzer:
+            try:
+                logger.info("Starting DeepSeek LLM depth snapshot analysis")
+                deepseek_analysis = (
+                    self.deepseek_orderbook_analyzer.analyze_order_book_with_llm(
+                        depth_data["aggregated_bids"], depth_data["aggregated_asks"], symbol
+                    )
+                )
+                logger.info(
+                    "DeepSeek depth snapshot analysis completed successfully"
+                )
+
+                # 在info日志中打印分析结果
+                self._log_deepseek_analysis(deepseek_analysis, "深度快照")
+
+            except Exception as e:
+                logger.error(f"DeepSeek depth snapshot analysis failed: {e}")
+                deepseek_analysis = {"status": "error", "error": str(e)}
+
+        depth_data["deepseek_analysis"] = deepseek_analysis
+        return depth_data
+
+    def _get_volume_profile_data(self, symbol: str) -> dict[str, Any]:
+        """获取Volume Profile数据（不包含AI分析）。
+
+        Args:
+            symbol: 交易符号
+
+        Returns:
+            Volume Profile数据结果
+        """
+        logger.info("Getting Volume Profile data")
 
         try:
             # 获取24小时交易窗口数据
@@ -262,7 +398,6 @@ class EnhancedMarketAnalyzer:
                 return {
                     "status": "no_data",
                     "error": "No trades window data available",
-                    "deepseek_analysis": None,
                 }
 
             logger.info(f"Retrieved {len(trades_window_data)} minutes of trade data")
@@ -280,7 +415,6 @@ class EnhancedMarketAnalyzer:
                     "status": "error",
                     "error": vp_result.get("error"),
                     "vp_analysis": vp_result,
-                    "deepseek_analysis": None,
                 }
 
             logger.info(
@@ -288,36 +422,54 @@ class EnhancedMarketAnalyzer:
                 f"total_volume={vp_result.get('total_volume', 0):.2f}"
             )
 
-            # DeepSeek Volume Profile分析
-            deepseek_analysis = None
-            if self.deepseek_vp_analyzer:
-                try:
-                    logger.info("Starting DeepSeek LLM Volume Profile analysis")
-                    deepseek_analysis = (
-                        self.deepseek_vp_analyzer.analyze_volume_profile_with_llm(
-                            vp_result
-                        )
-                    )
-                    logger.info(
-                        "DeepSeek Volume Profile analysis completed successfully"
-                    )
-
-                    # 在info日志中打印分析结果
-                    self._log_deepseek_analysis(deepseek_analysis, "Volume Profile")
-
-                except Exception as e:
-                    logger.error(f"DeepSeek Volume Profile analysis failed: {e}")
-                    deepseek_analysis = {"status": "error", "error": str(e)}
-
             return {
                 "status": "success",
                 "vp_analysis": vp_result,
-                "deepseek_analysis": deepseek_analysis,
             }
 
         except Exception as e:
-            logger.error(f"Volume Profile analysis failed: {e}")
-            return {"status": "error", "error": str(e), "deepseek_analysis": None}
+            logger.error(f"Volume Profile data retrieval failed: {e}")
+            return {"status": "error", "error": str(e)}
+
+    def _analyze_volume_profile(self, symbol: str) -> dict[str, Any]:
+        """分析Volume Profile数据（包含AI分析）。
+
+        Args:
+            symbol: 交易符号
+
+        Returns:
+            Volume Profile分析结果
+        """
+        logger.info("Starting Volume Profile analysis")
+
+        # 获取基础数据
+        vp_data = self._get_volume_profile_data(symbol)
+        if vp_data.get("status") != "success":
+            return vp_data
+
+        # DeepSeek Volume Profile分析
+        deepseek_analysis = None
+        if self.deepseek_vp_analyzer:
+            try:
+                logger.info("Starting DeepSeek LLM Volume Profile analysis")
+                deepseek_analysis = (
+                    self.deepseek_vp_analyzer.analyze_volume_profile_with_llm(
+                        vp_data["vp_analysis"]
+                    )
+                )
+                logger.info(
+                    "DeepSeek Volume Profile analysis completed successfully"
+                )
+
+                # 在info日志中打印分析结果
+                self._log_deepseek_analysis(deepseek_analysis, "Volume Profile")
+
+            except Exception as e:
+                logger.error(f"DeepSeek Volume Profile analysis failed: {e}")
+                deepseek_analysis = {"status": "error", "error": str(e)}
+
+        vp_data["deepseek_analysis"] = deepseek_analysis
+        return vp_data
 
     def _log_deepseek_analysis(
         self, analysis_result: dict[str, Any], analysis_type: str
@@ -356,6 +508,75 @@ class EnhancedMarketAnalyzer:
                         )
 
         logger.info("=" * 60)
+
+    def _log_unified_analysis(self, analysis_result: dict[str, Any]) -> None:
+        """在info日志中打印统一分析结果。
+
+        Args:
+            analysis_result: 统一分析结果
+        """
+        if analysis_result.get("status") != "success":
+            logger.info(
+                f"❌ 统一AI分析失败: {analysis_result.get('error', '未知错误')}"
+            )
+            return
+
+        symbol = analysis_result.get("symbol", "UNKNOWN")
+        logger.info(f"=== {symbol} 统一AI分析结果 - 高频做市策略 ===")
+
+        structured_analysis = analysis_result.get("structured_analysis")
+        if structured_analysis:
+            # 打印短期支撑位
+            if "短期支撑位" in structured_analysis:
+                logger.info("🟢 短期支撑位（入场机会）:")
+                for i, support in enumerate(structured_analysis["短期支撑位"][:3], 1):
+                    logger.info(
+                        f"  支撑位 {i}: ${support.get('价格', 'N/A')} | "
+                        f"可靠性: {support.get('可靠性评分', 'N/A')}/100 | "
+                        f"入场区间: {support.get('推荐入场区间', 'N/A')}"
+                    )
+                    reason = support.get('形成原因', 'N/A')
+                    logger.info(f"           原因: {reason[:60]}{'...' if len(reason) > 60 else ''}")
+
+            # 打印短期阻力位
+            if "短期阻力位" in structured_analysis:
+                logger.info("🔻 短期阻力位（退出目标）:")
+                for i, resistance in enumerate(structured_analysis["短期阻力位"][:3], 1):
+                    logger.info(
+                        f"  阻力位 {i}: ${resistance.get('价格', 'N/A')} | "
+                        f"可靠性: {resistance.get('可靠性评分', 'N/A')}/100 | "
+                        f"退出区间: {resistance.get('推荐退出区间', 'N/A')}"
+                    )
+                    reason = resistance.get('形成原因', 'N/A')
+                    logger.info(f"           原因: {reason[:60]}{'...' if len(reason) > 60 else ''}")
+
+            # 打印流动性供应区域
+            if "集中流动性供应区域" in structured_analysis:
+                liquidity = structured_analysis["集中流动性供应区域"]
+                logger.info("💰 集中流动性供应区域:")
+                logger.info(f"  最佳区间: {liquidity.get('最佳价格区间', 'N/A')}")
+                backup_zones = liquidity.get('备选区间', [])
+                if backup_zones:
+                    logger.info(f"  备选区间: {', '.join(backup_zones)}")
+                logger.info(f"  市场特征: {liquidity.get('市场特征', 'N/A')[:80]}{'...' if len(liquidity.get('市场特征', '')) > 80 else ''}")
+
+            # 打印做市策略要点
+            if "做市策略要点" in structured_analysis:
+                strategy = structured_analysis["做市策略要点"]
+                logger.info("📋 做市策略要点:")
+                logger.info(f"  主要机会: {strategy.get('主要机会', 'N/A')[:80]}{'...' if len(strategy.get('主要机会', '')) > 80 else ''}")
+                logger.info(f"  策略总结: {strategy.get('策略总结', 'N/A')[:100]}{'...' if len(strategy.get('策略总结', '')) > 100 else ''}")
+
+        else:
+            # 打印原始内容
+            raw_content = analysis_result.get("raw_content")
+            if raw_content:
+                logger.info("📋 统一AI分析内容:")
+                for line in raw_content.split("\n")[:8]:  # 限制前8行
+                    if line.strip():
+                        logger.info(f"   {line[:120]}{'...' if len(line) > 120 else ''}")
+
+        logger.info("=" * 70)
 
     def _log_depth_snapshot_analysis(self, structured_analysis: dict[str, Any]) -> None:
         """打印深度快照分析结果。
@@ -452,30 +673,22 @@ class EnhancedMarketAnalyzer:
         Returns:
             分析器状态字典
         """
-        return {
+        # 确定当前使用的分析模式
+        analysis_mode = "unified" if self.unified_deepseek_analyzer else "traditional" if (self.deepseek_orderbook_analyzer or self.deepseek_vp_analyzer) else "disabled"
+
+        status = {
+            "analysis_mode": analysis_mode,
             "depth_analysis": {
                 "price_aggregation": {
                     "enabled": True,
                     "precision": float(self.price_aggregator.precision),
                     "max_levels": self.price_aggregator.max_price_levels,
                 },
-                "deepseek_analysis": {
-                    "enabled": self.deepseek_orderbook_analyzer is not None,
-                    "model": self.deepseek_orderbook_analyzer.model
-                    if self.deepseek_orderbook_analyzer
-                    else None,
-                },
             },
             "volume_profile_analysis": {
                 "vp_analyzer": {
                     "enabled": True,
                     "precision": float(self.vp_analyzer.aggregation_precision),
-                },
-                "deepseek_analysis": {
-                    "enabled": self.deepseek_vp_analyzer is not None,
-                    "model": self.deepseek_vp_analyzer.model
-                    if self.deepseek_vp_analyzer
-                    else None,
                 },
             },
             "visualization": {
@@ -486,8 +699,41 @@ class EnhancedMarketAnalyzer:
             "trades_window_available": self.redis_store.get_trade_window_count() > 0,
         }
 
+        # 根据分析模式添加不同的AI分析状态
+        if analysis_mode == "unified":
+            status["unified_analysis"] = {
+                "enabled": True,
+                "model": self.unified_deepseek_analyzer.model,
+                "max_tokens": self.unified_deepseek_analyzer.max_tokens,
+                "timeout": self.unified_deepseek_analyzer.timeout,
+            }
+        elif analysis_mode == "traditional":
+            status["depth_analysis"]["deepseek_analysis"] = {
+                "enabled": self.deepseek_orderbook_analyzer is not None,
+                "model": self.deepseek_orderbook_analyzer.model
+                if self.deepseek_orderbook_analyzer
+                else None,
+            }
+            status["volume_profile_analysis"]["deepseek_analysis"] = {
+                "enabled": self.deepseek_vp_analyzer is not None,
+                "model": self.deepseek_vp_analyzer.model
+                if self.deepseek_vp_analyzer
+                else None,
+            }
+        else:
+            status["ai_analysis"] = {"enabled": False}
+
+        return status
+
     def close(self) -> None:
         """关闭分析器资源。"""
+        if self.unified_deepseek_analyzer:
+            try:
+                self.unified_deepseek_analyzer.close()
+                logger.info("Unified DeepSeek analyzer closed")
+            except Exception as e:
+                logger.error(f"Error closing unified DeepSeek analyzer: {e}")
+
         if self.deepseek_orderbook_analyzer:
             try:
                 self.deepseek_orderbook_analyzer.close()
