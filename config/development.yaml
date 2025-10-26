@@ -41,7 +41,7 @@ data_collector:
 analyzer:
   deepseek:
     enable: true
-    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"
+    api_key: "${DEEPSEEK_API_KEY}"  # 从环境变量获取API密钥
     base_url: "https://api.deepseek.com/v1"
     model: "deepseek-chat"
     max_tokens: 6000  # 增加token限制以支持统一分析
@@ -58,6 +58,21 @@ analyzer:
     enabled: true
     max_price_levels: 5000
   volume_profile_aggregation_precision: 10.0  # $10 precision for Volume Profile aggregation
+  trading_event_publisher:
+    enable: true  # 交易事件发布功能开关
+    redis:
+      host: "localhost"  # 外部Redis服务器地址
+      port: 6379  # Redis端口
+      db: 0  # Redis数据库
+      password: null  # Redis密码（可选）
+      channel: "hft_grid_strategy_params" # 发布Channel名称
+      timeout: 5  # 连接超时时间（秒）
+      max_retries: 3  # 最大重试次数
+    validation:
+      min_grid_delta: 0.1  # 最小价差
+      max_grid_delta: 100.0  # 最大价差
+      min_grid_quantity: 0.0001  # 最小挂单量
+      max_grid_quantity: 10.0  # 最大挂单量
   visualization:
     enabled: true
     price_aggregation_precision: 1.0  # $1 precision (kept for backward compatibility)

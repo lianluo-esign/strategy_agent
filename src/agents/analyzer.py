@@ -84,6 +84,7 @@ class AnalyzerAgent:
             ),
             deepseek_config=deepseek_config,
             visualizer=self.visualizer,
+            trading_event_publisher_config=settings.analyzer.trading_event_publisher,
         )
 
         logger.info(
@@ -174,7 +175,7 @@ class AnalyzerAgent:
         try:
             # 执行双重分析：静态深度快照 + 动态Volume Profile
             symbol = self.settings.binance.symbol
-            analysis_result = self.market_analyzer.perform_dual_analysis(symbol)
+            analysis_result = await self.market_analyzer.perform_dual_analysis(symbol)
 
             if analysis_result["status"] == "success":
                 logger.info(
@@ -342,7 +343,7 @@ class AnalyzerAgent:
         # 关闭增强型分析器资源
         if self.market_analyzer:
             try:
-                self.market_analyzer.close()
+                await self.market_analyzer.close()
                 logger.info("Enhanced market analyzer closed")
             except Exception as e:
                 logger.error(f"Error closing enhanced market analyzer: {e}")

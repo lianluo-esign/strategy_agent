@@ -15,6 +15,7 @@ from .deepseek_analyzer import (
 )
 from .deepseek_vp_analyzer import DeepSeekVPAnalyzer
 from .price_aggregator import PriceAggregator
+from .trading_event_publisher import TradingEventPublisher
 from .unified_deepseek_analyzer import UnifiedDeepSeekAnalyzer
 from .volume_profile_analyzer import VolumeProfileAnalyzer
 
@@ -39,6 +40,7 @@ class EnhancedMarketAnalyzer:
         vp_aggregation_precision: float = 10.0,
         deepseek_config: dict[str, Any] | None = None,
         visualizer: Any | None = None,
+        trading_event_publisher_config: Any | None = None,
     ):
         """初始化增强型市场分析器。
 
@@ -48,6 +50,7 @@ class EnhancedMarketAnalyzer:
             vp_aggregation_precision: Volume Profile聚合精度（例如：10.0表示$10精度）
             deepseek_config: DeepSeek配置字典
             visualizer: 可视化工具实例
+            trading_event_publisher_config: 交易事件发布器配置
         """
         self.redis_store = redis_store
         self.visualizer = visualizer
@@ -126,7 +129,21 @@ class EnhancedMarketAnalyzer:
         else:
             logger.info("DeepSeek LLM analysis is disabled")
 
-    def perform_dual_analysis(self, symbol: str = "BTCFDUSD") -> dict[str, Any]:
+        # 初始化交易事件发布器
+        self.trading_event_publisher = None
+        if trading_event_publisher_config and trading_event_publisher_config.enable:
+            try:
+                self.trading_event_publisher = TradingEventPublisher(
+                    config=trading_event_publisher_config
+                )
+                logger.info("Trading event publisher initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize trading event publisher: {e}")
+                self.trading_event_publisher = None
+        else:
+            logger.info("Trading event publisher is disabled")
+
+    async def perform_dual_analysis(self, symbol: str = "BTCFDUSD") -> dict[str, Any]:
         """执行双重分析：静态深度快照分析 + 动态Volume Profile分析。
 
         Args:
@@ -141,7 +158,7 @@ class EnhancedMarketAnalyzer:
             # 检查是否使用统一分析模式
             if self.unified_deepseek_analyzer:
                 logger.info("Using unified analysis mode")
-                return self._perform_unified_analysis(symbol)
+                return await self._perform_unified_analysis(symbol)
             else:
                 logger.info("Using traditional dual analysis mode")
                 return self._perform_tradual_dual_analysis(symbol)
@@ -150,7 +167,7 @@ class EnhancedMarketAnalyzer:
             logger.error(f"Enhanced dual analysis failed: {e}")
             return self._create_error_result(symbol, str(e))
 
-    def _perform_unified_analysis(self, symbol: str) -> dict[str, Any]:
+    async def _perform_unified_analysis(self, symbol: str) -> dict[str, Any]:
         """执行统一分析：单次AI请求处理深度快照和Volume Profile数据。
 
         Args:
@@ -187,6 +204,22 @@ class EnhancedMarketAnalyzer:
 
                     # 在info日志中打印统一分析结果
                     self._log_unified_analysis(unified_analysis)
+
+                    # 发布交易事件（如果启用且分析成功）
+                    if (self.trading_event_publisher and
+                        unified_analysis.get("status") == "success" and
+                        unified_analysis.get("raw_content")):
+                        try:
+                            logger.info("Processing trading event publication")
+                            success = await self.trading_event_publisher.process_ai_analysis_and_publish(
+                                unified_analysis["raw_content"]
+                            )
+                            if success:
+                                logger.info("Trading event published successfully")
+                            else:
+                                logger.warning("Trading event publication failed")
+                        except Exception as e:
+                            logger.error(f"Trading event publication error: {e}")
 
                 except Exception as e:
                     logger.error(f"Unified DeepSeek analysis failed: {e}")
@@ -725,7 +758,7 @@ class EnhancedMarketAnalyzer:
 
         return status
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """关闭分析器资源。"""
         if self.unified_deepseek_analyzer:
             try:
@@ -747,5 +780,12 @@ class EnhancedMarketAnalyzer:
                 logger.info("DeepSeek Volume Profile analyzer closed")
             except Exception as e:
                 logger.error(f"Error closing DeepSeek Volume Profile analyzer: {e}")
+
+        if self.trading_event_publisher:
+            try:
+                await self.trading_event_publisher.close()
+                logger.info("Trading event publisher closed")
+            except Exception as e:
+                logger.error(f"Error closing trading event publisher: {e}")
 
         logger.info("Enhanced market analyzer resources closed")

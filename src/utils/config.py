@@ -169,6 +169,71 @@ class VisualizationConfig(BaseModel):
     auto_cleanup: bool = True
 
 
+class TradingEventRedisConfig(BaseModel):
+    """Trading event Redis configuration."""
+
+    host: str = "localhost"
+    port: int = 6379
+    db: int = 0
+    password: str | None = None
+    channel: str = "hft_grid_strategy_params"
+    timeout: int = 5
+    max_retries: int = 3
+    # Connection pooling settings
+    max_connections: int = 20
+    retry_on_timeout: bool = True
+    socket_keepalive: bool = True
+    socket_keepalive_options: dict | None = None
+    health_check_interval: int = 30
+
+
+class TradingEventValidationConfig(BaseModel):
+    """Trading event validation configuration."""
+
+    min_grid_delta: float = 0.1
+    max_grid_delta: float = 100.0
+    min_grid_quantity: float = 0.0001
+    max_grid_quantity: float = 10.0
+
+    @field_validator("min_grid_delta")
+    @classmethod
+    def validate_min_grid_delta(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Minimum grid delta must be positive")
+        return v
+
+    @field_validator("max_grid_delta")
+    @classmethod
+    def validate_max_grid_delta(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Maximum grid delta must be positive")
+        return v
+
+    @field_validator("min_grid_quantity")
+    @classmethod
+    def validate_min_grid_quantity(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Minimum grid quantity must be positive")
+        return v
+
+    @field_validator("max_grid_quantity")
+    @classmethod
+    def validate_max_grid_quantity(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Maximum grid quantity must be positive")
+        return v
+
+
+class TradingEventPublisherConfig(BaseModel):
+    """Trading event publisher configuration."""
+
+    enable: bool = False
+    redis: TradingEventRedisConfig = Field(default_factory=TradingEventRedisConfig)
+    validation: TradingEventValidationConfig = Field(
+        default_factory=TradingEventValidationConfig
+    )
+
+
 class AnalyzerConfig(BaseModel):
     """Analyzer configuration."""
 
@@ -178,6 +243,9 @@ class AnalyzerConfig(BaseModel):
         default_factory=PriceAggregationConfig
     )
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
+    trading_event_publisher: TradingEventPublisherConfig = Field(
+        default_factory=TradingEventPublisherConfig
+    )
 
 
 class LoggingConfig(BaseModel):
