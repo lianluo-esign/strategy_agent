@@ -34,7 +34,7 @@ data_collector:
     # Removed window_size as depth_snapshot_5000 now uses single-key overwrite mechanism
   order_flow:
     websocket_url: "wss://stream.binance.com:9443/ws/btcfdusd@aggTrade"
-    window_size_minutes: 2880  # 48 hours
+    window_size_minutes: 7200 # 48 hours
     price_precision: 1.0  # $1 precision for aggregation
     aggregation_interval_seconds: 60
 
