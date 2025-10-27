@@ -147,7 +147,11 @@ class ResultValidator:
             for match in matches:
                 try:
                     # 修复常见的JSON格式问题
-                    cleaned_json = self._clean_json_string(match)
+                    import re
+                    cleaned_json = match.strip()
+                    # 移除可能的尾随逗号
+                    cleaned_json = re.sub(r',\s*}', '}', cleaned_json)
+                    cleaned_json = re.sub(r',\s*]', ']', cleaned_json)
                     json_data = json.loads(cleaned_json)
                     if isinstance(json_data, dict):
                         logger.info("Successfully extracted and cleaned JSON object")
