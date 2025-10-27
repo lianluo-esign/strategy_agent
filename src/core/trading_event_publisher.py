@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import redis.asyncio as redis
 from pydantic import BaseModel, Field, field_validator
 
-from ..utils.config import TradingEventPublisherConfig
+from utils.config import TradingEventPublisherConfig
 
 logger = logging.getLogger(__name__)
 

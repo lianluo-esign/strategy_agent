@@ -57,11 +57,10 @@ class SimplifiedAnalyzerAgent:
 
         # 初始化交易事件发布器（如果启用）
         trading_event_publisher = None
-        if settings.trading_event_publisher.enable:
+        if settings.analyzer.trading_event_publisher.enable:
             try:
                 trading_event_publisher = TradingEventPublisher(
-                    redis_store=self.redis_store,
-                    config=settings.trading_event_publisher
+                    config=settings.analyzer.trading_event_publisher
                 )
                 logger.info("✅ TradingEventPublisher initialized successfully")
             except Exception as e:
@@ -366,7 +365,7 @@ async def main() -> None:
             symbol = settings.binance.symbol
             analysis_result = await agent.market_analyzer.analyze_market(symbol)
             agent._log_analysis_summary(analysis_result)
-            await agent.close()
+            await agent._shutdown()
         else:
             # 持续运行模式
             await agent.start()
