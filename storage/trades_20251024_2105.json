@@ -1,0 +1,981 @@
+{
+  "timestamp": "2025-10-24T21:05:13.430825",
+  "price_levels": {
+    "111656": {
+      "price_level": 111656.0,
+      "buy_volume": 0.08432,
+      "sell_volume": 0.03047,
+      "total_volume": 0.11479,
+      "delta": 0.05385,
+      "trade_count": 15
+    },
+    "111663": {
+      "price_level": 111663.0,
+      "buy_volume": 0.07725,
+      "sell_volume": 0.00455,
+      "total_volume": 0.0818,
+      "delta": 0.0727,
+      "trade_count": 9
+    },
+    "111655": {
+      "price_level": 111655.0,
+      "buy_volume": 0.30335,
+      "sell_volume": 0.02949,
+      "total_volume": 0.33284,
+      "delta": 0.27386,
+      "trade_count": 25
+    },
+    "111658": {
+      "price_level": 111658.0,
+      "buy_volume": 0.13876,
+      "sell_volume": 0.14954,
+      "total_volume": 0.2883,
+      "delta": -0.01078,
+      "trade_count": 10
+    },
+    "111659": {
+      "price_level": 111659.0,
+      "buy_volume": 0.13676,
+      "sell_volume": 0.02976,
+      "total_volume": 0.16652,
+      "delta": 0.107,
+      "trade_count": 17
+    },
+    "111661": {
+      "price_level": 111661.0,
+      "buy_volume": 0.00329,
+      "sell_volume": 0.01833,
+      "total_volume": 0.02162,
+      "delta": -0.01504,
+      "trade_count": 7
+    },
+    "111664": {
+      "price_level": 111664.0,
+      "buy_volume": 0.04897,
+      "sell_volume": 0.07034,
+      "total_volume": 0.11931,
+      "delta": -0.02137,
+      "trade_count": 24
+    },
+    "111665": {
+      "price_level": 111665.0,
+      "buy_volume": 0.02232,
+      "sell_volume": 0.0036,
+      "total_volume": 0.02592,
+      "delta": 0.01872,
+      "trade_count": 6
+    },
+    "111662": {
+      "price_level": 111662.0,
+      "buy_volume": 0.00025,
+      "sell_volume": 0.01218,
+      "total_volume": 0.01243,
+      "delta": -0.01193,
+      "trade_count": 4
+    },
+    "111660": {
+      "price_level": 111660.0,
+      "buy_volume": 0.01502,
+      "sell_volume": 0.10125,
+      "total_volume": 0.11627,
+      "delta": -0.08623,
+      "trade_count": 24
+    },
+    "111654": {
+      "price_level": 111654.0,
+      "buy_volume": 0.05127,
+      "sell_volume": 0.01297,
+      "total_volume": 0.06424,
+      "delta": 0.0383,
+      "trade_count": 12
+    },
+    "111666": {
+      "price_level": 111666.0,
+      "buy_volume": 0.04457,
+      "sell_volume": 0.0,
+      "total_volume": 0.04457,
+      "delta": 0.04457,
+      "trade_count": 4
+    },
+    "111667": {
+      "price_level": 111667.0,
+      "buy_volume": 0.00029,
+      "sell_volume": 0.02808,
+      "total_volume": 0.02837,
+      "delta": -0.02779,
+      "trade_count": 5
+    },
+    "111668": {
+      "price_level": 111668.0,
+      "buy_volume": 0.02629,
+      "sell_volume": 0.0604,
+      "total_volume": 0.08669,
+      "delta": -0.03411,
+      "trade_count": 16
+    },
+    "111669": {
+      "price_level": 111669.0,
+      "buy_volume": 0.06505,
+      "sell_volume": 0.00809,
+      "total_volume": 0.07314,
+      "delta": 0.05696,
+      "trade_count": 9
+    },
+    "111670": {
+      "price_level": 111670.0,
+      "buy_volume": 0.05208,
+      "sell_volume": 0.01367,
+      "total_volume": 0.06575,
+      "delta": 0.03841,
+      "trade_count": 14
+    },
+    "111671": {
+      "price_level": 111671.0,
+      "buy_volume": 0.0349,
+      "sell_volume": 0.00597,
+      "total_volume": 0.04087,
+      "delta": 0.02893,
+      "trade_count": 9
+    },
+    "111672": {
+      "price_level": 111672.0,
+      "buy_volume": 0.03507,
+      "sell_volume": 0.15624,
+      "total_volume": 0.19131,
+      "delta": -0.12117,
+      "trade_count": 33
+    },
+    "111673": {
+      "price_level": 111673.0,
+      "buy_volume": 0.25261,
+      "sell_volume": 0.05748,
+      "total_volume": 0.31009,
+      "delta": 0.19513,
+      "trade_count": 26
+    },
+    "111674": {
+      "price_level": 111674.0,
+      "buy_volume": 0.00348,
+      "sell_volume": 0.03352,
+      "total_volume": 0.037,
+      "delta": -0.03004,
+      "trade_count": 16
+    },
+    "111675": {
+      "price_level": 111675.0,
+      "buy_volume": 0.00064,
+      "sell_volume": 0.19957,
+      "total_volume": 0.20021,
+      "delta": -0.19893,
+      "trade_count": 14
+    },
+    "111676": {
+      "price_level": 111676.0,
+      "buy_volume": 0.01482,
+      "sell_volume": 0.05066,
+      "total_volume": 0.06548,
+      "delta": -0.03584,
+      "trade_count": 17
+    },
+    "111677": {
+      "price_level": 111677.0,
+      "buy_volume": 0.05017,
+      "sell_volume": 0.09422,
+      "total_volume": 0.14439,
+      "delta": -0.04405,
+      "trade_count": 18
+    },
+    "111678": {
+      "price_level": 111678.0,
+      "buy_volume": 0.08744,
+      "sell_volume": 0.08672,
+      "total_volume": 0.17416,
+      "delta": 0.00072,
+      "trade_count": 14
+    },
+    "111679": {
+      "price_level": 111679.0,
+      "buy_volume": 0.09879,
+      "sell_volume": 0.13185,
+      "total_volume": 0.23064,
+      "delta": -0.03306,
+      "trade_count": 18
+    },
+    "111680": {
+      "price_level": 111680.0,
+      "buy_volume": 0.40841,
+      "sell_volume": 0.24738,
+      "total_volume": 0.65579,
+      "delta": 0.16103,
+      "trade_count": 14
+    },
+    "111681": {
+      "price_level": 111681.0,
+      "buy_volume": 0.07349,
+      "sell_volume": 0.02134,
+      "total_volume": 0.09483,
+      "delta": 0.05215,
+      "trade_count": 18
+    },
+    "111682": {
+      "price_level": 111682.0,
+      "buy_volume": 0.0046,
+      "sell_volume": 0.00146,
+      "total_volume": 0.00606,
+      "delta": 0.00314,
+      "trade_count": 12
+    },
+    "111684": {
+      "price_level": 111684.0,
+      "buy_volume": 0.52508,
+      "sell_volume": 0.0,
+      "total_volume": 0.52508,
+      "delta": 0.52508,
+      "trade_count": 18
+    },
+    "111685": {
+      "price_level": 111685.0,
+      "buy_volume": 0.00483,
+      "sell_volume": 0.00985,
+      "total_volume": 0.01468,
+      "delta": -0.00502,
+      "trade_count": 8
+    },
+    "111686": {
+      "price_level": 111686.0,
+      "buy_volume": 0.00537,
+      "sell_volume": 0.17593,
+      "total_volume": 0.1813,
+      "delta": -0.17056,
+      "trade_count": 10
+    },
+    "111683": {
+      "price_level": 111683.0,
+      "buy_volume": 0.05603,
+      "sell_volume": 0.02929,
+      "total_volume": 0.08532,
+      "delta": 0.02674,
+      "trade_count": 8
+    },
+    "111687": {
+      "price_level": 111687.0,
+      "buy_volume": 0.04122,
+      "sell_volume": 0.0,
+      "total_volume": 0.04122,
+      "delta": 0.04122,
+      "trade_count": 6
+    },
+    "111688": {
+      "price_level": 111688.0,
+      "buy_volume": 0.01279,
+      "sell_volume": 0.0,
+      "total_volume": 0.01279,
+      "delta": 0.01279,
+      "trade_count": 4
+    },
+    "111689": {
+      "price_level": 111689.0,
+      "buy_volume": 0.01956,
+      "sell_volume": 0.0,
+      "total_volume": 0.01956,
+      "delta": 0.01956,
+      "trade_count": 6
+    },
+    "111690": {
+      "price_level": 111690.0,
+      "buy_volume": 0.01395,
+      "sell_volume": 0.0,
+      "total_volume": 0.01395,
+      "delta": 0.01395,
+      "trade_count": 2
+    },
+    "111691": {
+      "price_level": 111691.0,
+      "buy_volume": 0.02093,
+      "sell_volume": 0.0,
+      "total_volume": 0.02093,
+      "delta": 0.02093,
+      "trade_count": 4
+    },
+    "111692": {
+      "price_level": 111692.0,
+      "buy_volume": 0.13876,
+      "sell_volume": 0.0,
+      "total_volume": 0.13876,
+      "delta": 0.13876,
+      "trade_count": 2
+    },
+    "111657": {
+      "price_level": 111657.0,
+      "buy_volume": 0.20145,
+      "sell_volume": 0.00179,
+      "total_volume": 0.20324,
+      "delta": 0.19966,
+      "trade_count": 3
+    },
+    "111653": {
+      "price_level": 111653.0,
+      "buy_volume": 0.24807,
+      "sell_volume": 5e-05,
+      "total_volume": 0.24812,
+      "delta": 0.24802,
+      "trade_count": 13
+    },
+    "111652": {
+      "price_level": 111652.0,
+      "buy_volume": 0.07313,
+      "sell_volume": 0.0678,
+      "total_volume": 0.14093,
+      "delta": 0.00533,
+      "trade_count": 21
+    },
+    "111651": {
+      "price_level": 111651.0,
+      "buy_volume": 0.19381,
+      "sell_volume": 0.0113,
+      "total_volume": 0.20511,
+      "delta": 0.18251,
+      "trade_count": 18
+    },
+    "111650": {
+      "price_level": 111650.0,
+      "buy_volume": 0.60987,
+      "sell_volume": 1.14259,
+      "total_volume": 1.75246,
+      "delta": -0.53272,
+      "trade_count": 44
+    },
+    "111646": {
+      "price_level": 111646.0,
+      "buy_volume": 0.09501,
+      "sell_volume": 0.34589,
+      "total_volume": 0.4409,
+      "delta": -0.25088,
+      "trade_count": 45
+    },
+    "111649": {
+      "price_level": 111649.0,
+      "buy_volume": 0.03842,
+      "sell_volume": 0.063,
+      "total_volume": 0.10142,
+      "delta": -0.02458,
+      "trade_count": 21
+    },
+    "111647": {
+      "price_level": 111647.0,
+      "buy_volume": 0.08857,
+      "sell_volume": 0.2395,
+      "total_volume": 0.32807,
+      "delta": -0.15093,
+      "trade_count": 44
+    },
+    "111645": {
+      "price_level": 111645.0,
+      "buy_volume": 0.19978,
+      "sell_volume": 0.14881,
+      "total_volume": 0.34859,
+      "delta": 0.05097,
+      "trade_count": 34
+    },
+    "111644": {
+      "price_level": 111644.0,
+      "buy_volume": 0.02261,
+      "sell_volume": 0.15577,
+      "total_volume": 0.17838,
+      "delta": -0.13316,
+      "trade_count": 34
+    },
+    "111642": {
+      "price_level": 111642.0,
+      "buy_volume": 0.00033,
+      "sell_volume": 0.0972,
+      "total_volume": 0.09753,
+      "delta": -0.09687,
+      "trade_count": 17
+    },
+    "111641": {
+      "price_level": 111641.0,
+      "buy_volume": 0.00448,
+      "sell_volume": 0.01776,
+      "total_volume": 0.02224,
+      "delta": -0.01328,
+      "trade_count": 5
+    },
+    "111640": {
+      "price_level": 111640.0,
+      "buy_volume": 0.26993,
+      "sell_volume": 0.34296,
+      "total_volume": 0.61289,
+      "delta": -0.07303,
+      "trade_count": 29
+    },
+    "111639": {
+      "price_level": 111639.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.05062,
+      "total_volume": 0.05062,
+      "delta": -0.05062,
+      "trade_count": 12
+    },
+    "111637": {
+      "price_level": 111637.0,
+      "buy_volume": 0.00025,
+      "sell_volume": 0.02397,
+      "total_volume": 0.02422,
+      "delta": -0.02372,
+      "trade_count": 7
+    },
+    "111636": {
+      "price_level": 111636.0,
+      "buy_volume": 0.23424,
+      "sell_volume": 0.19581,
+      "total_volume": 0.43005,
+      "delta": 0.03843,
+      "trade_count": 11
+    },
+    "111635": {
+      "price_level": 111635.0,
+      "buy_volume": 0.11516,
+      "sell_volume": 0.02658,
+      "total_volume": 0.14174,
+      "delta": 0.08858,
+      "trade_count": 15
+    },
+    "111634": {
+      "price_level": 111634.0,
+      "buy_volume": 0.06735,
+      "sell_volume": 0.03991,
+      "total_volume": 0.10726,
+      "delta": 0.02744,
+      "trade_count": 10
+    },
+    "111633": {
+      "price_level": 111633.0,
+      "buy_volume": 0.008,
+      "sell_volume": 0.20339,
+      "total_volume": 0.21139,
+      "delta": -0.19539,
+      "trade_count": 12
+    },
+    "111638": {
+      "price_level": 111638.0,
+      "buy_volume": 0.01379,
+      "sell_volume": 0.0,
+      "total_volume": 0.01379,
+      "delta": 0.01379,
+      "trade_count": 1
+    },
+    "111643": {
+      "price_level": 111643.0,
+      "buy_volume": 0.06763,
+      "sell_volume": 0.19992,
+      "total_volume": 0.26755,
+      "delta": -0.13229,
+      "trade_count": 20
+    },
+    "111648": {
+      "price_level": 111648.0,
+      "buy_volume": 0.0441,
+      "sell_volume": 0.16199,
+      "total_volume": 0.20609,
+      "delta": -0.11789,
+      "trade_count": 26
+    },
+    "111632": {
+      "price_level": 111632.0,
+      "buy_volume": 7e-05,
+      "sell_volume": 0.17953,
+      "total_volume": 0.1796,
+      "delta": -0.17946,
+      "trade_count": 2
+    },
+    "111630": {
+      "price_level": 111630.0,
+      "buy_volume": 0.24225,
+      "sell_volume": 0.14716,
+      "total_volume": 0.38941,
+      "delta": 0.09509,
+      "trade_count": 29
+    },
+    "111629": {
+      "price_level": 111629.0,
+      "buy_volume": 0.0126,
+      "sell_volume": 0.20274,
+      "total_volume": 0.21534,
+      "delta": -0.19014,
+      "trade_count": 9
+    },
+    "111628": {
+      "price_level": 111628.0,
+      "buy_volume": 0.15299,
+      "sell_volume": 0.05078,
+      "total_volume": 0.20377,
+      "delta": 0.10221,
+      "trade_count": 15
+    },
+    "111626": {
+      "price_level": 111626.0,
+      "buy_volume": 0.01233,
+      "sell_volume": 0.21546,
+      "total_volume": 0.22779,
+      "delta": -0.20313,
+      "trade_count": 14
+    },
+    "111625": {
+      "price_level": 111625.0,
+      "buy_volume": 0.09793,
+      "sell_volume": 0.15643,
+      "total_volume": 0.25436,
+      "delta": -0.0585,
+      "trade_count": 13
+    },
+    "111624": {
+      "price_level": 111624.0,
+      "buy_volume": 0.0937,
+      "sell_volume": 0.05908,
+      "total_volume": 0.15278,
+      "delta": 0.03462,
+      "trade_count": 10
+    },
+    "111622": {
+      "price_level": 111622.0,
+      "buy_volume": 0.39956,
+      "sell_volume": 0.37272,
+      "total_volume": 0.77228,
+      "delta": 0.02684,
+      "trade_count": 34
+    },
+    "111621": {
+      "price_level": 111621.0,
+      "buy_volume": 0.14596,
+      "sell_volume": 0.41947,
+      "total_volume": 0.56543,
+      "delta": -0.27351,
+      "trade_count": 38
+    },
+    "111620": {
+      "price_level": 111620.0,
+      "buy_volume": 0.19421,
+      "sell_volume": 1.09936,
+      "total_volume": 1.29357,
+      "delta": -0.90515,
+      "trade_count": 27
+    },
+    "111619": {
+      "price_level": 111619.0,
+      "buy_volume": 0.05977,
+      "sell_volume": 0.05516,
+      "total_volume": 0.11493,
+      "delta": 0.00461,
+      "trade_count": 23
+    },
+    "111618": {
+      "price_level": 111618.0,
+      "buy_volume": 0.02673,
+      "sell_volume": 0.054,
+      "total_volume": 0.08073,
+      "delta": -0.02727,
+      "trade_count": 29
+    },
+    "111617": {
+      "price_level": 111617.0,
+      "buy_volume": 0.06072,
+      "sell_volume": 0.03478,
+      "total_volume": 0.0955,
+      "delta": 0.02594,
+      "trade_count": 15
+    },
+    "111616": {
+      "price_level": 111616.0,
+      "buy_volume": 0.09549,
+      "sell_volume": 0.24136,
+      "total_volume": 0.33685,
+      "delta": -0.14587,
+      "trade_count": 22
+    },
+    "111615": {
+      "price_level": 111615.0,
+      "buy_volume": 0.01148,
+      "sell_volume": 0.07751,
+      "total_volume": 0.08899,
+      "delta": -0.06603,
+      "trade_count": 28
+    },
+    "111612": {
+      "price_level": 111612.0,
+      "buy_volume": 0.02328,
+      "sell_volume": 0.07654,
+      "total_volume": 0.09982,
+      "delta": -0.05326,
+      "trade_count": 14
+    },
+    "111611": {
+      "price_level": 111611.0,
+      "buy_volume": 0.08277,
+      "sell_volume": 0.05905,
+      "total_volume": 0.14182,
+      "delta": 0.02372,
+      "trade_count": 22
+    },
+    "111610": {
+      "price_level": 111610.0,
+      "buy_volume": 0.27229,
+      "sell_volume": 0.24789,
+      "total_volume": 0.52018,
+      "delta": 0.0244,
+      "trade_count": 19
+    },
+    "111609": {
+      "price_level": 111609.0,
+      "buy_volume": 0.019,
+      "sell_volume": 0.01337,
+      "total_volume": 0.03237,
+      "delta": 0.00563,
+      "trade_count": 8
+    },
+    "111607": {
+      "price_level": 111607.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.03059,
+      "total_volume": 0.03059,
+      "delta": -0.03059,
+      "trade_count": 8
+    },
+    "111606": {
+      "price_level": 111606.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.03692,
+      "total_volume": 0.03692,
+      "delta": -0.03692,
+      "trade_count": 8
+    },
+    "111605": {
+      "price_level": 111605.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.119,
+      "total_volume": 0.119,
+      "delta": -0.119,
+      "trade_count": 12
+    },
+    "111604": {
+      "price_level": 111604.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.0014,
+      "total_volume": 0.0014,
+      "delta": -0.0014,
+      "trade_count": 3
+    },
+    "111603": {
+      "price_level": 111603.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.02584,
+      "total_volume": 0.02584,
+      "delta": -0.02584,
+      "trade_count": 4
+    },
+    "111602": {
+      "price_level": 111602.0,
+      "buy_volume": 0.06024,
+      "sell_volume": 0.0003,
+      "total_volume": 0.06054,
+      "delta": 0.05994,
+      "trade_count": 7
+    },
+    "111608": {
+      "price_level": 111608.0,
+      "buy_volume": 0.0344,
+      "sell_volume": 0.00105,
+      "total_volume": 0.03545,
+      "delta": 0.03335,
+      "trade_count": 7
+    },
+    "111613": {
+      "price_level": 111613.0,
+      "buy_volume": 0.13084,
+      "sell_volume": 0.02234,
+      "total_volume": 0.15318,
+      "delta": 0.1085,
+      "trade_count": 25
+    },
+    "111623": {
+      "price_level": 111623.0,
+      "buy_volume": 0.04685,
+      "sell_volume": 0.03,
+      "total_volume": 0.07685,
+      "delta": 0.01685,
+      "trade_count": 8
+    },
+    "111627": {
+      "price_level": 111627.0,
+      "buy_volume": 0.17282,
+      "sell_volume": 0.04498,
+      "total_volume": 0.2178,
+      "delta": 0.12784,
+      "trade_count": 10
+    },
+    "111631": {
+      "price_level": 111631.0,
+      "buy_volume": 0.01237,
+      "sell_volume": 0.05302,
+      "total_volume": 0.06539,
+      "delta": -0.04065,
+      "trade_count": 8
+    },
+    "111614": {
+      "price_level": 111614.0,
+      "buy_volume": 6e-05,
+      "sell_volume": 0.01518,
+      "total_volume": 0.01524,
+      "delta": -0.01512,
+      "trade_count": 8
+    },
+    "111601": {
+      "price_level": 111601.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.001,
+      "total_volume": 0.001,
+      "delta": -0.001,
+      "trade_count": 1
+    },
+    "111600": {
+      "price_level": 111600.0,
+      "buy_volume": 0.01599,
+      "sell_volume": 0.29908,
+      "total_volume": 0.31507,
+      "delta": -0.28309,
+      "trade_count": 11
+    },
+    "111599": {
+      "price_level": 111599.0,
+      "buy_volume": 0.07783,
+      "sell_volume": 0.00041,
+      "total_volume": 0.07824,
+      "delta": 0.07742,
+      "trade_count": 10
+    },
+    "111598": {
+      "price_level": 111598.0,
+      "buy_volume": 0.02183,
+      "sell_volume": 0.0002,
+      "total_volume": 0.02203,
+      "delta": 0.02163,
+      "trade_count": 5
+    },
+    "111597": {
+      "price_level": 111597.0,
+      "buy_volume": 0.02322,
+      "sell_volume": 0.05423,
+      "total_volume": 0.07745,
+      "delta": -0.03101,
+      "trade_count": 6
+    },
+    "111596": {
+      "price_level": 111596.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00844,
+      "total_volume": 0.00844,
+      "delta": -0.00844,
+      "trade_count": 7
+    },
+    "111593": {
+      "price_level": 111593.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.08169,
+      "total_volume": 0.08169,
+      "delta": -0.08169,
+      "trade_count": 3
+    },
+    "111592": {
+      "price_level": 111592.0,
+      "buy_volume": 0.00084,
+      "sell_volume": 0.06677,
+      "total_volume": 0.06761,
+      "delta": -0.06593,
+      "trade_count": 5
+    },
+    "111590": {
+      "price_level": 111590.0,
+      "buy_volume": 0.09077,
+      "sell_volume": 0.02096,
+      "total_volume": 0.11173,
+      "delta": 0.06981,
+      "trade_count": 10
+    },
+    "111589": {
+      "price_level": 111589.0,
+      "buy_volume": 0.12129,
+      "sell_volume": 0.04613,
+      "total_volume": 0.16742,
+      "delta": 0.07516,
+      "trade_count": 10
+    },
+    "111588": {
+      "price_level": 111588.0,
+      "buy_volume": 0.14549,
+      "sell_volume": 0.00342,
+      "total_volume": 0.14891,
+      "delta": 0.14207,
+      "trade_count": 15
+    },
+    "111595": {
+      "price_level": 111595.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.0002,
+      "total_volume": 0.0002,
+      "delta": -0.0002,
+      "trade_count": 1
+    },
+    "111586": {
+      "price_level": 111586.0,
+      "buy_volume": 0.06633,
+      "sell_volume": 0.0303,
+      "total_volume": 0.09663,
+      "delta": 0.03603,
+      "trade_count": 16
+    },
+    "111594": {
+      "price_level": 111594.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00224,
+      "total_volume": 0.00224,
+      "delta": -0.00224,
+      "trade_count": 1
+    },
+    "111585": {
+      "price_level": 111585.0,
+      "buy_volume": 0.00488,
+      "sell_volume": 0.0783,
+      "total_volume": 0.08318,
+      "delta": -0.07342,
+      "trade_count": 14
+    },
+    "111583": {
+      "price_level": 111583.0,
+      "buy_volume": 0.23131,
+      "sell_volume": 0.21784,
+      "total_volume": 0.44915,
+      "delta": 0.01347,
+      "trade_count": 29
+    },
+    "111582": {
+      "price_level": 111582.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.04585,
+      "total_volume": 0.04585,
+      "delta": -0.04585,
+      "trade_count": 4
+    },
+    "111587": {
+      "price_level": 111587.0,
+      "buy_volume": 0.09389,
+      "sell_volume": 0.01693,
+      "total_volume": 0.11082,
+      "delta": 0.07696,
+      "trade_count": 12
+    },
+    "111591": {
+      "price_level": 111591.0,
+      "buy_volume": 0.03705,
+      "sell_volume": 0.0,
+      "total_volume": 0.03705,
+      "delta": 0.03705,
+      "trade_count": 2
+    },
+    "111584": {
+      "price_level": 111584.0,
+      "buy_volume": 0.00032,
+      "sell_volume": 0.12814,
+      "total_volume": 0.12846,
+      "delta": -0.12782,
+      "trade_count": 13
+    },
+    "111581": {
+      "price_level": 111581.0,
+      "buy_volume": 0.11352,
+      "sell_volume": 0.08999,
+      "total_volume": 0.20351,
+      "delta": 0.02353,
+      "trade_count": 11
+    },
+    "111580": {
+      "price_level": 111580.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.01807,
+      "total_volume": 0.01807,
+      "delta": -0.01807,
+      "trade_count": 3
+    },
+    "111578": {
+      "price_level": 111578.0,
+      "buy_volume": 0.0011,
+      "sell_volume": 0.00056,
+      "total_volume": 0.00166,
+      "delta": 0.00054,
+      "trade_count": 8
+    },
+    "111577": {
+      "price_level": 111577.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00139,
+      "total_volume": 0.00139,
+      "delta": -0.00139,
+      "trade_count": 7
+    },
+    "111575": {
+      "price_level": 111575.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00095,
+      "total_volume": 0.00095,
+      "delta": -0.00095,
+      "trade_count": 3
+    },
+    "111574": {
+      "price_level": 111574.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.04122,
+      "total_volume": 0.04122,
+      "delta": -0.04122,
+      "trade_count": 7
+    },
+    "111573": {
+      "price_level": 111573.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00505,
+      "total_volume": 0.00505,
+      "delta": -0.00505,
+      "trade_count": 3
+    },
+    "111571": {
+      "price_level": 111571.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.05401,
+      "total_volume": 0.05401,
+      "delta": -0.05401,
+      "trade_count": 6
+    },
+    "111576": {
+      "price_level": 111576.0,
+      "buy_volume": 0.0495,
+      "sell_volume": 0.0002,
+      "total_volume": 0.0497,
+      "delta": 0.0493,
+      "trade_count": 2
+    },
+    "111570": {
+      "price_level": 111570.0,
+      "buy_volume": 0.0,
+      "sell_volume": 0.00072,
+      "total_volume": 0.00072,
+      "delta": -0.00072,
+      "trade_count": 1
+    },
+    "111579": {
+      "price_level": 111579.0,
+      "buy_volume": 0.01247,
+      "sell_volume": 0.0143,
+      "total_volume": 0.02677,
+      "delta": -0.00183,
+      "trade_count": 4
+    }
+  }
+}
