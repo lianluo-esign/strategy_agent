@@ -205,8 +205,8 @@ class UnifiedDeepSeekAnalyzer:
 ```
 
 **参数说明**：
-- grid_delta: 交易价差，范围0.1-100.0，基于支撑阻力位间距和市场波动性确定
-- grid_quantity: 挂单量，范围0.0001-10.0，基于流动性和风险评估确定
+- grid_delta: 交易价差，范围1.0-50.0，基于支撑阻力位间距和市场波动性确定
+- grid_quantity: 挂单量，范围0.0001-0.02，基于流动性和风险评估确定
 - active_side: 交易方向，只能是"Buy"或"Sell"，基于市场趋势分析确定
 
 **重要**：
@@ -321,8 +321,8 @@ class UnifiedDeepSeekAnalyzer:
 }}
 
 参数范围：
-- grid_delta: 0.1-100.0 (基于支撑阻力位间距)
-- grid_quantity: 0.0001-10.0 (基于流动性水平)
+- grid_delta: 1.0-50.0 (基于支撑阻力位间距)
+- grid_quantity: 0.0001-0.02 (基于流动性水平)
 - active_side: "Buy"或"Sell" (基于市场趋势)"""
 
         return prompt
