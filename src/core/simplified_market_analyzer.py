@@ -8,10 +8,11 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .price_aggregator import PriceAggregator
 from .result_validator import result_validator
+from .trading_event_publisher import TradingEventPublisher
 from .unified_deepseek_analyzer import UnifiedDeepSeekAnalyzer
 from .volume_profile_analyzer import VolumeProfileAnalyzer
 
@@ -30,9 +31,10 @@ class SimplifiedMarketAnalyzer:
     def __init__(
         self,
         redis_store: Any,
-        deepseek_config: Dict[str, Any],
+        deepseek_config: dict[str, Any],
         price_aggregation_precision: float = 1.0,
         vp_aggregation_precision: float = 10.0,
+        trading_event_publisher: TradingEventPublisher | None = None,
     ):
         """初始化简化市场分析器。
 
@@ -41,6 +43,7 @@ class SimplifiedMarketAnalyzer:
             deepseek_config: DeepSeek配置字典
             price_aggregation_precision: 深度快照价格聚合精度
             vp_aggregation_precision: Volume Profile聚合精度
+            trading_event_publisher: 交易事件发布器实例（可选）
         """
         logger.info("Initializing SimplifiedMarketAnalyzer")
 
@@ -68,11 +71,17 @@ class SimplifiedMarketAnalyzer:
             max_retries=deepseek_config.get("max_retries", 3),
         )
 
+        # 存储交易事件发布器实例
+        self.trading_event_publisher = trading_event_publisher
+
+        # 初始化JSON模板（优化性能）
+        self._json_template = '{{"grid_delta": {}, "grid_quantity": {}, "active_side": "{}"}}'
+
         logger.info("SimplifiedMarketAnalyzer initialized successfully")
 
     async def analyze_market(
         self, symbol: str = "BTCFDUSD"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """执行完整的市场分析流程。
 
         Args:
@@ -125,6 +134,17 @@ class SimplifiedMarketAnalyzer:
                 }
 
                 logger.info(f"Simplified market analysis completed successfully: {trading_params}")
+
+                # 发布交易参数到Redis（可选，不影响主流程）
+                if self.trading_event_publisher:
+                    try:
+                        await self._publish_trading_params(trading_params, symbol)
+                    except Exception as publish_error:
+                        logger.error(f"❌ Failed to publish trading parameters: {publish_error}")
+                        # 发布失败不影响主分析结果
+                else:
+                    logger.debug("TradingEventPublisher not configured, skipping Redis publish")
+
                 return result
 
             except Exception as validation_error:
@@ -137,7 +157,7 @@ class SimplifiedMarketAnalyzer:
 
     async def _read_and_aggregate_market_data(
         self, symbol: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """从Redis读取并聚合市场数据。
 
         Args:
@@ -206,7 +226,7 @@ class SimplifiedMarketAnalyzer:
             logger.error(f"Failed to read and aggregate market data: {e}")
             return {"status": "error", "error": str(e)}
 
-    def _create_error_result(self, symbol: str, error_message: str) -> Dict[str, Any]:
+    def _create_error_result(self, symbol: str, error_message: str) -> dict[str, Any]:
         """创建错误分析结果。
 
         Args:
@@ -225,7 +245,45 @@ class SimplifiedMarketAnalyzer:
             "trading_params": None,
         }
 
-    def get_status(self) -> Dict[str, Any]:
+    async def _publish_trading_params(self, trading_params: dict[str, Any], symbol: str) -> bool:
+        """发布交易参数到Redis channel。
+
+        Args:
+            trading_params: 交易参数字典
+            symbol: 交易符号
+
+        Returns:
+            发布是否成功
+        """
+        if not self.trading_event_publisher:
+            logger.debug("TradingEventPublisher not configured, skipping publish")
+            return False
+
+        try:
+            logger.info(f"🚀 Publishing trading parameters to Redis: {trading_params}")
+
+            # 使用预编译的JSON模板（优化性能）
+            ai_response_text = self._json_template.format(
+                trading_params["grid_delta"],
+                trading_params["grid_quantity"],
+                trading_params["active_side"]
+            )
+
+            # 使用TradingEventPublisher发布到Redis
+            publish_success = await self.trading_event_publisher.process_ai_analysis_and_publish(ai_response_text)
+
+            if publish_success:
+                logger.info(f"✅ Successfully published trading parameters for {symbol}")
+                return True
+            else:
+                logger.warning(f"❌ Failed to publish trading parameters for {symbol}")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Error publishing trading parameters for {symbol}: {e}")
+            return False
+
+    def get_status(self) -> dict[str, Any]:
         """获取分析器状态。
 
         Returns:
@@ -251,6 +309,10 @@ class SimplifiedMarketAnalyzer:
                 "connected": self.redis_store.test_connection(),
                 "depth_snapshot_available": self.redis_store.depth_snapshot_exists(),
                 "trades_window_available": self.redis_store.get_trade_window_count() > 0,
+            },
+            "trading_event_publisher": {
+                "configured": self.trading_event_publisher is not None,
+                "enabled": self.trading_event_publisher is not None,
             }
         }
 
@@ -260,7 +322,16 @@ class SimplifiedMarketAnalyzer:
             if self.unified_analyzer:
                 self.unified_analyzer.close()
                 logger.info("Unified DeepSeek analyzer closed")
+
+            # 关闭TradingEventPublisher资源
+            if self.trading_event_publisher:
+                try:
+                    await self.trading_event_publisher.close()
+                    logger.info("TradingEventPublisher closed")
+                except Exception as e:
+                    logger.error(f"Error closing TradingEventPublisher: {e}")
+
         except Exception as e:
-            logger.error(f"Error closing unified analyzer: {e}")
+            logger.error(f"Error closing analyzer: {e}")
 
         logger.info("SimplifiedMarketAnalyzer closed")

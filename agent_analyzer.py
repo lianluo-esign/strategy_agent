@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from core.redis_client import RedisDataStore
 from core.simplified_market_analyzer import SimplifiedMarketAnalyzer
+from core.trading_event_publisher import TradingEventPublisher
 from utils.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,19 @@ class SimplifiedAnalyzerAgent:
         # 初始化DeepSeek配置
         deepseek_config = self._prepare_deepseek_config(settings)
 
+        # 初始化交易事件发布器（如果启用）
+        trading_event_publisher = None
+        if settings.trading_event_publisher.enable:
+            try:
+                trading_event_publisher = TradingEventPublisher(
+                    redis_store=self.redis_store,
+                    config=settings.trading_event_publisher
+                )
+                logger.info("✅ TradingEventPublisher initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize TradingEventPublisher: {e}")
+                # 继续运行，但不启用发布功能
+
         # 初始化简化市场分析器
         self.market_analyzer = SimplifiedMarketAnalyzer(
             redis_store=self.redis_store,
@@ -64,6 +78,7 @@ class SimplifiedAnalyzerAgent:
             vp_aggregation_precision=getattr(
                 settings.analyzer, "volume_profile_aggregation_precision", 10.0
             ),
+            trading_event_publisher=trading_event_publisher,
         )
 
         logger.info("Simplified analyzer agent initialized with 3-step analysis flow")

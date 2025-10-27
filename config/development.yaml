@@ -59,7 +59,7 @@ analyzer:
     max_price_levels: 5000
   volume_profile_aggregation_precision: 10.0  # $10 precision for Volume Profile aggregation
   trading_event_publisher:
-    enable: false  # 交易事件发布功能开关
+    enable: true  # 交易事件发布功能开关
     redis:
       host: "localhost"  # 外部Redis服务器地址
       port: 6379  # Redis端口
