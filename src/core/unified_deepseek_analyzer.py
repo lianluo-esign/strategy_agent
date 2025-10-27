@@ -184,43 +184,36 @@ class UnifiedDeepSeekAnalyzer:
 
     def _get_unified_analysis_system_prompt(self) -> str:
         """获取统一分析的系统提示词。"""
-        return """你是一个专业的加密货币市场分析师和交易策略专家，专门为BTC-FDUSD高频做市策略提供支撑阻力位分析和交易指导。
+        return """你是一个专业的加密货币市场分析师，专门为BTC-FDUSD高频做市策略提供市场分析。
 
-你的核心任务是综合分析静态订单簿深度数据和动态交易流数据，为现货高频做市策略提供：
+你的核心任务是分析静态订单簿深度数据和动态交易流数据，生成具体的交易参数。
 
-1. **短期支撑位识别**：适合入场的价格位置
-2. **短期阻力位识别**：适合退出的价格位置
-3. **集中流动性供应区域**：最优的做市布局区间
-4. **交易指导事件生成**：具体的交易参数和方向建议
-
-**分析原则**：
-- 结合静态深度（订单簿）和动态数据（成交量分布）进行综合判断
-- 重点关注短期价格行为和流动性特征
-- 识别高概率的支撑阻力位，为做市策略提供入场和退出信号
-- 评估流动性集中区域，优化资金部署效率
-- 基于分析结果生成具体的交易执行参数
-
-**数据类型理解**：
-1. **深度快照数据**：反映当前市场的挂单意愿和潜在支撑阻力
-2. **Volume Profile数据**：反映24小时内实际成交的价格分布和市场共识
-3. **综合分析**：结合两种数据识别更可靠的支撑阻力位
+**分析任务**：
+1. 分析订单簿深度数据和Volume Profile数据
+2. 识别市场支撑阻力位和流动性特征
+3. 基于市场分析生成具体的交易参数
 
 **输出要求**：
-- 提供具体的入场和退出价格建议
-- 识别适合集中流动性供应的区域
-- 评估每个价格水平的可靠性
-- 生成具体的交易指导事件（JSON格式）
-- 避免模糊表述，提供可操作的分析结果
+你必须且只能返回标准的三字段JSON格式，不得包含任何其他解释、分析或说明：
 
-**交易指导事件格式**：
-基于市场分析，生成具体的交易参数：
-- grid_delta: 交易价差（基于支撑阻力位分析）
-- grid_quantity: 挂单量（基于流动性和风险评估）
-- active_side: 交易方向（Buy/Sell，基于市场趋势分析）
+```json
+{
+    "grid_delta": 2.0,
+    "grid_quantity": 0.001,
+    "active_side": "Buy"
+}
+```
 
-**重要提醒**：
-这是为高频做市策略提供的市场结构分析和交易指导，专注于识别短期交易机会、流动性部署策略和具体交易执行参数。
-生成的交易指导事件将直接用于自动化交易执行。
+**参数说明**：
+- grid_delta: 交易价差，范围0.1-100.0，基于支撑阻力位间距和市场波动性确定
+- grid_quantity: 挂单量，范围0.0001-10.0，基于流动性和风险评估确定
+- active_side: 交易方向，只能是"Buy"或"Sell"，基于市场趋势分析确定
+
+**重要**：
+1. 只返回上述三字段的JSON，不要包含任何其他内容
+2. 不要添加解释、分析过程或其他文字说明
+3. 确保所有参数都在指定范围内
+4. 确保JSON格式完全正确
 """
 
     def _create_unified_analysis_prompt(
@@ -296,117 +289,41 @@ class UnifiedDeepSeekAnalyzer:
         value_area_high = poc_analysis.get("value_area_high", 0)
         value_area_low = poc_analysis.get("value_area_low", 0)
 
-        prompt = f"""请为{symbol}高频做市策略进行综合市场分析：
+        prompt = f"""分析{symbol}市场数据并生成交易参数：
 
-**市场概况**：
-- 买盘总量：{total_bid_volume:.2f}
-- 卖盘总量：{total_ask_volume:.2f}
+**市场数据**：
 - 最优买价：${best_bid:,.2f}
 - 最优卖价：${best_ask:,.2f}
 - 买卖价差：${spread:,.2f}
-- 24小时总成交量：{total_volume:.2f}
+- 买盘总量：{total_bid_volume:.2f}
+- 卖盘总量：{total_ask_volume:.2f}
+- 24小时成交量：{total_volume:.2f}
 
-**深度快照数据（静态订单簿）**：
-{json.dumps(order_book_data, ensure_ascii=False, indent=2)}
+**订单簿前5档**：
+{json.dumps(order_book_data, ensure_ascii=False, indent=2)[:500]}
 
-**Volume Profile数据（动态成交分布）**：
-- POC点价格：${float(poc_price):,.2f}
-- POC点成交量：{poc_volume:.2f}
+**Volume Profile关键数据**：
+- POC价格：${float(poc_price):,.2f}
+- POC成交量：{poc_volume:.2f}
 - 价值区间：${float(value_area_low):,.2f} - ${float(value_area_high):,.2f}
 
-**顶级成交量价格水平**：
-{json.dumps(vp_levels_data, ensure_ascii=False, indent=2)}
+**前5大成交量价位**：
+{json.dumps(vp_levels_data[:5], ensure_ascii=False, indent=2)}
 
-**分析任务**：
-请基于以上综合数据，为高频做市策略提供以下分析：
+**分析要求**：
+基于以上数据，分析市场结构和流动性分布，生成高频做市交易参数。
 
-1. **短期支撑位分析（入场机会）**：
-   - 识别最强的3个支撑位价格
-   - 评估每个支撑位的可靠性（0-100分）
-   - 分析支撑位形成的原因（订单簿支撑/成交量共识）
-   - 推荐最佳的入场价格区间
-
-2. **短期阻力位分析（退出目标）**：
-   - 识别最强的3个阻力位价格
-   - 评估每个阻力位的可靠性（0-100分）
-   - 分析阻力位形成的原因（订单簿阻力/历史成交压力）
-   - 推荐最佳的退出价格区间
-
-3. **集中流动性供应区域**：
-   - 识别最适合部署集中流动性的价格区间
-   - 分析该区域的市场特征和优势
-   - 评估流动性的安全性和收益潜力
-   - 提供具体的流动性部署建议
-
-4. **做市策略要点**：
-   - 当前市场环境下做市的主要机会
-   - 需要重点关注的风险点
-   - 最优的仓位管理建议
-   - 入场和退出的时机把握
-
-5. **交易指导事件生成**：
-   - 基于以上分析，生成具体的交易执行参数
-   - 确定最优的交易方向（Buy/Sell）
-   - 计算合适的交易价差（基于支撑阻力位分析）
-   - 确定安全的挂单量（基于流动性和风险评估）
-   - 提供明确的交易执行建议
-
-**输出格式要求**：
-请严格按照以下JSON格式输出分析结果：
+请直接返回标准的JSON格式：
 {{
-  "短期支撑位": [
-    {{
-      "价格": "具体支撑价格",
-      "可靠性评分": "0-100分",
-      "形成原因": "订单簿支撑/成交量共识/综合因素",
-      "推荐入场区间": "建议的入场价格范围",
-      "特征描述": "该支撑位的详细特征"
-    }}
-  ],
-  "短期阻力位": [
-    {{
-      "价格": "具体阻力价格",
-      "可靠性评分": "0-100分",
-      "形成原因": "订单簿阻力/历史成交压力/综合因素",
-      "推荐退出区间": "建议的退出价格范围",
-      "特征描述": "该阻力位的详细特征"
-    }}
-  ],
-  "集中流动性供应区域": {{
-    "最佳价格区间": "推荐的主要流动性部署区间",
-    "备选区间": ["备选的价格区间1", "备选的价格区间2"],
-    "市场特征": "该区域的市场特征和优势",
-    "安全性评估": "流动性安全性分析",
-    "收益潜力": "预期收益潜力评估"
-  }},
-  "做市策略要点": {{
-    "主要机会": "当前市场环境下的主要做市机会",
-    "风险控制": "需要重点关注的风险点",
-    "仓位管理": "最优的仓位管理建议",
-    "时机把握": "入场和退出的时机建议",
-    "策略总结": "简洁的策略总结"
-  }}
+    "grid_delta": 数值,
+    "grid_quantity": 数值,
+    "active_side": "Buy"或"Sell"
 }}
 
-```json
-{{
-  "grid_delta": 2.0,
-  "grid_quantity": 0.001,
-  "active_side": "Buy"
-}}
-```
-
-**交易指导事件说明**：
-- grid_delta: 基于支撑阻力位分析确定的最优交易价差（建议范围：0.1-100.0）
-- grid_quantity: 基于流动性和风险评估确定的安全挂单量（建议范围：0.0001-10.0）
-- active_side: 基于市场趋势分析确定的交易方向（"Buy"或"Sell"）
-
-**生成交易指导事件的原则**：
-1. **grid_delta决策**：根据识别的支撑阻力位间距和市场波动性确定
-2. **grid_quantity决策**：考虑当前流动性水平和风险控制要求
-3. **active_side决策**：基于市场趋势、买卖压力和支撑阻力位分析
-
-请确保分析结果具体、可操作，直接服务于高频做市策略的决策需求和自动化交易执行。"""
+参数范围：
+- grid_delta: 0.1-100.0 (基于支撑阻力位间距)
+- grid_quantity: 0.0001-10.0 (基于流动性水平)
+- active_side: "Buy"或"Sell" (基于市场趋势)"""
 
         return prompt
 
@@ -497,41 +414,44 @@ class UnifiedDeepSeekAnalyzer:
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("Empty or invalid content in response")
 
-            # 尝试从响应中提取JSON
-            json_start = content.find("{")
-            json_end = content.rfind("}") + 1
+            # 使用结果验证器提取和验证交易参数
+            from .result_validator import result_validator
 
-            if json_start != -1 and json_end > json_start and json_end <= len(content):
-                json_str = content[json_start:json_end]
-                try:
-                    analysis_json = json.loads(json_str)
-                    # 验证解析后的JSON包含必要字段
-                    if not isinstance(analysis_json, dict):
-                        raise ValueError("Parsed JSON is not a dictionary")
+            try:
+                # 创建临时分析结果用于验证
+                temp_analysis_result = {
+                    "status": "success",
+                    "raw_content": content,
+                    "symbol": symbol
+                }
 
-                    return {
-                        "symbol": symbol,
-                        "analysis_type": "unified_market_analysis",
-                        "raw_content": content,
-                        "structured_analysis": analysis_json,
-                        "status": "success",
-                        "timestamp": None,  # 将由调用者设置
-                    }
-                except json.JSONDecodeError as e:
-                    logger.warning(
-                        f"Failed to parse JSON from unified analysis response: {e}. Using raw content."
-                    )
+                # 验证并提取交易参数
+                trading_params = result_validator.validate_and_extract_trading_params(temp_analysis_result)
 
-            # 回退：返回原始内容
-            logger.info("Using raw content as structured analysis parsing failed")
-            return {
-                "symbol": symbol,
-                "analysis_type": "unified_market_analysis",
-                "raw_content": content,
-                "structured_analysis": None,
-                "status": "success",
-                "timestamp": None,  # 将由调用者设置
-            }
+                logger.info(f"Successfully extracted trading parameters: {trading_params}")
+
+                return {
+                    "symbol": symbol,
+                    "analysis_type": "unified_market_analysis",
+                    "raw_content": content,
+                    "trading_params": trading_params,
+                    "structured_analysis": trading_params,  # 保持向后兼容
+                    "status": "success",
+                    "timestamp": None,  # 将由调用者设置
+                }
+
+            except Exception as validation_error:
+                logger.warning(f"Failed to validate trading parameters: {validation_error}")
+                # 返回原始内容但标记为验证失败
+                return {
+                    "symbol": symbol,
+                    "analysis_type": "unified_market_analysis",
+                    "raw_content": content,
+                    "structured_analysis": None,
+                    "validation_error": str(validation_error),
+                    "status": "success",  # API调用成功，但验证失败
+                    "timestamp": None,
+                }
 
         except (KeyError, IndexError, TypeError, ValueError) as e:
             logger.error(f"Failed to parse unified analysis response due to invalid structure: {e}")
