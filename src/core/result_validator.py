@@ -29,10 +29,10 @@ class ResultValidator:
     """
 
     # 参数范围定义
-    GRID_DELTA_MIN = 0.1
-    GRID_DELTA_MAX = 100.0
+    GRID_DELTA_MIN = 1.0
+    GRID_DELTA_MAX = 50.0
     GRID_QUANTITY_MIN = 0.0001
-    GRID_QUANTITY_MAX = 10.0
+    GRID_QUANTITY_MAX = 0.02
     ACTIVE_SIDES = ["Buy", "Sell"]
 
     # 预编译正则表达式模式以提高性能

@@ -374,7 +374,7 @@ if __name__ == "__main__":
     print("   1. Initialize components")
     print("   2. Read and aggregate Redis data")
     print("   3. Send to DeepSeek for analysis")
-    print("📤 Expected Output: {\"grid_delta\": 2.0, \"grid_quantity\": 0.001, \"active_side\": \"Buy\"}")
+    print("📤 Expected Output: {\"grid_delta\": 2.0, \"grid_quantity\": 0.001, \"active_side\": \"Buy\"}  # delta: 1.0-50.0, quantity: 0.0001-0.02")
     print("=" * 60)
 
     asyncio.run(main())

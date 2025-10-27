@@ -12,8 +12,8 @@
 ### 标准输出格式
 ```json
 {
-  "grid_delta": 2.0,      // 范围: 0.1-100.0
-  "grid_quantity": 0.001, // 范围: 0.0001-10.0
+  "grid_delta": 2.0,      // 范围: 1.0-50.0
+  "grid_quantity": 0.001, // 范围: 0.0001-0.02
   "active_side": "Buy"    // 选项: "Buy" 或 "Sell"
 }
 ```
