@@ -51,7 +51,9 @@ class OptimizedAnalyzerAgent:
         self.redis_store = RedisDataStore(
             host=settings.redis.host,
             port=settings.redis.port,
-            db=settings.redis.db
+            db=settings.redis.db,
+            storage_dir=settings.redis.storage_dir,
+            max_storage_files=settings.redis.max_storage_files
         )
 
         # 准备Deepseek配置
@@ -173,7 +175,7 @@ class OptimizedAnalyzerAgent:
 
     async def _analysis_loop(self) -> None:
         """主分析循环。"""
-        interval = getattr(self.settings.analyzer.analysis, "interval_seconds", 300)
+        interval = self.settings.analyzer.analysis.interval_seconds
 
         logger.info(f"🔄 开始分析循环: {self.symbol} (间隔: {interval}s)")
 
