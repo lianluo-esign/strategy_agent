@@ -1,0 +1,100 @@
+# 量价结合策略配置文件 (15分钟窗口)
+# 基于支撑阻力位和成交量确认的稳定交易策略
+
+strategy:
+  name: "volume_price_15min"
+  description: "量价结合策略 - 15分钟窗口，支撑阻力位+成交量确认"
+  version: "1.0.0"
+  symbol: "BTCFDUSD"
+
+# 分析参数
+analysis:
+  window_minutes: 15              # 分析窗口：15分钟
+  analysis_interval_seconds: 60    # 分析间隔：60秒
+  analysis_delay_seconds: 5        # 分析延迟：5秒（等待数据写入）
+
+# 支撑阻力位参数
+support_resistance:
+  min_touches: 2                   # 最少触及次数
+  price_tolerance_percent: 0.1     # 价格容差百分比：0.1%
+  volume_threshold: 0.3            # 成交量阈值：30%
+
+# 成交量确认参数
+volume_confirmation:
+  min_volume_ratio: 1.5            # 最小成交量放大倍数：1.5倍
+  volume_spike_threshold: 2.0      # 成交量激增阈值：2.0倍
+  volume_trend_threshold: 0.3      # 成交量趋势阈值：30%
+
+# 价格位置参数
+price_position:
+  max_distance_from_level_percent: 0.2  # 距离关键位最大百分比：0.2%
+  min_strength_threshold: 0.6           # 最小信号强度阈值：60%
+
+# 风险管理参数
+risk_management:
+  risk_reward_ratio_min: 1.5        # 最小风险收益比：1.5
+  stop_loss_percent: 0.2            # 止损百分比：0.2%
+  take_profit_percent: 0.3          # 止盈百分比：0.3%
+  max_signals_per_hour: 5           # 每小时最大信号数：5个
+
+# 信号质量要求
+signal_quality:
+  min_confidence: 0.6               # 最小置信度：60%
+  min_strength: 0.6                 # 最小强度：60%
+  require_volume_confirmation: true  # 必须有成交量确认
+
+# 信号类型配置
+signal_types:
+  support_bounce:
+    enabled: true
+    min_strength: 0.7
+    min_confidence: 0.65
+    volume_multiplier: 1.5
+
+  resistance_breakout:
+    enabled: true
+    min_strength: 0.75
+    min_confidence: 0.7
+    volume_multiplier: 2.0
+
+  volume_breakout:
+    enabled: true
+    min_strength: 0.6
+    min_confidence: 0.6
+    volume_multiplier: 2.5
+
+# Redis配置
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  key_prefix: "trades_window:"
+  connection_timeout: 5
+  max_connections: 10
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/volume_price_strategy.log"
+  max_size_mb: 10
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 输出配置
+output:
+  signal_file: "signals/latest_volume_price_signal.json"
+  log_file: "logs/volume_price_signals.log"
+  save_analysis_details: true
+
+# 性能监控
+monitoring:
+  memory_check_interval: 300        # 内存检查间隔：5分钟
+  performance_log_interval: 600     # 性能日志间隔：10分钟
+  health_check_enabled: true
+
+# 测试和回测配置
+testing:
+  backtest_mode: false
+  paper_trading: false
+  save_backtest_results: true
+  backtest_data_path: "data/historical/"

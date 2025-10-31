@@ -1,0 +1,60 @@
+# 短期动量策略配置文件（优化版）
+
+# 分析器配置
+analyzer:
+  window_size_minutes: 5          # 分析时间窗口（分钟）
+  buy_threshold: 0.12            # 买入阈值（调整为更敏感）
+  sell_threshold: -0.12          # 卖出阈值（调整为更敏感）
+  neutral_range: 0.03            # 中性区间范围（缩小，减少中性信号）
+
+# 数据源配置
+data:
+  symbol: "BTCFDUSD"             # 交易对
+  data_source: "redis"           # 数据源: redis, mock, file, websocket
+  mock_trades_per_second: 20      # 模拟数据每秒交易数
+  data_file_path: "storage/trades_20251025_0400.json"  # 数据文件路径
+
+# Redis配置
+redis:
+  host: "localhost"              # Redis服务器地址
+  port: 6379                     # Redis端口
+  db: 0                          # Redis数据库编号
+  storage_dir: "storage"         # 数据存储目录
+
+# 输出配置
+output:
+  console: true                  # 控制台输出
+  file: true                     # 文件输出
+  file_path: "logs/momentum_signals.log"      # 信号日志文件
+  signal_file: "signals/latest_signal.json"   # 最新信号文件
+
+# 日志配置
+logging:
+  level: "INFO"                  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 分析间隔（秒）
+analysis_interval_seconds: 60        # 每分钟分析一次
+
+# 高频交易优化配置
+hft_config:
+  # 订单流动量权重配置
+  indicator_weights:
+    order_flow_momentum: 0.3      # 订单流动量权重（核心指标）
+    volume_imbalance: 0.2         # 成交量不平衡
+    price_momentum: 0.15          # 价格动量
+    trend_strength: 0.1           # 趋势强度
+    flow_consistency: 0.1         # 流动一致性
+    volume_trend: 0.05            # 成交量趋势
+    volatility_adjusted: 0.1      # 波动率调整
+
+  # 信号质量过滤器
+  min_volume_levels: 3           # 最少价格层级数
+  min_total_volume: 1.0          # 最小总成交量
+  concentration_threshold: 0.6   # 成交量集中度阈值
+
+# 风险管理配置
+risk_management:
+  max_signals_per_minute: 12     # 每分钟最大信号数
+  min_confidence_threshold: 0.4  # 最小置信度阈值（提高）
+  max_position_size: 0.1        # 最大仓位大小（比例）

@@ -1,0 +1,60 @@
+# 精确定时3分钟动量策略配置文件
+
+# 分析器配置
+analyzer:
+  window_size_minutes: 3           # 3分钟时间窗口
+  buy_threshold: 0.12             # 买入阈值
+  sell_threshold: -0.12           # 卖出阈值
+  neutral_range: 0.03             # 中性区间范围
+
+# 数据源配置
+data:
+  symbol: "BTCFDUSD"             # 交易对
+  data_source: "redis"           # 数据源: redis
+
+# Redis配置
+redis:
+  host: "localhost"              # Redis服务器地址
+  port: 6379                     # Redis端口
+  db: 0                          # Redis数据库编号
+  storage_dir: "storage"         # 数据存储目录
+
+# 输出配置
+output:
+  console: true                  # 控制台输出
+  file: true                     # 文件输出
+  file_path: "logs/timed_3min_momentum_signals.log"    # 定时信号日志文件
+  signal_file: "signals/timed_3min_latest_signal.json" # 定时最新信号文件
+
+# 日志配置
+logging:
+  level: "INFO"                  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 定时配置
+timing:
+  analysis_delay_seconds: 5      # 每分钟第5秒开始分析（等待Data Collector写入完成）
+  max_wait_time_seconds: 30      # 最大等待新数据时间
+
+# 高频交易优化配置
+hft_config:
+  # 订单流动量权重配置（针对3分钟窗口优化）
+  indicator_weights:
+    order_flow_momentum: 0.30     # 订单流动量权重
+    volume_imbalance: 0.25        # 成交量不平衡
+    price_momentum: 0.15          # 价格动量
+    trend_strength: 0.10          # 趋势强度
+    flow_consistency: 0.12        # 流动一致性
+    volume_trend: 0.05            # 成交量趋势
+    volatility_adjusted: 0.03     # 波动率调整（3分钟窗口降低）
+
+  # 信号质量过滤器
+  min_volume_levels: 3           # 最少价格层级数
+  min_total_volume: 0.8          # 最小总成交量（3分钟适中）
+  concentration_threshold: 0.6   # 成交量集中度阈值
+
+# 风险管理配置
+risk_management:
+  max_signals_per_minute: 12     # 每分钟最大信号数
+  min_confidence_threshold: 0.4  # 最小置信度阈值
+  max_position_size: 0.08       # 最大仓位大小（3分钟策略适中）

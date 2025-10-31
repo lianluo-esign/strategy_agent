@@ -1,0 +1,67 @@
+# 高频交易动量策略配置文件
+
+# 分析器配置
+analyzer:
+  window_size_minutes: 1           # 短时间窗口（1分钟）
+  buy_threshold: 0.08             # 更敏感的买入阈值
+  sell_threshold: -0.08           # 更敏感的卖出阈值
+  neutral_range: 0.02             # 更小的中性区间
+
+# 数据源配置
+data:
+  symbol: "BTCFDUSD"             # 交易对
+  data_source: "redis"           # 数据源: redis, mock, file, websocket
+  mock_trades_per_second: 50     # 增加模拟数据密度
+  data_file_path: "storage/trades_20251025_0400.json"  # 数据文件路径
+
+# Redis配置
+redis:
+  host: "localhost"              # Redis服务器地址
+  port: 6379                     # Redis端口
+  db: 0                          # Redis数据库编号
+  storage_dir: "storage"         # 数据存储目录
+
+# 输出配置
+output:
+  console: true                  # 控制台输出
+  file: true                     # 文件输出
+  file_path: "logs/hft_momentum_signals.log"    # HFT信号日志文件
+  signal_file: "signals/hft_latest_signal.json" # HFT最新信号文件
+
+# 日志配置
+logging:
+  level: "INFO"                  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 分析间隔（秒）- 高频设置
+analysis_interval_seconds: 5     # 每5秒分析一次
+
+# 高频交易优化配置
+hft_config:
+  # 订单流动量权重配置（针对高频优化）
+  indicator_weights:
+    order_flow_momentum: 0.35     # 订单流动量权重（提高）
+    volume_imbalance: 0.25        # 成交量不平衡（提高）
+    price_momentum: 0.10          # 价格动量（降低）
+    trend_strength: 0.08          # 趋势强度（降低）
+    flow_consistency: 0.12        # 流动一致性
+    volume_trend: 0.05            # 成交量趋势
+    volatility_adjusted: 0.05     # 波动率调整（降低）
+
+  # 信号质量过滤器（更严格）
+  min_volume_levels: 5           # 最少价格层级数（提高）
+  min_total_volume: 0.5          # 最小总成交量（降低，适应短窗口）
+  concentration_threshold: 0.7   # 成交量集中度阈值（提高）
+
+  # 高频特有参数
+  micro_trend_detection: true     # 微趋势检测
+  immediate_execution: true       # 立即执行模式
+  latency_threshold_ms: 50       # 延迟阈值（毫秒）
+
+# 风险管理配置（高频版）
+risk_management:
+  max_signals_per_minute: 60     # 每分钟最大信号数（提高）
+  min_confidence_threshold: 0.5  # 最小置信度阈值（提高）
+  max_position_size: 0.05       # 最大仓位大小（降低，提高周转率）
+  max_holding_time_seconds: 30   # 最大持仓时间
+  slippage_tolerance: 0.001     # 滑点容忍度

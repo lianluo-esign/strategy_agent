@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-10-28T15:45:26.606088",
+  "symbol": "BTCFDUSD",
+  "analysis_window_minutes": 5,
+  "signal": {
+    "timestamp": "2025-10-28T15:45:26.606088",
+    "symbol": "BTCFDUSD",
+    "direction": "buy",
+    "strength": 1.0,
+    "confidence": 0.8201059477525554,
+    "raw_score": 0.20865784015486885,
+    "indicators": {
+      "price_momentum": 4.876819970189757e-05,
+      "price_change_rate": 4.876819970189757e-05,
+      "trend_strength": 0.8,
+      "weighted_price_momentum": 4.876819970189757e-05,
+      "volume_momentum": 0.11380720731385902,
+      "volume_imbalance": -0.019576208989778604,
+      "large_trade_ratio": 0.2378673080091494,
+      "volume_trend": 0.01619796326838144,
+      "order_flow_momentum": 0.4687700674040246,
+      "buy_pressure": 0.49021189550511074,
+      "sell_pressure": 0.5097881044948893,
+      "flow_consistency": 0.5,
+      "volatility_adjusted": 0.11124848338242847,
+      "realized_volatility": 0.0003383718161285103,
+      "risk_adjusted_return": 0.11124848338242847
+    },
+    "timeframe": "5m",
+    "analysis_window_minutes": 5,
+    "trade_count": 6313,
+    "signal_quality_score": 0.8201059477525554,
+    "market_condition": "ranging"
+  },
+  "trade_window_summary": {
+    "symbol": "BTCFDUSD",
+    "start_time": "2025-10-28T15:49:26.817818",
+    "end_time": "2025-10-28T15:45:26.606088",
+    "total_volume": 9.34706,
+    "total_trades": 6313,
+    "buy_volume": 4.58204,
+    "sell_volume": 4.76502,
+    "open_price": 114520.97988701756,
+    "close_price": 114505.19604988092,
+    "high_price": 0.0,
+    "low_price": 0.0,
+    "vwap": 114505.19604988092,
+    "price_change": -15.78383713663614,
+    "price_change_rate": -0.00013782485228652365,
+    "volume_imbalance": -0.019576208989778604
+  },
+  "analysis_statistics": {
+    "trade_statistics": {
+      "total_trades": 6313,
+      "total_volume": 9.34706,
+      "avg_trade_size": 0.0014806051005860923,
+      "buy_ratio": 0.4902118955051107,
+      "sell_ratio": 0.5097881044948893
+    },
+    "price_statistics": {
+      "open_price": 114520.97988701756,
+      "close_price": 114505.19604988092,
+      "high_price": 0.0,
+      "low_price": 0.0,
+      "vwap": 114505.19604988092,
+      "price_change": -15.78383713663614,
+      "price_change_rate": -0.00013782485228652365
+    },
+    "indicator_summary": {
+      "strongest_indicator": "trend",
+      "overall_momentum": 0.20865784015486885,
+      "volatility_level": "low"
+    }
+  },
+  "processing_time_ms": 0.656,
+  "memory_usage_mb": 0.0
+}
