@@ -26,6 +26,7 @@ class DataCollectorAgent:
             port=settings.redis.port,
             db=settings.redis.db,
             storage_dir=settings.redis.storage_dir,
+            max_storage_files=settings.redis.max_storage_files,
         )
         self.api_client = BinanceAPIClient(
             base_url=settings.binance.rest_api_base, timeout=settings.binance.timeout

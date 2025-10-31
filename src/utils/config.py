@@ -62,6 +62,7 @@ class RedisConfig(BaseModel):
     socket_timeout: int = 5
     socket_connect_timeout: int = 5
     storage_dir: str = "storage"
+    max_storage_files: int = 10000  # Maximum number of JSON files to keep in storage
 
 
 class BinanceConfig(BaseModel):

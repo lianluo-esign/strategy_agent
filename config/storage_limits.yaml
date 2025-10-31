@@ -1,0 +1,32 @@
+# Storage limits configuration for data collector
+# This file demonstrates how to configure storage file limits
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  decode_responses: true
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  storage_dir: "storage"
+
+  # 🗂️ Storage File Limits Configuration
+  # Maximum number of JSON files to keep in storage directory
+  # When exceeded, oldest files will be automatically removed
+  max_storage_files: 10000  # Default: 10000 files
+
+  # 📝 Recommended settings for different scenarios:
+  # - Development: 1000 files (about 1.7 days of data)
+  # - Testing: 500 files (about 8.3 hours of data)
+  # - Production: 10000 files (about 7 days of data)
+  # - Archive mode: 50000 files (about 35 days of data)
+
+analyzer:
+  deepseek:
+    enable: false  # Disabled for storage testing
+    api_key: ""
+    base_url: "https://api.deepseek.com/v1"
+    model: "deepseek-chat"
+    max_tokens: 4000
+    temperature: 0.1
+    timeout: 60

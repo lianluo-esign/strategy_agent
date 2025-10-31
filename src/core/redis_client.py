@@ -31,6 +31,7 @@ class RedisDataStore:
         port: int = 6379,
         db: int = 0,
         storage_dir: str = "storage",
+        max_storage_files: int = 10000,
     ):
         """Initialize Redis connection."""
         self.redis = redis.Redis(
@@ -46,6 +47,7 @@ class RedisDataStore:
         )
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(exist_ok=True)
+        self.max_storage_files = max_storage_files
 
     def test_connection(self) -> bool:
         """Test Redis connection."""
@@ -203,12 +205,48 @@ class RedisDataStore:
 
             logger.debug(f"Serialized trade data to {filepath}")
 
+            # After writing file, check and enforce file count limit
+            await self._enforce_storage_file_limit(self.max_storage_files)
+
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON data for file serialization: {e}")
         except OSError as e:
             logger.error(f"File system error writing trade data: {e}")
         except Exception as e:
             logger.error(f"Failed to write trade data file: {e}")
+
+    async def _enforce_storage_file_limit(self, max_files: int = 10000) -> None:
+        """Enforce maximum file count limit by removing oldest files."""
+        try:
+            # Get all JSON files in storage directory
+            json_files = list(self.storage_dir.glob("trades_*.json"))
+
+            if len(json_files) > max_files:
+                # Sort files by modification time (oldest first)
+                json_files.sort(key=lambda f: f.stat().st_mtime)
+
+                # Calculate how many files to remove
+                files_to_remove = len(json_files) - max_files
+                files_removed = 0
+
+                # Remove oldest files
+                for i in range(files_to_remove):
+                    try:
+                        file_to_remove = json_files[i]
+                        file_to_remove.unlink()
+                        files_removed += 1
+                        logger.debug(f"Removed old storage file: {file_to_remove.name}")
+                    except OSError as e:
+                        logger.warning(f"Failed to remove file {json_files[i].name}: {e}")
+
+                if files_removed > 0:
+                    logger.info(
+                        f"Storage file limit enforcement: removed {files_removed} oldest files, "
+                        f"keeping {len(json_files) - files_removed}/{max_files} files"
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to enforce storage file limit: {e}")
 
     def get_recent_trade_data(self, minutes: int = 60) -> list[MinuteTradeData]:
         """Get recent trade data for analysis."""
