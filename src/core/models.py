@@ -1,5 +1,6 @@
 """Data models for the Strategy Agent system."""
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -112,14 +113,39 @@ class PriceLevelData:
 
 @dataclass
 class MinuteTradeData:
-    """Aggregated trade data for a one-minute interval."""
+    """Aggregated trade data for a one-minute interval with thread-safe operations."""
 
     timestamp: datetime
     price_levels: dict[Decimal, PriceLevelData] = field(default_factory=dict)
     max_price_levels: int = 1000  # Memory limit for price levels
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # Async lock for thread safety
 
-    def add_trade(self, trade: Trade) -> None:
-        """Add a trade to the appropriate price level."""
+    async def add_trade(self, trade: Trade) -> None:
+        """Add a trade to the appropriate price level in a thread-safe manner."""
+        async with self._lock:
+            await self._add_trade_unsafe(trade)
+
+    def add_trade_sync(self, trade: Trade) -> None:
+        """Add a trade synchronously (for backward compatibility)."""
+        # Note: This method is not thread-safe and should be used carefully
+        if len(self.price_levels) >= self.max_price_levels:
+            logger.warning(
+                f"Maximum price levels ({self.max_price_levels}) reached, skipping trade"
+            )
+            return
+
+        # Round price to $1 precision
+        price_level_key = trade.price.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+        if price_level_key not in self.price_levels:
+            self.price_levels[price_level_key] = PriceLevelData(
+                price_level=price_level_key
+            )
+
+        self.price_levels[price_level_key].add_trade(trade)
+
+    async def _add_trade_unsafe(self, trade: Trade) -> None:
+        """Internal unsafe trade addition (assumes lock is held)."""
         # Check memory limit
         if len(self.price_levels) >= self.max_price_levels:
             logger.warning(
@@ -137,10 +163,15 @@ class MinuteTradeData:
 
         self.price_levels[price_level_key].add_trade(trade)
 
-    def cleanup_low_volume_levels(
+    async def cleanup_low_volume_levels(
         self, min_volume_threshold: Decimal = Decimal("0.001")
-    ) -> None:
-        """Remove price levels with very low volume to save memory."""
+    ) -> int:
+        """Remove price levels with very low volume to save memory (thread-safe)."""
+        async with self._lock:
+            return self._cleanup_low_volume_levels_unsafe(min_volume_threshold)
+
+    def _cleanup_low_volume_levels_unsafe(self, min_volume_threshold: Decimal) -> int:
+        """Internal unsafe cleanup (assumes lock is held)."""
         to_remove = [
             price
             for price, data in self.price_levels.items()
@@ -153,8 +184,49 @@ class MinuteTradeData:
         if to_remove:
             logger.debug(f"Cleaned up {len(to_remove)} low-volume price levels")
 
+        return len(to_remove)
+
+    def cleanup_low_volume_levels_sync(
+        self, min_volume_threshold: Decimal = Decimal("0.001")
+    ) -> int:
+        """Remove price levels with very low volume to save memory (deprecated sync version)."""
+        logger.warning("Using deprecated sync cleanup method - consider migrating to async version")
+        # Fallback to unsafe synchronous operation
+        return self._cleanup_low_volume_levels_unsafe(min_volume_threshold)
+
+    async def get_price_levels_copy(self) -> dict[Decimal, PriceLevelData]:
+        """Get a thread-safe copy of price levels."""
+        async with self._lock:
+            return dict(self.price_levels)
+
+    async def get_statistics(self) -> dict[str, Any]:
+        """Get current statistics in a thread-safe manner."""
+        async with self._lock:
+            total_trades = sum(
+                level.trade_count for level in self.price_levels.values()
+            )
+            total_volume = sum(
+                level.total_volume for level in self.price_levels.values()
+            )
+            return {
+                "price_levels_count": len(self.price_levels),
+                "total_trades": total_trades,
+                "total_volume": float(total_volume),
+                "max_price_levels": self.max_price_levels
+            }
+
+    async def to_dict_async(self) -> dict:
+        """Convert to dictionary for Redis storage in a thread-safe manner."""
+        async with self._lock:
+            return {
+                "timestamp": self.timestamp.isoformat(),
+                "price_levels": {str(k): v.to_dict() for k, v in self.price_levels.items()},
+            }
+
     def to_dict(self) -> dict:
-        """Convert to dictionary for Redis storage."""
+        """Convert to dictionary for Redis storage (synchronous - use with caution)."""
+        # Note: This method is not thread-safe and should only be used when you know
+        # there are no concurrent modifications happening
         return {
             "timestamp": self.timestamp.isoformat(),
             "price_levels": {str(k): v.to_dict() for k, v in self.price_levels.items()},
