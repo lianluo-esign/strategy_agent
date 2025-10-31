@@ -83,7 +83,13 @@ class OptimizedAnalyzerAgent:
         self.is_running = False
         self.shutdown_event = asyncio.Event()
 
-        logger.info("优化版分析器代理初始化完成")
+        # 数据驱动模式的状态跟踪
+        self.last_analysis_timestamp = None
+        self.last_trades_window_hash = None
+        self.min_data_points_for_analysis = 60  # 至少需要60个数据点才进行分析
+        self.check_interval = 5  # 每5秒检查一次是否有新数据
+
+        logger.info("优化版分析器代理初始化完成 (数据驱动模式)")
 
     def _prepare_deepseek_config(self, settings: Settings) -> dict:
         """准备Deepseek配置。
@@ -174,27 +180,33 @@ class OptimizedAnalyzerAgent:
             await self._shutdown()
 
     async def _analysis_loop(self) -> None:
-        """主分析循环。"""
-        interval = self.settings.analyzer.analysis.interval_seconds
-
-        logger.info(f"🔄 开始分析循环: {self.symbol} (间隔: {interval}s)")
+        """数据驱动的分析循环 - 仅在有新数据时触发分析。"""
+        logger.info(f"🔄 开始数据驱动分析循环: {self.symbol}")
+        logger.info(f"📊 最小数据点要求: {self.min_data_points_for_analysis}")
+        logger.info(f"🔍 数据检查间隔: {self.check_interval}秒")
 
         while self.is_running:
             try:
-                logger.debug("开始优化版市场分析周期")
-                await self._perform_analysis_cycle()
+                # 检查是否有新的数据点
+                has_new_data = await self._check_for_new_data()
 
-                # 等待下一个周期
+                if has_new_data:
+                    logger.info("🆕 检测到新的trades_window数据点，触发分析")
+                    await self._perform_analysis_cycle()
+                else:
+                    logger.debug("📋 没有新数据点，等待下次检查")
+
+                # 等待下次检查或关闭信号
                 try:
-                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=interval)
+                    await asyncio.wait_for(self.shutdown_event.wait(), timeout=self.check_interval)
                     logger.info("关闭事件触发，退出分析循环")
                     break
                 except TimeoutError:
-                    # 正常超时，继续下一个周期
+                    # 正常超时，继续检查数据变化
                     continue
 
             except Exception as e:
-                logger.error(f"优化版分析周期错误: {e}")
+                logger.error(f"数据驱动分析检查错误: {e}")
                 # 重试前等待
                 try:
                     await asyncio.wait_for(
@@ -205,6 +217,54 @@ class OptimizedAnalyzerAgent:
                     continue
                 # 如果等待完成，表示请求关闭
                 break
+
+    async def _check_for_new_data(self) -> bool:
+        """检查trades_window中是否有新数据点。
+
+        Returns:
+            bool: 如果有新数据且满足分析条件返回True，否则返回False
+        """
+        try:
+            # 获取当前trades窗口状态
+            current_count = self.redis_store.get_trade_window_count()
+            latest_timestamp = self.redis_store.get_latest_trade_timestamp()
+            current_hash = self.redis_store.get_trades_window_hash()
+
+            logger.debug(f"数据检查: 数量={current_count}, 最新时间={latest_timestamp}, 哈希={current_hash}")
+
+            # 检查是否有足够的数据点
+            if current_count < self.min_data_points_for_analysis:
+                if current_count > 0:
+                    logger.debug(f"数据点不足: {current_count}/{self.min_data_points_for_analysis}")
+                return False
+
+            # 首次运行时，只要有足够数据就分析
+            if self.last_analysis_timestamp is None:
+                logger.info(f"首次运行，检测到 {current_count} 个数据点，将进行分析")
+                self.last_analysis_timestamp = latest_timestamp
+                self.last_trades_window_hash = current_hash
+                return True
+
+            # 检查是否有新的时间戳数据（比上次分析时间更新）
+            if latest_timestamp and latest_timestamp > self.last_analysis_timestamp:
+                time_diff = latest_timestamp - self.last_analysis_timestamp
+                logger.info(f"检测到新数据点，时间差: {time_diff}")
+                self.last_analysis_timestamp = latest_timestamp
+                self.last_trades_window_hash = current_hash
+                return True
+
+            # 检查数据内容是否发生变化（哈希值不同）
+            if current_hash and current_hash != self.last_trades_window_hash:
+                logger.info("检测到trades_window内容发生变化")
+                self.last_trades_window_hash = current_hash
+                return True
+
+            # 没有检测到新数据
+            return False
+
+        except Exception as e:
+            logger.error(f"检查新数据时出错: {e}")
+            return False
 
     async def _perform_analysis_cycle(self) -> None:
         """执行分析周期。"""
@@ -238,8 +298,13 @@ class OptimizedAnalyzerAgent:
         processing_time = result.get("processing_time", 0)
         discord_sent = result.get("discord_notification_sent", False)
 
-        logger.info(f"=== 📊 {symbol} 优化版分析摘要 ===")
-        logger.info(f"🔍 分析模式: 基于原始trades_window数据的AI趋势分析")
+        logger.info(f"=== 📊 {symbol} 数据驱动分析摘要 ===")
+        logger.info(f"🔍 分析模式: 基于trades_window新数据点触发的AI趋势分析")
+
+        # 显示触发信息
+        current_data_points = self.redis_store.get_trade_window_count()
+        logger.info(f"🎯 触发条件: trades_window检测到新数据点")
+        logger.info(f"📋 当前数据点: {current_data_points}/{self.min_data_points_for_analysis}")
 
         # 分析结果摘要
         analysis_result = result.get("analysis_result", {})
@@ -263,6 +328,7 @@ class OptimizedAnalyzerAgent:
 
         logger.info(f"⏱️ 处理时间: {processing_time:.2f}s")
         logger.info(f"📢 Discord通知: {'已发送' if discord_sent else '未发送'}")
+        logger.info(f"⚡ 模式优势: 仅在有新数据时分析，避免无效计算")
         logger.info("=" * 50)
 
     async def _shutdown(self) -> None:
@@ -305,9 +371,16 @@ class OptimizedAnalyzerAgent:
         """获取代理状态。"""
         base_status = {
             "agent_type": "optimized_analyzer",
+            "mode": "data_driven",  # 新增：显示运行模式
             "is_running": self.is_running,
             "symbol": self.symbol,
             "discord_webhook_configured": True,
+            # 数据驱动模式状态
+            "last_analysis_timestamp": self.last_analysis_timestamp.isoformat() if self.last_analysis_timestamp else None,
+            "min_data_points_required": self.min_data_points_for_analysis,
+            "check_interval_seconds": self.check_interval,
+            "current_data_points": self.redis_store.get_trade_window_count(),
+            "latest_trade_timestamp": self.redis_store.get_latest_trade_timestamp().isoformat() if self.redis_store.get_latest_trade_timestamp() else None,
         }
 
         # 添加优化版分析器状态
@@ -388,12 +461,20 @@ if __name__ == "__main__":
     # 显示启动信息
     print("🚀 启动优化版市场分析代理")
     print("📋 优化功能:")
+    print("   • 数据驱动模式：仅当trades_window出现新数据点时触发分析")
+    print("   • 智能检测：基于时间戳和哈希值检测数据变化")
     print("   • 基于原始trades_window数据进行AI趋势分析")
     print("   • 直接使用最近4小时每分钟数据点")
     print("   • 无二次聚合，保持数据原始性")
     print("   • 集成Deepseek AI分析")
     print("   • 标准JSON输出格式")
     print("   • 分析完成后直接发送Discord通知")
+    print("")
+    print("⚡ 数据驱动优势:")
+    print("   • 高效：避免无数据的空分析周期")
+    print("   • 实时：数据更新立即触发分析")
+    print("   • 节能：减少无效的AI调用和计算")
+    print("   • 精准：只在真正有新市场活动时进行分析")
     print("📤 输出格式:")
     print("   • timestamp: 最新分钟时间")
     print("   • trend: 趋势判断(震荡/微弱看涨/看涨/强力看涨/微弱看跌/看跌/强力看跌)")

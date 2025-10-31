@@ -362,6 +362,45 @@ class RedisDataStore:
         """Get the number of stored trade data points."""
         return self.redis.llen(REDIS_TRADES_WINDOW_KEY)
 
+    def get_latest_trade_timestamp(self) -> datetime | None:
+        """Get the timestamp of the most recent trade data."""
+        try:
+            # Get the first (most recent) item from the trades window
+            latest_data_str = self.redis.lindex(REDIS_TRADES_WINDOW_KEY, 0)
+            if not latest_data_str:
+                return None
+
+            data = json.loads(latest_data_str)
+            timestamp = datetime.fromisoformat(data["timestamp"])
+
+            # Validate timestamp is reasonable
+            if timestamp.year < 2000:
+                logger.warning(f"Suspicious timestamp detected: {timestamp}, using current time")
+                return datetime.now()
+
+            return timestamp
+
+        except Exception as e:
+            logger.error(f"Failed to get latest trade timestamp: {e}")
+            return None
+
+    def get_trades_window_hash(self) -> str | None:
+        """Get a hash of the trades window for change detection."""
+        try:
+            # Get first few items to create a lightweight hash for change detection
+            sample_size = min(5, self.redis.llen(REDIS_TRADES_WINDOW_KEY))
+            if sample_size == 0:
+                return None
+
+            sample_data = self.redis.lrange(REDIS_TRADES_WINDOW_KEY, 0, sample_size - 1)
+            # Create a simple hash from timestamps and data counts
+            hash_input = f"{len(sample_data)}-{sample_data[0] if sample_data else ''}"
+            return str(hash(hash_input))
+
+        except Exception as e:
+            logger.error(f"Failed to create trades window hash: {e}")
+            return None
+
     def clear_all_data(self) -> None:
         """Clear all stored data (for testing)."""
         try:
