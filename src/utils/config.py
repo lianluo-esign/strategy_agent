@@ -112,13 +112,6 @@ class DeepSeekConfig(BaseModel):
     temperature: float = 0.1
     timeout: int = 60
 
-    def __init__(self, **data: Any) -> None:
-        """Initialize with environment variable support."""
-        # Support environment variable for API key
-        if "api_key" not in data:
-            data["api_key"] = os.getenv("DEEPSEEK_API_KEY", "")
-        super().__init__(**data)
-
 
 class PriceAggregationConfig(BaseModel):
     """Price aggregation configuration."""
@@ -144,6 +137,15 @@ class PriceAggregationConfig(BaseModel):
         if v <= 0:
             raise ValueError("Max price levels must be positive")
         return v
+
+
+class DiscordConfig(BaseModel):
+    """Discord webhook notification configuration."""
+
+    enable: bool = False
+    webhook_url: str = ""
+    timeout: int = 30
+    max_retries: int = 3
 
 
 class AnalysisConfig(BaseModel):
@@ -239,6 +241,7 @@ class AnalyzerConfig(BaseModel):
 
     deepseek: DeepSeekConfig
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    discord: DiscordConfig = Field(default_factory=DiscordConfig)
     price_aggregation: PriceAggregationConfig = Field(
         default_factory=PriceAggregationConfig
     )

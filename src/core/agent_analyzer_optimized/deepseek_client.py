@@ -203,26 +203,49 @@ class DeepSeekAnalyzer:
             logger.error(f"趋势分析失败: {e}")
             raise RuntimeError(f"趋势分析失败: {str(e)}") from e
 
-    def _build_analysis_prompt(self, aggregated_data: Dict[str, Any], symbol: str) -> str:
+    def _build_analysis_prompt(self, raw_data: Dict[str, Any], symbol: str) -> str:
         """构建AI分析提示词。
 
         Args:
-            aggregated_data: 聚合数据
+            raw_data: 原始交易数据
             symbol: 交易符号
 
         Returns:
             格式化的提示词
         """
-        # 提取关键数据
-        total_volume = aggregated_data.get("total_volume", 0)
-        trade_count = aggregated_data.get("trade_count", 0)
-        price_levels_count = aggregated_data.get("price_levels_count", 0)
-        price_range = aggregated_data.get("price_range", [0, 0])
-        price_levels = aggregated_data.get("price_levels", {})
+        # 提取原始数据
+        minute_data_points = raw_data.get("minute_data_points", [])
+        data_points_count = raw_data.get("data_points_count", 0)
+        time_range = raw_data.get("time_range", ["", ""])
+
+        # 计算基础统计信息
+        total_volume = 0
+        all_price_levels = {}
+        first_timestamp = None
+        last_timestamp = None
+
+        for point in minute_data_points:
+            timestamp = point.get("timestamp", "")
+            price_levels = point.get("price_levels", {})
+
+            # 记录时间范围
+            if first_timestamp is None:
+                first_timestamp = timestamp
+            last_timestamp = timestamp
+
+            # 累加成交量统计
+            for price_str, level_data in price_levels.items():
+                try:
+                    volume = float(level_data.get("total_volume", 0))
+                    if volume > 0:
+                        total_volume += volume
+                        all_price_levels[float(price_str)] = all_price_levels.get(float(price_str), 0) + volume
+                except (ValueError, TypeError, AttributeError):
+                    continue
 
         # 获取成交量最大的前10个价格水平
         top_price_levels = sorted(
-            price_levels.items(),
+            all_price_levels.items(),
             key=lambda x: x[1],
             reverse=True
         )[:10]
@@ -233,27 +256,38 @@ class DeepSeekAnalyzer:
             for price, volume in top_price_levels
         ])
 
+        # 计算价格范围
+        if all_price_levels:
+            price_min = min(all_price_levels.keys())
+            price_max = max(all_price_levels.keys())
+        else:
+            price_min = price_max = 0
+
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        prompt = f"""请基于以下{symbol}的交易数据进行市场趋势分析：
+        prompt = f"""请基于以下{symbol}的原始trades_window数据进行市场趋势分析：
 
 **分析时间**: {current_time}
 
 **数据概览**:
+- 原始分钟数据点: {data_points_count} 个
+- 时间范围: {first_timestamp} 到 {last_timestamp}
 - 总成交量: {total_volume:.2f}
-- 交易次数: {trade_count}
-- 价格水平数量: {price_levels_count}
-- 价格区间: ${price_range[0]:.2f} - ${price_range[1]:.2f}
+- 活跃价格水平: {len(all_price_levels)} 个
+- 价格区间: ${price_min:.2f} - ${price_max:.2f}
 
-**主要成交价格水平**:
+**主要成交价格水平 (Top 10)**:
 {price_levels_str}
 
+**数据说明**:
+这是未经处理的原始trades_window数据，包含过去4小时内每分钟的价格和成交量信息。
+
 **分析要求**:
-请基于以上数据，进行专业的市场趋势分析。重点关注：
-1. 成交量分布特征
-2. 价格集中度分析
-3. 买卖力量对比
-4. 市场情绪判断
+请基于以上原始交易数据，进行专业的市场趋势分析。重点关注：
+1. 成交量分布和价格活跃度
+2. 买卖压力变化趋势
+3. 关键价格位置的反应
+4. 市场情绪和力量对比
 
 **输出要求**:
 请严格按照以下JSON格式返回分析结果，不要添加任何其他文本：

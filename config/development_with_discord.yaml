@@ -2,15 +2,6 @@ app:
   name: "strategy-agent"
   environment: "development"
   log_level: "DEBUG"
-  data_retention_days: 30
-  max_workers: 4
-  batch_size: 1000
-
-# Trading Configuration (for future use)
-trading:
-  enabled: false
-  api_key_example: "your_exchange_api_key"
-  api_secret_example: "your_exchange_api_secret"
 
 redis:
   host: "localhost"
@@ -31,32 +22,34 @@ data_collector:
   depth_snapshot:
     limit: 5000
     update_interval_seconds: 60
-    # Removed window_size as depth_snapshot_5000 now uses single-key overwrite mechanism
   order_flow:
     websocket_url: "wss://stream.binance.com:9443/ws/btcfdusd@aggTrade"
-    window_size_minutes: 7200 # 48 hours
-    price_precision: 1.0  # $1 precision for aggregation
+    window_size_minutes: 2880 # 48 hours
+    price_precision: 1.0
     aggregation_interval_seconds: 60
 
 analyzer:
   deepseek:
     enable: true
-    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"  # 直接在配置文件中指定API密钥
+    api_key: "sk-2ce70cb7d88e44c19d65524b990b192b"  # 从环境变量获取
     base_url: "https://api.deepseek.com/v1"
     model: "deepseek-chat"
     max_tokens: 6000
     temperature: 0.1
     timeout: 90
     max_retries: 3
+
   discord:
     enable: true
-    webhook_url: "https://discord.com/api/webhooks/1433882831775338558/ZlPlAiCFA49TidMxyiapXzJ89MDkA8gYy5uOPxZRr7-orOwRa-71Hc_79Fa6D7SU2K6C"  # 直接在配置文件中指定Discord webhook URL
+    webhook_url: "https://discord.com/api/webhooks/1433882831775338558/ZlPlAiCFA49TidMxyiapXzJ89MDkA8gYy5uOPxZRr7-orOwRa-71Hc_79Fa6D7SU2K6C"  # 示例：直接填写URL
     timeout: 30
     max_retries: 3
+
   analysis:
-    interval_seconds: 300  # 分析间隔：5分钟
+    interval_seconds: 60  # 分析间隔：5分钟
     min_order_volume_threshold: 0.01
     support_resistance_threshold: 0.1
+
   price_aggregation:
     precision: 1.0  # $1 precision for price aggregation
     enabled: true

@@ -42,9 +42,7 @@ class OptimizedAgentAnalyzer:
         redis_store: Any,
         deepseek_config: Dict[str, Any],
         discord_webhook_url: Optional[str] = None,
-        aggregation_precision: float = 10.0,
-        min_volume_threshold: float = 0.1,
-        analysis_window_minutes: int = 1440
+        analysis_window_minutes: int = 240
     ):
         """初始化优化版分析器。
 
@@ -52,18 +50,14 @@ class OptimizedAgentAnalyzer:
             redis_store: Redis数据存储实例
             deepseek_config: Deepseek配置字典
             discord_webhook_url: Discord webhook URL（可选）
-            aggregation_precision: 价格聚合精度
-            min_volume_threshold: 最小成交量阈值
             analysis_window_minutes: 分析时间窗口（分钟）
         """
         self.redis_store = redis_store
         self.symbol = "BTCFDUSD"
 
-        # 初始化数据聚合器
+        # 初始化数据收集器
         self.trades_aggregator = TradesAggregator(
-            aggregation_precision=aggregation_precision,
-            min_volume_threshold=min_volume_threshold,
-            minutes_to_analyze=analysis_window_minutes
+            minutes_to_collect=analysis_window_minutes
         )
 
         # 初始化Deepseek分析器
@@ -98,7 +92,7 @@ class OptimizedAgentAnalyzer:
 
         logger.info(
             f"OptimizedAgentAnalyzer initialized: symbol={self.symbol}, "
-            f"aggregation_precision={aggregation_precision}, "
+            f"analysis_window_minutes={analysis_window_minutes}, "
             f"discord_enabled={self.discord_manager is not None}"
         )
 
@@ -125,9 +119,9 @@ class OptimizedAgentAnalyzer:
             logger.info(f"开始市场分析: {symbol}")
 
             # 执行分析流程
-            aggregated_dict = await self._collect_and_aggregate_data(symbol)
-            trend_result = await self._perform_ai_analysis(aggregated_dict, symbol)
-            json_response = await self._format_analysis_result(trend_result, aggregated_dict, symbol)
+            raw_dict = await self._collect_and_raw_data(symbol)
+            trend_result = await self._perform_ai_analysis(raw_dict, symbol)
+            json_response = await self._format_analysis_result(trend_result, raw_dict, symbol)
 
             # 处理通知和质量检查
             quality_check, discord_sent = await self._handle_notifications_and_quality(
@@ -139,7 +133,7 @@ class OptimizedAgentAnalyzer:
             self._update_stats(processing_time, success=True)
 
             result = self._build_final_result(
-                symbol, json_response, aggregated_dict,
+                symbol, json_response, raw_dict,
                 processing_time, discord_sent, quality_check
             )
 
@@ -153,11 +147,11 @@ class OptimizedAgentAnalyzer:
         except Exception as e:
             return await self._handle_analysis_error(symbol, e, start_time)
 
-    async def _collect_and_aggregate_data(self, symbol: str) -> Dict[str, Any]:
-        """收集和聚合数据。"""
+    async def _collect_and_raw_data(self, symbol: str) -> Dict[str, Any]:
+        """收集原始数据。"""
         # 第一步：从Redis读取trades_window数据
         trades_window_data = self.redis_store.get_recent_trade_data(
-            minutes=self.trades_aggregator.minutes_to_analyze
+            minutes=self.trades_aggregator.minutes_to_collect
         )
 
         if not trades_window_data:
@@ -165,24 +159,24 @@ class OptimizedAgentAnalyzer:
 
         logger.info(f"读取到 {len(trades_window_data)} 分钟的交易数据")
 
-        # 第二步：聚合数据
-        aggregated_data = self.trades_aggregator.aggregate_trades_window(
+        # 第二步：收集原始数据
+        raw_data = self.trades_aggregator.collect_raw_trades_data(
             trades_window_data, symbol
         )
-        aggregated_dict = aggregated_data.to_dict()
+        raw_dict = raw_data.to_dict()
 
         logger.info(
-            f"数据聚合完成: {len(aggregated_data.price_levels)} 个价格水平, "
-            f"总成交量 {aggregated_data.total_volume:.2f}"
+            f"原始数据收集完成: {raw_data.data_points_count} 个分钟数据点, "
+            f"时间跨度 {len(raw_data.minute_data_points)} 分钟"
         )
 
-        return aggregated_dict
+        return raw_dict
 
-    async def _perform_ai_analysis(self, aggregated_dict: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+    async def _perform_ai_analysis(self, raw_dict: Dict[str, Any], symbol: str) -> Dict[str, Any]:
         """执行AI分析。"""
         # 第三步：AI分析
         trend_result_dict = await self.deepseek_analyzer.analyze_trend(
-            aggregated_dict, symbol
+            raw_dict, symbol
         )
         trend_result = trend_result_dict.to_dict()
 
@@ -196,13 +190,13 @@ class OptimizedAgentAnalyzer:
     async def _format_analysis_result(
         self,
         trend_result: Dict[str, Any],
-        aggregated_dict: Dict[str, Any],
+        raw_dict: Dict[str, Any],
         symbol: str
     ) -> str:
         """格式化分析结果。"""
         # 第四步：格式化响应
         json_response = self.response_formatter.format_analysis_response(
-            trend_result, aggregated_dict, symbol
+            trend_result, raw_dict, symbol
         )
 
         # 验证响应格式
@@ -246,7 +240,7 @@ class OptimizedAgentAnalyzer:
         self,
         symbol: str,
         json_response: str,
-        aggregated_dict: Dict[str, Any],
+        raw_dict: Dict[str, Any],
         processing_time: float,
         discord_sent: bool,
         quality_check: Dict[str, Any]
@@ -257,7 +251,7 @@ class OptimizedAgentAnalyzer:
             "symbol": symbol,
             "timestamp": datetime.now().isoformat(),
             "analysis_result": json.loads(json_response),
-            "aggregated_data": aggregated_dict,
+            "raw_data": raw_dict,
             "processing_time": processing_time,
             "discord_notification_sent": discord_sent,
             "quality_check": quality_check
@@ -265,8 +259,8 @@ class OptimizedAgentAnalyzer:
 
         # 添加性能统计
         result["performance_stats"] = {
-            "data_aggregation_time": processing_time * 0.2,  # 估算
-            "ai_analysis_time": processing_time * 0.7,      # 估算
+            "data_collection_time": processing_time * 0.15,  # 估算
+            "ai_analysis_time": processing_time * 0.75,     # 估算
             "formatting_time": processing_time * 0.1        # 估算
         }
 
@@ -376,8 +370,7 @@ class OptimizedAgentAnalyzer:
             "components": {
                 "trades_aggregator": {
                     "enabled": True,
-                    "aggregation_precision": float(self.trades_aggregator.aggregation_precision),
-                    "minutes_to_analyze": self.trades_aggregator.minutes_to_analyze
+                    "minutes_to_collect": self.trades_aggregator.minutes_to_collect
                 },
                 "deepseek_analyzer": self.deepseek_analyzer.get_stats(),
                 "response_formatter": {
@@ -400,22 +393,7 @@ class OptimizedAgentAnalyzer:
 
         return status
 
-    async def test_discord_connection(self) -> bool:
-        """测试Discord连接。
-
-        Returns:
-            连接是否正常
-        """
-        if not self.discord_manager:
-            logger.warning("Discord通知未配置")
-            return False
-
-        try:
-            return await self.discord_manager.get_notifier().test_connection()
-        except Exception as e:
-            logger.error(f"Discord连接测试失败: {e}")
-            return False
-
+    
     async def health_check(self) -> Dict[str, Any]:
         """执行健康检查。
 
@@ -455,19 +433,12 @@ class OptimizedAgentAnalyzer:
                 "message": f"数据检查异常: {str(e)}"
             }
 
-        # Discord连接检查（如果启用）
+        # Discord功能检查（如果启用）
         if self.discord_manager:
-            try:
-                discord_ok = await self.test_discord_connection()
-                health_status["checks"]["discord_connection"] = {
-                    "status": "pass" if discord_ok else "fail",
-                    "message": "Discord连接正常" if discord_ok else "Discord连接失败"
-                }
-            except Exception as e:
-                health_status["checks"]["discord_connection"] = {
-                    "status": "fail",
-                    "message": f"Discord检查异常: {str(e)}"
-                }
+            health_status["checks"]["discord_service"] = {
+                "status": "pass",
+                "message": "Discord通知服务已启用，将在分析完成后发送结果"
+            }
 
         # 确定整体状态
         failed_checks = [

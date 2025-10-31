@@ -22,7 +22,7 @@ from .deepseek_client import DeepSeekAnalyzer, TrendAnalysisResult
 from .discord_notifier import DiscordNotifier, DiscordNotificationManager
 from .optimized_analyzer import OptimizedAgentAnalyzer
 from .response_formatter import ResponseFormatter, ResponseValidator
-from .trades_aggregator import AggregatedTradesData, TradesAggregator
+from .trades_aggregator import RawTradesData, TradesAggregator
 
 __version__ = "1.0.0"
 __author__ = "Claude Code Assistant"
@@ -34,7 +34,7 @@ __all__ = [
 
     # 数据处理
     "TradesAggregator",
-    "AggregatedTradesData",
+    "RawTradesData",
 
     # AI分析
     "DeepSeekAnalyzer",

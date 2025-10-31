@@ -1,316 +1,263 @@
-"""交易数据聚合器 - 优化版trades_window数据处理器。
+"""交易数据收集器 - 简化版trades_window数据处理器。
 
-该模块专注于trades_window数据的聚合处理，移除了对5000层深度快照的依赖，
-提供高效的数据聚合和预处理功能。
+该模块专注于直接收集trades_window原始数据，移除复杂的聚合处理逻辑，
+为Deepseek AI分析提供未经修改的原始市场数据。
 """
 
 import logging
-from collections import defaultdict
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# 聚合配置常量
-DEFAULT_AGGREGATION_PRECISION = 10.0  # 默认价格聚合精度
-MINUTES_TO_ANALYZE = 1440  # 分析过去24小时的数据
-VOLUME_THRESHOLD = 0.1  # 最小成交量阈值
+# 数据收集配置常量
+DEFAULT_ANALYSIS_MINUTES = 4320  # 默认分析过去72小时的数据（3天）
 
 
-class AggregatedTradesData:
-    """聚合后的交易数据模型。"""
+class RawTradesData:
+    """原始交易数据模型。"""
 
     def __init__(
         self,
         timestamp: datetime,
         symbol: str,
-        price_levels: Dict[float, float],
-        total_volume: float,
-        trade_count: int,
-        price_range: tuple[float, float]
+        minute_data_points: List[Dict[str, Any]],
+        data_points_count: int,
+        time_range: tuple[str, str]
     ):
         self.timestamp = timestamp
         self.symbol = symbol
-        self.price_levels = price_levels
-        self.total_volume = total_volume
-        self.trade_count = trade_count
-        self.price_range = price_range
+        self.minute_data_points = minute_data_points
+        self.data_points_count = data_points_count
+        self.time_range = time_range
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式。"""
         return {
             "timestamp": self.timestamp.isoformat(),
             "symbol": self.symbol,
-            "price_levels": self.price_levels,
-            "total_volume": self.total_volume,
-            "trade_count": self.trade_count,
-            "price_range": self.price_range,
-            "price_levels_count": len(self.price_levels)
+            "minute_data_points": self.minute_data_points,
+            "data_points_count": self.data_points_count,
+            "time_range": self.time_range,
+            "analysis_minutes": len(self.minute_data_points)
         }
 
 
 class TradesAggregator:
-    """交易数据聚合器，专注于trades_window数据的高效处理。
+    """交易数据收集器，专注于直接收集trades_window原始数据。
 
-    该类替代了原有的深度快照数据处理逻辑，专注于：
-    1. 高效聚合trades_window数据
-    2. 生成价格-成交量分布
-    3. 提供市场结构分析基础数据
+    该类替代了复杂的聚合处理逻辑，专注于：
+    1. 直接收集trades_window原始分钟数据
+    2. 保持数据完整性，不做二次加工
+    3. 为AI分析提供未经修改的市场数据
     """
 
     def __init__(
         self,
-        aggregation_precision: float = DEFAULT_AGGREGATION_PRECISION,
-        min_volume_threshold: float = VOLUME_THRESHOLD,
-        minutes_to_analyze: int = MINUTES_TO_ANALYZE
+        minutes_to_collect: int = DEFAULT_ANALYSIS_MINUTES
     ):
-        """初始化交易数据聚合器。
+        """初始化交易数据收集器。
 
         Args:
-            aggregation_precision: 价格聚合精度
-            min_volume_threshold: 最小成交量阈值
-            minutes_to_analyze: 分析的时间窗口（分钟）
+            minutes_to_collect: 收集的时间窗口（分钟）
         """
-        if aggregation_precision <= 0:
-            raise ValueError("聚合精度必须为正数")
+        if minutes_to_collect <= 0:
+            raise ValueError("收集时间窗口必须为正数")
 
-        if min_volume_threshold < 0:
-            raise ValueError("最小成交量阈值不能为负数")
-
-        if minutes_to_analyze <= 0:
-            raise ValueError("分析时间窗口必须为正数")
-
-        self.aggregation_precision = Decimal(str(aggregation_precision))
-        self.min_volume_threshold = min_volume_threshold
-        self.minutes_to_analyze = minutes_to_analyze
+        self.minutes_to_collect = minutes_to_collect
 
         logger.info(
-            f"Initialized TradesAggregator with precision=${aggregation_precision}, "
-            f"min_volume_threshold={min_volume_threshold}, "
-            f"analysis_window={minutes_to_analyze} minutes"
+            f"Initialized TradesAggregator with collection_window={minutes_to_collect} minutes"
         )
 
-    def aggregate_trades_window(
+    def collect_raw_trades_data(
         self,
         trades_window_data: List[Any],
         symbol: str = "BTCFDUSD"
-    ) -> AggregatedTradesData:
-        """聚合trades_window数据。
+    ) -> RawTradesData:
+        """收集trades_window原始数据。
 
         Args:
             trades_window_data: 从Redis获取的trades_window数据
             symbol: 交易符号
 
         Returns:
-            聚合后的交易数据
+            原始交易数据集合
 
         Raises:
             ValueError: 当输入数据无效时
         """
-        logger.info(f"Starting aggregation of trades window data for {symbol}")
+        logger.info(f"Starting collection of raw trades window data for {symbol}")
 
         if not trades_window_data:
             raise ValueError("trades_window_data不能为空")
 
-        # 验证数据质量
-        valid_data = self._validate_and_filter_data(trades_window_data)
-        if not valid_data:
-            raise ValueError("没有有效的交易数据可供聚合")
+        # 转换为原始数据格式，不做任何加工
+        minute_data_points = self._convert_to_raw_format(trades_window_data)
 
-        # 执行聚合
-        volume_profile = self._build_volume_profile(valid_data)
+        if not minute_data_points:
+            raise ValueError("没有有效的交易数据可供收集")
 
-        # 计算统计信息
-        total_volume = sum(volume_profile.values())
-        trade_count = len(valid_data)
+        # 计算时间范围
+        timestamps = [point["timestamp"] for point in minute_data_points]
+        time_range = (min(timestamps), max(timestamps))
 
-        if total_volume <= 0:
-            raise ValueError("聚合后的总交易量为0")
-
-        # 计算价格范围
-        prices = list(volume_profile.keys())
-        price_range = (min(prices), max(prices))
-
-        # 创建聚合结果
-        result = AggregatedTradesData(
+        # 创建原始数据结果
+        result = RawTradesData(
             timestamp=datetime.now(),
             symbol=symbol,
-            price_levels=volume_profile,
-            total_volume=float(total_volume),
-            trade_count=trade_count,
-            price_range=price_range
+            minute_data_points=minute_data_points,
+            data_points_count=len(minute_data_points),
+            time_range=time_range
         )
 
         logger.info(
-            f"Aggregation completed: {len(volume_profile)} price levels, "
-            f"total_volume={result.total_volume:.2f}, "
-            f"price_range=${price_range[0]:.2f}-${price_range[1]:.2f}"
+            f"Raw data collection completed: {len(minute_data_points)} 分钟数据点, "
+            f"时间范围: {time_range[0]} 到 {time_range[1]}"
         )
 
         return result
 
-    def _validate_and_filter_data(self, trades_window_data: List[Any]) -> List[Any]:
-        """验证并过滤无效的交易数据。
+    def _convert_to_raw_format(self, trades_window_data: List[Any]) -> List[Dict[str, Any]]:
+        """将trades_window数据转换为原始格式。
 
         Args:
-            trades_window_data: 原始交易数据列表
+            trades_window_data: 从Redis获取的原始交易数据列表
 
         Returns:
-            过滤后的有效数据列表
+            标准化的原始数据点列表
         """
-        valid_data = []
-        cutoff_time = datetime.now() - timedelta(minutes=self.minutes_to_analyze)
+        import json
+
+        raw_data_points = []
+        cutoff_time = datetime.now() - timedelta(minutes=self.minutes_to_collect)
 
         for minute_data in trades_window_data:
             try:
-                # 检查数据是否包含必要字段
-                if not hasattr(minute_data, "timestamp") or not hasattr(minute_data, "price_levels"):
-                    continue
-
-                # 检查时间是否在分析窗口内
-                if hasattr(minute_data.timestamp, 'timestamp'):
-                    # 处理时间戳格式
-                    data_time = datetime.fromtimestamp(minute_data.timestamp.timestamp())
-                else:
+                # 处理MinuteTradeData对象格式
+                if hasattr(minute_data, 'timestamp') and hasattr(minute_data, 'price_levels'):
+                    # 直接访问MinuteTradeData对象的属性
                     data_time = minute_data.timestamp
+                    price_levels = minute_data.price_levels
 
-                if data_time < cutoff_time:
-                    continue
-
-                # 检查价格水平数据
-                price_levels = minute_data.price_levels
-                if not price_levels or not isinstance(price_levels, dict):
-                    continue
-
-                valid_data.append(minute_data)
-
-            except Exception as e:
-                logger.debug(f"跳过无效数据点: {e}")
-                continue
-
-        logger.info(f"数据验证完成: {len(valid_data)}/{len(trades_window_data)} 数据点有效")
-        return valid_data
-
-    def _build_volume_profile(self, valid_data: List[Any]) -> Dict[float, float]:
-        """构建成交量分布图。
-
-        Args:
-            valid_data: 验证后的有效数据
-
-        Returns:
-            价格-成交量字典
-        """
-        volume_profile: defaultdict[float, float] = defaultdict(float)
-
-        total_processed = 0
-        for minute_data in valid_data:
-            try:
-                price_levels = minute_data.price_levels
-
-                for price_key, level_data in price_levels.items():
-                    try:
-                        # 提取成交量
-                        if isinstance(level_data, dict):
-                            volume = float(level_data.get("total_volume", 0))
-                        else:
-                            # 假设是对象格式
-                            volume = float(getattr(level_data, "total_volume", 0))
-
-                        if volume > 0:
-                            # 对齐价格到聚合精度
-                            price = float(price_key)
-                            aligned_price = self._align_price_to_precision(price)
-                            volume_profile[aligned_price] += volume
-                            total_processed += 1
-
-                    except (ValueError, TypeError, AttributeError) as e:
-                        logger.debug(f"跳过无效价格水平数据: {e}")
+                    # 检查时间是否在收集窗口内
+                    if data_time < cutoff_time:
                         continue
 
+                    # 检查价格水平数据
+                    if not price_levels:
+                        continue
+
+                    # 转换price_levels中的Decimal键为float，以便JSON序列化
+                    converted_price_levels = {}
+                    for price_level, data in price_levels.items():
+                        if hasattr(price_level, 'float'):  # Decimal类型
+                            price_key = float(price_level)
+                        else:
+                            price_key = float(price_level)
+                        converted_price_levels[str(int(price_key))] = data
+
+                    # 创建原始数据格式
+                    raw_point = {
+                        "timestamp": data_time.isoformat(),
+                        "price_levels": converted_price_levels
+                    }
+
+                    raw_data_points.append(raw_point)
+
+                elif isinstance(minute_data, str):
+                    # 处理JSON字符串格式（向后兼容）
+                    try:
+                        parsed_data = json.loads(minute_data)
+                    except json.JSONDecodeError:
+                        logger.debug(f"Failed to parse JSON data: {minute_data[:100]}...")
+                        continue
+
+                    # 检查数据是否包含必要字段
+                    if not isinstance(parsed_data, dict) or "timestamp" not in parsed_data or "price_levels" not in parsed_data:
+                        continue
+
+                    # 解析时间戳
+                    timestamp_str = parsed_data["timestamp"]
+                    if isinstance(timestamp_str, str):
+                        if timestamp_str.endswith('Z'):
+                            timestamp_str = timestamp_str.replace('Z', '+00:00')
+                        data_time = datetime.fromisoformat(timestamp_str)
+                    else:
+                        data_time = timestamp_str
+
+                    # 检查时间是否在收集窗口内
+                    if data_time < cutoff_time:
+                        continue
+
+                    # 检查价格水平数据
+                    price_levels = parsed_data["price_levels"]
+                    if not price_levels or not isinstance(price_levels, dict):
+                        continue
+
+                    raw_point = {
+                        "timestamp": data_time.isoformat(),
+                        "price_levels": price_levels
+                    }
+
+                    raw_data_points.append(raw_point)
+
+                elif isinstance(minute_data, dict):
+                    # 处理字典格式（向后兼容）
+                    if "timestamp" not in minute_data or "price_levels" not in minute_data:
+                        continue
+
+                    # 解析时间戳
+                    timestamp_str = minute_data["timestamp"]
+                    if isinstance(timestamp_str, str):
+                        if timestamp_str.endswith('Z'):
+                            timestamp_str = timestamp_str.replace('Z', '+00:00')
+                        data_time = datetime.fromisoformat(timestamp_str)
+                    else:
+                        data_time = timestamp_str
+
+                    # 检查时间是否在收集窗口内
+                    if data_time < cutoff_time:
+                        continue
+
+                    price_levels = minute_data["price_levels"]
+                    if not price_levels:
+                        continue
+
+                    raw_point = {
+                        "timestamp": data_time.isoformat(),
+                        "price_levels": price_levels
+                    }
+
+                    raw_data_points.append(raw_point)
+                else:
+                    logger.debug(f"Unsupported data type: {type(minute_data)}")
+                    continue
+
             except Exception as e:
-                logger.debug(f"处理分钟数据时出错: {e}")
+                logger.info(f"跳过无效数据点: {e}")
+                logger.info(f"Problem data sample: {str(minute_data)[:200]}")
                 continue
 
-        # 过滤低于阈值的成交量
-        filtered_profile = {
-            price: volume
-            for price, volume in volume_profile.items()
-            if volume >= self.min_volume_threshold
-        }
+        logger.info(f"原始数据转换完成: {len(raw_data_points)}/{len(trades_window_data)} 数据点有效")
+        return raw_data_points
 
-        logger.info(
-            f"成交量分布构建完成: 处理了{total_processed}个数据点, "
-            f"生成{len(filtered_profile)}个有效价格水平"
-        )
-
-        return filtered_profile
-
-    def _align_price_to_precision(self, price: float) -> float:
-        """将价格对齐到聚合精度。
+    def get_data_summary(self, raw_data: RawTradesData) -> Dict[str, Any]:
+        """生成原始数据摘要。
 
         Args:
-            price: 原始价格
+            raw_data: 原始交易数据
 
         Returns:
-            对齐后的价格
+            数据摘要字典
         """
-        # 向下对齐到聚合精度
-        aligned = (price // float(self.aggregation_precision)) * float(self.aggregation_precision)
-        return aligned
-
-    def get_market_summary(self, aggregated_data: AggregatedTradesData) -> Dict[str, Any]:
-        """生成市场数据摘要。
-
-        Args:
-            aggregated_data: 聚合后的交易数据
-
-        Returns:
-            市场摘要字典
-        """
-        price_levels = aggregated_data.price_levels
-
-        if not price_levels:
-            return {"error": "没有价格水平数据"}
-
-        # 计算统计信息
-        volumes = list(price_levels.values())
-        total_volume = sum(volumes)
-        max_volume = max(volumes)
-        min_volume = min(volumes)
-        avg_volume = total_volume / len(volumes)
-
-        # 找到成交量最大的价格（POC - Point of Control）
-        poc_price = max(price_levels.items(), key=lambda x: x[1])
-
-        # 计算成交量分布
-        sorted_volumes = sorted(volumes, reverse=True)
-        top_10_percent_volume = sum(sorted_volumes[: max(1, len(sorted_volumes) // 10)])
-
-        # 价格范围分析
-        price_range = aggregated_data.price_range
-        price_spread = price_range[1] - price_range[0]
-
         return {
-            "analysis_timestamp": aggregated_data.timestamp.isoformat(),
-            "symbol": aggregated_data.symbol,
+            "collection_timestamp": raw_data.timestamp.isoformat(),
+            "symbol": raw_data.symbol,
             "data_summary": {
-                "total_volume": total_volume,
-                "trade_count": aggregated_data.trade_count,
-                "price_levels_count": len(price_levels),
-                "price_range": price_range,
-                "price_spread": price_spread
+                "minutes_collected": raw_data.data_points_count,
+                "time_range": raw_data.time_range,
+                "collection_window_minutes": self.minutes_to_collect
             },
-            "volume_analysis": {
-                "max_volume": max_volume,
-                "min_volume": min_volume,
-                "avg_volume": avg_volume,
-                "volume_concentration": max_volume / avg_volume if avg_volume > 0 else 0,
-                "top_10_percent_volume_ratio": top_10_percent_volume / total_volume if total_volume > 0 else 0
-            },
-            "poc_analysis": {
-                "poc_price": poc_price[0],
-                "poc_volume": poc_price[1],
-                "poc_volume_percentage": poc_price[1] / total_volume if total_volume > 0 else 0
-            }
+            "note": "原始trades_window数据，未经任何聚合处理，直接提供给AI分析"
         }

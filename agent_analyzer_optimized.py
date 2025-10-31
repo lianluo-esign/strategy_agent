@@ -58,23 +58,22 @@ class OptimizedAnalyzerAgent:
         deepseek_config = self._prepare_deepseek_config(settings)
 
         # 获取Discord webhook URL
-        discord_webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-        if not discord_webhook_url:
-            logger.warning("Discord webhook URL未配置，将跳过通知功能")
+        discord_config = getattr(settings.analyzer, 'discord', None)
+        discord_webhook_url = ""
+        if discord_config and discord_config.enable:
+            discord_webhook_url = discord_config.webhook_url
+            if not discord_webhook_url:
+                logger.warning("Discord功能已启用但webhook URL未配置，将跳过通知功能")
+        else:
+            logger.info("Discord通知功能未启用")
 
         # 创建优化版分析器
         self.analyzer = OptimizedAgentAnalyzer(
             redis_store=self.redis_store,
             deepseek_config=deepseek_config,
             discord_webhook_url=discord_webhook_url,
-            aggregation_precision=getattr(
-                settings.analyzer, "price_aggregation_precision", 10.0
-            ),
-            min_volume_threshold=getattr(
-                settings.analyzer, "min_volume_threshold", 0.1
-            ),
             analysis_window_minutes=getattr(
-                settings.analyzer, "analysis_window_minutes", 1440
+                settings.analyzer, "analysis_window_minutes", 4320
             )
         )
 
@@ -100,15 +99,8 @@ class OptimizedAnalyzerAgent:
             raise ValueError("Deepseek功能未启用")
 
         if not deepseek_settings.api_key:
-            # 尝试从环境变量获取
-            import os
-            api_key = os.getenv("DEEPSEEK_API_KEY")
-            if not api_key:
-                logger.error("Deepseek API密钥未配置")
-                raise ValueError("请设置DEEPSEEK_API_KEY环境变量或在配置文件中指定api_key")
-
-            logger.info("从环境变量获取Deepseek API密钥")
-            deepseek_settings.api_key = api_key
+            logger.error("Deepseek API密钥未配置")
+            raise ValueError("请在配置文件中指定deepseek.api_key")
 
         return {
             "api_key": deepseek_settings.api_key,
@@ -155,11 +147,11 @@ class OptimizedAnalyzerAgent:
 
         logger.info("✅ Redis连接已建立")
 
-        # 测试Discord连接（如果启用）
-        if await self.analyzer.test_discord_connection():
-            logger.info("✅ Discord连接测试成功")
+        # Discord通知功能说明（不进行连接测试）
+        if self.analyzer.discord_manager:
+            logger.info("✅ Discord通知功能已启用，分析完成后将自动发送结果")
         else:
-            logger.warning("⚠️ Discord连接测试失败，将跳过通知功能")
+            logger.info("ℹ️ Discord通知功能未配置")
 
         # 执行健康检查
         health = await self.analyzer.health_check()
@@ -181,7 +173,7 @@ class OptimizedAnalyzerAgent:
 
     async def _analysis_loop(self) -> None:
         """主分析循环。"""
-        interval = getattr(self.settings.analyzer, "analysis", {}).get("interval_seconds", 300)
+        interval = getattr(self.settings.analyzer.analysis, "interval_seconds", 300)
 
         logger.info(f"🔄 开始分析循环: {self.symbol} (间隔: {interval}s)")
 
@@ -245,7 +237,7 @@ class OptimizedAnalyzerAgent:
         discord_sent = result.get("discord_notification_sent", False)
 
         logger.info(f"=== 📊 {symbol} 优化版分析摘要 ===")
-        logger.info(f"🔍 分析模式: 基于trades_window数据的AI趋势分析")
+        logger.info(f"🔍 分析模式: 基于原始trades_window数据的AI趋势分析")
 
         # 分析结果摘要
         analysis_result = result.get("analysis_result", {})
@@ -259,12 +251,12 @@ class OptimizedAnalyzerAgent:
                 for level, value in strength_levels.items():
                     logger.info(f"   {level}: {value:.2f}")
 
-        # 性能摘要
-        aggregated_data = result.get("aggregated_data", {})
-        if aggregated_data:
+        # 数据摘要
+        raw_data = result.get("raw_data", {})
+        if raw_data:
             logger.info(
-                f"📊 数据统计: {aggregated_data.get('price_levels_count', 0)} 个价格水平, "
-                f"总成交量 {aggregated_data.get('total_volume', 0):.2f}"
+                f"📊 数据统计: {raw_data.get('data_points_count', 0)} 个分钟数据点, "
+                f"分析窗口 {len(raw_data.get('minute_data_points', []))} 分钟"
             )
 
         logger.info(f"⏱️ 处理时间: {processing_time:.2f}s")
@@ -335,9 +327,6 @@ async def main() -> None:
     parser.add_argument(
         "--single-run", action="store_true", help="运行分析一次后退出"
     )
-    parser.add_argument(
-        "--test-discord", action="store_true", help="测试Discord连接"
-    )
     args = parser.parse_args()
 
     # 加载设置
@@ -368,18 +357,7 @@ async def main() -> None:
         sys.exit(1)
 
     try:
-        if args.test_discord:
-            # 测试Discord连接
-            logger.info("🔧 测试Discord连接...")
-            success = await agent.test_discord_connection()
-            if success:
-                logger.info("✅ Discord连接测试成功")
-                sys.exit(0)
-            else:
-                logger.error("❌ Discord连接测试失败")
-                sys.exit(1)
-
-        elif args.single_run:
+        if args.single_run:
             # 单次运行模式
             logger.info("🔧 单次运行模式")
             json_result = await agent.analyzer.analyze_single_cycle()
@@ -408,17 +386,19 @@ if __name__ == "__main__":
     # 显示启动信息
     print("🚀 启动优化版市场分析代理")
     print("📋 优化功能:")
-    print("   • 基于trades_window数据进行AI趋势分析")
-    print("   • 移除5000层深度快照依赖")
+    print("   • 基于原始trades_window数据进行AI趋势分析")
+    print("   • 直接使用最近4小时每分钟数据点")
+    print("   • 无二次聚合，保持数据原始性")
     print("   • 集成Deepseek AI分析")
     print("   • 标准JSON输出格式")
-    print("   • Discord webhook通知支持")
+    print("   • 分析完成后直接发送Discord通知")
     print("📤 输出格式:")
     print("   • timestamp: 最新分钟时间")
     print("   • trend: 趋势判断(震荡/微弱看涨/看涨/强力看涨/微弱看跌/看跌/强力看跌)")
     print("   • strength_levels: 各档位强度值")
     print("   • reason: 分析原因")
     print("   • confidence: 置信度")
+    print("   • 分析完成后自动发送Discord通知")
     print("=" * 60)
 
     asyncio.run(main())
