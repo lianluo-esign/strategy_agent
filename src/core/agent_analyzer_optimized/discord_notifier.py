@@ -137,7 +137,7 @@ class DiscordNotifier:
             logger.error(f"Discord通知发送异常: {e}")
             return False
 
-  def _format_discord_message(
+    def _format_discord_message(
         self,
         analysis_result: dict[str, Any],
         symbol: str
