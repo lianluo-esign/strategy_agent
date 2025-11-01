@@ -594,10 +594,10 @@ class DiscordNotifier:
                         logger.debug(f"Invalid price/volume data: {price_str}={level_data.get('total_volume')}")
                         continue
 
-            if all_volumes and price_analysis["current_price"] > 0:
+            if all_volumes and float(price_analysis["current_price"]) > 0:  # type: ignore[arg-type]
                 # 按成交量排序，找出热点价格
                 sorted_volumes = sorted(all_volumes.items(), key=lambda x: x[1], reverse=True)
-                current_price = price_analysis["current_price"]
+                current_price = float(price_analysis["current_price"])  # type: ignore[arg-type]
 
                 # 找出支撑位（当前价格下方的高成交量位置）
                 support_candidates = [(price, vol) for price, vol in sorted_volumes if price < current_price]
@@ -605,12 +605,12 @@ class DiscordNotifier:
 
                 # 取前3个支撑位和阻力位
                 price_analysis["support_levels"] = [
-                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100}
+                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100.0}
                     for price, volume in support_candidates[:3]
                 ]
 
                 price_analysis["resistance_levels"] = [
-                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100}
+                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100.0}
                     for price, volume in resistance_candidates[:3]
                 ]
 
@@ -795,85 +795,141 @@ class DiscordNotifier:
             格式化的价格分析字符串
         """
         try:
-            # 验证输入数据
-            if not analysis_result or not isinstance(analysis_result, dict):
-                logger.warning("Invalid analysis_result provided")
-                return "数据格式异常"
-
-            # 尝试从metadata中提取data_statistics
-            metadata = analysis_result.get("metadata", {})
-            if not isinstance(metadata, dict):
-                logger.warning("Invalid metadata structure")
-                return "数据格式异常"
-
-            data_stats = metadata.get("data_statistics", {})
+            data_stats = self._validate_and_extract_statistics(analysis_result)
             if not data_stats:
                 return "暂无统计数据"
 
-            # 验证data_statistics结构
-            if not isinstance(data_stats, dict):
-                logger.warning("Invalid data_statistics structure")
-                return "数据格式异常"
-
             # 提取并验证各项统计数据
-            try:
-                total_volume = float(data_stats.get("total_volume", 0))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid total_volume: {data_stats.get('total_volume')}")
-                total_volume = 0.0
-
-            try:
-                trade_count = int(data_stats.get("trade_count", 0))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid trade_count: {data_stats.get('trade_count')}")
-                trade_count = 0
-
-            try:
-                price_levels_count = int(data_stats.get("price_levels_count", 0))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid price_levels_count: {data_stats.get('price_levels_count')}")
-                price_levels_count = 0
-
-            # 验证价格范围
-            price_range = data_stats.get("price_range", [0, 0])
-            if not isinstance(price_range, list) or len(price_range) != 2:
-                logger.warning(f"Invalid price_range: {price_range}")
-                price_range = [0, 0]
+            total_volume = self._safe_convert_to_float(data_stats.get("total_volume", 0), "total_volume")
+            trade_count = self._safe_convert_to_int(data_stats.get("trade_count", 0), "trade_count")
+            price_levels_count = self._safe_convert_to_int(data_stats.get("price_levels_count", 0), "price_levels_count")
+            price_range = self._validate_price_range(data_stats.get("price_range", [0, 0]))
 
             # 格式化显示
             lines = []
-
-            # 总成交量（处理BTC单位显示）
-            if total_volume > 0:
-                if total_volume >= 1000:
-                    volume_display = f"{total_volume/1000:.2f}K BTC"
-                else:
-                    volume_display = f"{total_volume:.4f} BTC"
-                lines.append(f"• 总成交量: {volume_display}")
-            else:
-                lines.append("• 总成交量: 0 BTC")
-
-            # 交易数量
+            lines.append(self._format_volume_line(total_volume))
             lines.append(f"• 交易数量: {trade_count:,} 笔")
-
-            # 价格档位数量
             lines.append(f"• 价格档位: {price_levels_count:,} 个")
-
-            # 价格区间
-            if isinstance(price_range, list) and len(price_range) == 2:
-                min_price, max_price = price_range
-                if min_price > 0 and max_price > 0:
-                    lines.append(f"• 价格区间: ${min_price:,.0f} - ${max_price:,.0f}")
-                else:
-                    lines.append("• 价格区间: 数据异常")
-            else:
-                lines.append("• 价格区间: 不可用")
+            lines.append(self._format_price_range_line(price_range))
 
             return "\n".join(lines)
 
         except Exception as e:
             logger.debug(f"格式化数据统计信息失败: {e}")
             return "统计数据格式异常"
+
+    def _validate_and_extract_statistics(self, analysis_result: dict[str, Any]) -> dict[str, Any] | None:
+        """验证并提取统计数据。
+
+        Args:
+            analysis_result: 分析结果字典
+
+        Returns:
+            统计数据字典，验证失败时返回None
+        """
+        # 验证输入数据
+        if not analysis_result or not isinstance(analysis_result, dict):
+            logger.warning("Invalid analysis_result provided")
+            return None
+
+        # 尝试从metadata中提取data_statistics
+        metadata = analysis_result.get("metadata", {})
+        if not isinstance(metadata, dict):
+            logger.warning("Invalid metadata structure")
+            return None
+
+        data_stats = metadata.get("data_statistics", {})
+        if not data_stats:
+            return None
+
+        # 验证data_statistics结构
+        if not isinstance(data_stats, dict):
+            logger.warning("Invalid data_statistics structure")
+            return None
+
+        return data_stats
+
+    def _safe_convert_to_float(self, value: Any, field_name: str) -> float:
+        """安全转换为float类型。
+
+        Args:
+            value: 要转换的值
+            field_name: 字段名称（用于日志）
+
+        Returns:
+            转换后的float值，失败时返回0.0
+        """
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid {field_name}: {value}")
+            return 0.0
+
+    def _safe_convert_to_int(self, value: Any, field_name: str) -> int:
+        """安全转换为int类型。
+
+        Args:
+            value: 要转换的值
+            field_name: 字段名称（用于日志）
+
+        Returns:
+            转换后的int值，失败时返回0
+        """
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid {field_name}: {value}")
+            return 0
+
+    def _validate_price_range(self, price_range: Any) -> list[float]:
+        """验证价格范围。
+
+        Args:
+            price_range: 价格范围数据
+
+        Returns:
+            验证后的价格范围列表
+        """
+        if not isinstance(price_range, list) or len(price_range) != 2:
+            logger.warning(f"Invalid price_range: {price_range}")
+            return [0.0, 0.0]
+        return price_range
+
+    def _format_volume_line(self, total_volume: float) -> str:
+        """格式化成交量行。
+
+        Args:
+            total_volume: 总成交量
+
+        Returns:
+            格式化的成交量字符串
+        """
+        if total_volume > 0:
+            if total_volume >= 1000:
+                volume_display = f"{total_volume/1000:.2f}K BTC"
+            else:
+                volume_display = f"{total_volume:.4f} BTC"
+            return f"• 总成交量: {volume_display}"
+        else:
+            return "• 总成交量: 0 BTC"
+
+    def _format_price_range_line(self, price_range: list[float]) -> str:
+        """格式化价格区间行。
+
+        Args:
+            price_range: 价格范围列表
+
+        Returns:
+            格式化的价格区间字符串
+        """
+        if len(price_range) == 2:
+            min_price, max_price = price_range
+            if min_price > 0 and max_price > 0:
+                return f"• 价格区间: ${min_price:,.0f} - ${max_price:,.0f}"
+            else:
+                return "• 价格区间: 数据异常"
+        else:
+            return "• 价格区间: 不可用"
 
     def _format_data_statistics_text(self, analysis_result: dict[str, Any]) -> str:
         """格式化数据统计信息为文本格式。
@@ -1739,10 +1795,10 @@ class BayesianDiscordFormatter:
                         logger.debug(f"Invalid price/volume data: {price_str}={level_data.get('total_volume')}")
                         continue
 
-            if all_volumes and price_analysis["current_price"] > 0:
+            if all_volumes and float(price_analysis["current_price"]) > 0:  # type: ignore[arg-type]
                 # 按成交量排序，找出热点价格
                 sorted_volumes = sorted(all_volumes.items(), key=lambda x: x[1], reverse=True)
-                current_price = price_analysis["current_price"]
+                current_price = float(price_analysis["current_price"])  # type: ignore[arg-type]
 
                 # 找出支撑位（当前价格下方的高成交量位置）
                 support_candidates = [(price, vol) for price, vol in sorted_volumes if price < current_price]
@@ -1750,12 +1806,12 @@ class BayesianDiscordFormatter:
 
                 # 取前3个支撑位和阻力位
                 price_analysis["support_levels"] = [
-                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100}
+                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100.0}
                     for price, volume in support_candidates[:3]
                 ]
 
                 price_analysis["resistance_levels"] = [
-                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100}
+                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100.0}
                     for price, volume in resistance_candidates[:3]
                 ]
 
