@@ -54,7 +54,7 @@ analyzer:
     timeout: 30
     max_retries: 3
   analysis:
-    interval_seconds: 300  # 分析间隔：5分钟
+    interval_seconds: 60  # 分析间隔：5分钟
     min_order_volume_threshold: 0.01
     support_resistance_threshold: 0.1
   price_aggregation:
