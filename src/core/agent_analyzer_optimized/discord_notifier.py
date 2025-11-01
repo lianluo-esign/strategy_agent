@@ -79,7 +79,7 @@ class DiscordNotifier:
             "total_notifications": 0,
             "successful_notifications": 0,
             "failed_notifications": 0,
-            "average_response_time": 0
+            "average_response_time": 0.0
         }
 
         logger.info(f"Initialized DiscordNotifier with webhook URL: {webhook_url[:50]}...")
@@ -325,8 +325,19 @@ class DiscordNotifier:
             return text
         return text[:max_length - 3] + "..."
 
+    async def send_raw_message(self, payload: dict[str, Any]) -> bool:
+        """发送原始消息到Discord（公共方法）。
+
+        Args:
+            payload: Discord消息载荷
+
+        Returns:
+            发送是否成功
+        """
+        return await self._send_to_discord(payload)
+
     async def _send_to_discord(self, payload: dict[str, Any]) -> bool:
-        """发送消息到Discord。
+        """发送消息到Discord（私有方法）。
 
         Args:
             payload: 消息载荷
@@ -461,7 +472,7 @@ class DiscordNotificationManager:
 
             # 发送到Discord
             try:
-                success = await self.notifier._send_to_discord(formatted_message)
+                success = await self.notifier.send_raw_message(formatted_message)
                 if success:
                     logger.info(f"贝叶斯趋势警报发送成功: {symbol}")
                 return success
@@ -536,7 +547,7 @@ class DiscordNotificationManager:
         }
 
         try:
-            return await self.notifier._send_to_discord(error_payload)
+            return await self.notifier.send_raw_message(error_payload)
         except Exception as e:
             logger.error(f"错误通知发送失败: {e}")
             return False
@@ -564,7 +575,7 @@ class BayesianDiscordFormatter:
     4. 贝叶斯证据权重分析
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化贝叶斯Discord格式化器。"""
         # 贝叶斯趋势表情符号映射
         self.bayesian_trend_emojis = {
@@ -605,24 +616,24 @@ class BayesianDiscordFormatter:
         Returns:
             Discord消息载荷
         """
-        # 提取贝叶斯分析结果
-        trend_analysis = analysis_data.get("trend_analysis", {})
-        bayesian_analysis = analysis_data.get("bayesian_analysis", {})
+        # 从复杂的数据结构中提取核心信息
+        core_info = self._extract_core_bayesian_info(analysis_data)
 
         # 提取关键信息
-        most_likely_trend = trend_analysis.get("most_likely_trend", "未知")
-        confidence = trend_analysis.get("confidence", 0.0)
-        risk_level = trend_analysis.get("risk_level", "unknown")
-        timestamp = analysis_data.get("timestamp", datetime.now().isoformat())
-
-        # 获取分析原因
-        analysis_reason = bayesian_analysis.get("analysis_reason", "暂无分析原因")
+        most_likely_trend = core_info.get("trend", "未知")
+        confidence = core_info.get("confidence", 0.0)
+        timestamp = core_info.get("timestamp", datetime.now().isoformat())
+        analysis_reason = core_info.get("reason", "暂无分析原因")
+        probabilities = core_info.get("probabilities", {})
 
         # 获取表情符号和颜色
         trend_emoji = self.bayesian_trend_emojis.get(most_likely_trend, "❓")
-        embed_color = self._get_bayesian_color(most_likely_trend, confidence, risk_level)
+        embed_color = self._get_bayesian_color(most_likely_trend, confidence, "unknown")
 
-        # 简化的嵌入消息 - 只包含趋势、原因和时间
+        # 构建概率信息字符串
+        prob_info = self._format_probability_summary(probabilities)
+
+        # 简化的嵌入消息 - 只包含趋势、原因、时间和概率
         embed = {
             "title": f"{trend_emoji} {symbol} 趋势分析",
             "description": f"**趋势**: {most_likely_trend} {trend_emoji}\n**置信度**: {confidence:.1%}",
@@ -630,8 +641,13 @@ class BayesianDiscordFormatter:
             "timestamp": timestamp,
             "fields": [
                 {
+                    "name": "🎯 概率分布",
+                    "value": prob_info,
+                    "inline": False
+                },
+                {
                     "name": "📝 分析原因",
-                    "value": self._truncate_text(analysis_reason, 1000),
+                    "value": self._truncate_text(analysis_reason, 800),
                     "inline": False
                 }
             ],
@@ -641,6 +657,102 @@ class BayesianDiscordFormatter:
         }
 
         return {"embeds": [embed]}
+
+    def _extract_core_bayesian_info(self, analysis_data: dict[str, Any]) -> dict[str, Any]:
+        """从复杂的贝叶斯分析数据中提取核心信息。
+
+        Args:
+            analysis_data: 完整的贝叶斯分析数据
+
+        Returns:
+            包含核心信息的字典
+        """
+        import json
+
+        core_info = {
+            "trend": "未知",
+            "confidence": 0.0,
+            "timestamp": datetime.now().isoformat(),
+            "reason": "暂无分析原因",
+            "probabilities": {},
+            "evidence": []
+        }
+
+        try:
+            # 1. 提取趋势分析信息
+            trend_analysis = analysis_data.get("trend_analysis", {})
+            core_info["trend"] = trend_analysis.get("most_likely_trend") or "未知"
+            core_info["confidence"] = trend_analysis.get("confidence") or 0.0
+            core_info["timestamp"] = analysis_data.get("timestamp") or core_info["timestamp"]
+
+            # 2. 提取分析原因
+            bayesian_analysis = analysis_data.get("bayesian_analysis", {})
+            core_info["reason"] = bayesian_analysis.get("analysis_reason") or "暂无分析原因"
+
+            # 3. 提取概率分布
+            probabilities = {}
+
+            # 首先尝试从response_raw中解析
+            metadata = analysis_data.get("metadata", {})
+            response_raw = metadata.get("response_raw", "")
+
+            if response_raw:
+                try:
+                    raw_data = json.loads(response_raw)
+                    posterior_probs = raw_data.get("posterior_probabilities", {})
+                    if posterior_probs:
+                        # 验证和清洗概率值
+                        probabilities = self._validate_and_clean_probabilities(posterior_probs)
+                except json.JSONDecodeError:
+                    pass
+
+            # 如果response_raw解析失败，尝试其他方式
+            if not probabilities:
+                prob_distribution = analysis_data.get("probability_distribution", {})
+                full_dist = prob_distribution.get("full_distribution", {})
+                if full_dist:
+                    # 同样需要验证其他来源的概率数据
+                    probabilities = self._validate_and_clean_probabilities(full_dist)
+
+            core_info["probabilities"] = probabilities
+
+            # 4. 提取关键证据
+            evidence_summary = bayesian_analysis.get("evidence_summary", {})
+            if evidence_summary:
+                evidence_list = []
+                for key, value in evidence_summary.items():
+                    if value and len(str(value)) > 10:
+                        evidence_list.append(f"**{key}**: {str(value)[:100]}...")
+                core_info["evidence"] = evidence_list[:3]  # 只取前3个最重要的证据
+
+        except Exception as e:
+            logger.error(f"提取贝叶斯核心信息失败: {e}")
+
+        return core_info
+
+    def _format_probability_summary(self, probabilities: dict[str, float]) -> str:
+        """格式化概率分布摘要。
+
+        Args:
+            probabilities: 概率分布字典
+
+        Returns:
+            格式化的概率字符串
+        """
+        if not probabilities:
+            return "暂无概率数据"
+
+        lines = []
+        # 按概率排序，显示前4个
+        sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
+
+        for trend, prob in sorted_probs[:4]:
+            emoji = self.bayesian_trend_emojis.get(trend, "❓")
+            bar_length = int(prob * 10)
+            bar = "█" * bar_length + "░" * (10 - bar_length)
+            lines.append(f"{emoji} {trend}: `{prob:.1%}` {bar}")
+
+        return "\n".join(lines)
 
     def _extract_probability_distribution(self, analysis_data: dict[str, Any], prob_dist: dict[str, Any]) -> dict[str, Any]:
         """从analysis_data中提取概率分布数据。
@@ -936,6 +1048,54 @@ class BayesianDiscordFormatter:
         if len(text) <= max_length:
             return text
         return text[:max_length - 3] + "..."
+
+    def _validate_and_clean_probabilities(self, probabilities: dict[str, float]) -> dict[str, float]:
+        """验证和清洗概率分布数据。
+
+        Args:
+            probabilities: 原始概率分布字典
+
+        Returns:
+            验证和清洗后的概率分布字典
+        """
+        cleaned_probs = {}
+
+        for trend, prob in probabilities.items():
+            # 验证概率值是否为数字
+            try:
+                prob_float = float(prob)
+            except (ValueError, TypeError):
+                logger.warning(f"无效的概率值类型: {trend}={prob}")
+                continue
+
+            # 验证概率值范围
+            if prob_float < 0:
+                logger.warning(f"概率值为负数，已修正为0: {trend}={prob_float}")
+                prob_float = 0.0
+            elif prob_float > 1:
+                logger.warning(f"概率值超过1，已修正为1: {trend}={prob_float}")
+                prob_float = 1.0
+
+            # 只保留有效的概率值
+            if prob_float > 0:
+                cleaned_probs[trend] = prob_float
+
+        # 如果所有概率都无效，返回空字典
+        if not cleaned_probs:
+            logger.warning("所有概率值都无效，返回空概率分布")
+            return {}
+
+        # 归一化概率值，确保总和为1（允许小的浮点误差）
+        total_prob = sum(cleaned_probs.values())
+        if abs(total_prob - 1.0) > 0.01:  # 如果总和偏差超过1%
+            logger.info(f"概率分布总和不为1({total_prob:.3f})，进行归一化处理")
+            if total_prob > 0:
+                cleaned_probs = {
+                    trend: prob / total_prob
+                    for trend, prob in cleaned_probs.items()
+                }
+
+        return cleaned_probs
 
     def _calculate_entropy(self, probabilities: dict[str, float]) -> float:
         """计算概率分布的熵（用于衡量不确定性）。
