@@ -151,41 +151,81 @@ class DiscordNotifier:
         Returns:
             Discord消息载荷
         """
-        # 提取关键信息
+        # 提取关键信息 - 支持贝叶斯分析格式
         timestamp = analysis_result.get("timestamp", datetime.now().isoformat())
-        trend = analysis_result.get("trend", "未知")
+
+        # 尝试从不同位置提取趋势信息
+        trend = "未知"
+        confidence = 0.5
+        reason = "暂无分析原因"
+
+        # 1. 首先尝试从trend_analysis提取（贝叶斯格式）
+        trend_analysis = analysis_result.get("trend_analysis", {})
+        if trend_analysis:
+            trend = trend_analysis.get("most_likely_trend", "未知")
+            confidence = trend_analysis.get("confidence", 0.5)
+
+        # 2. 如果没有找到，尝试从顶级字段提取（传统格式）
+        if trend == "未知":
+            trend = analysis_result.get("trend", "未知")
+            confidence = analysis_result.get("confidence", 0.5)
+
+        # 3. 提取分析原因
+        bayesian_analysis = analysis_result.get("bayesian_analysis", {})
+        if bayesian_analysis.get("analysis_reason"):
+            reason = bayesian_analysis["analysis_reason"]
+        else:
+            reason = analysis_result.get("reason", "暂无分析原因")
+
         strength_levels = analysis_result.get("strength_levels", {})
-        reason = analysis_result.get("reason", "暂无分析原因")
-        confidence = analysis_result.get("confidence", 0.5)
 
         # 获取表情符号
         trend_emoji = TREND_EMOJIS.get(trend, "❓")
         confidence_bar = self._create_confidence_bar(confidence)
 
+        # 尝试提取概率分布信息（用于贝叶斯分析）
+        probability_summary = self._extract_probability_summary(analysis_result)
+
         if self.enable_embeds:
+            # 构建字段列表
+            fields = [
+                {
+                    "name": "📊 趋势详情",
+                    "value": f"**当前趋势**: {trend} {trend_emoji}\n**置信度**: {confidence:.1%} {confidence_bar}",
+                    "inline": False
+                }
+            ]
+
+            # 如果有概率分布信息，添加概率字段
+            if probability_summary:
+                fields.append({
+                    "name": "📈 概率分布",
+                    "value": probability_summary,
+                    "inline": True
+                })
+
+            # 如果有强度信息，添加强度字段
+            if strength_levels:
+                fields.append({
+                    "name": "💪 支撑/阻力强度",
+                    "value": self._format_strength_levels(strength_levels),
+                    "inline": True
+                })
+
+            # 添加分析原因
+            fields.append({
+                "name": "📝 分析原因",
+                "value": self._truncate_text(reason, 1024),
+                "inline": False
+            })
+
             # 使用嵌入格式
             embed = {
                 "title": f"{trend_emoji} {symbol} 市场趋势分析",
                 "description": f"**趋势判断**: {trend}",
                 "color": self._get_trend_color(trend),
                 "timestamp": timestamp,
-                "fields": [
-                    {
-                        "name": "📊 趋势详情",
-                        "value": f"**当前趋势**: {trend} {trend_emoji}\n**置信度**: {confidence:.1%} {confidence_bar}",
-                        "inline": False
-                    },
-                    {
-                        "name": "💪 支撑/阻力强度",
-                        "value": self._format_strength_levels(strength_levels),
-                        "inline": True
-                    },
-                    {
-                        "name": "📝 分析原因",
-                        "value": self._truncate_text(reason, 1024),
-                        "inline": False
-                    }
-                ],
+                "fields": fields,
                 "footer": {
                     "text": "AI分析 | BTC-FDUSD流动性分析Agent"
                 }
@@ -211,6 +251,65 @@ class DiscordNotifier:
 *由AI分析生成 | BTC-FDUSD流动性分析Agent*"""
 
             return {"content": message}
+
+    def _extract_probability_summary(self, analysis_result: dict[str, Any]) -> str:
+        """提取概率分布摘要（用于传统格式化器）。
+
+        Args:
+            analysis_result: 分析结果
+
+        Returns:
+            格式化的概率分布字符串
+        """
+        try:
+            # 尝试从metadata的response_raw中解析概率分布
+            metadata = analysis_result.get("metadata", {})
+            response_raw = metadata.get("response_raw", "")
+
+            if response_raw:
+                import json
+                try:
+                    raw_data = json.loads(response_raw)
+                    posterior_probs = raw_data.get("posterior_probabilities", {})
+                    if posterior_probs:
+                        return self._format_probability_distribution_simple(posterior_probs)
+                except json.JSONDecodeError:
+                    pass
+
+            # 尝试从probability_distribution中提取
+            prob_distribution = analysis_result.get("probability_distribution", {})
+            full_dist = prob_distribution.get("full_distribution", {})
+            if full_dist:
+                return self._format_probability_distribution_simple(full_dist)
+
+        except Exception as e:
+            logger.debug(f"提取概率分布失败: {e}")
+
+        return ""
+
+    def _format_probability_distribution_simple(self, probabilities: dict[str, float]) -> str:
+        """格式化概率分布（简化版）。
+
+        Args:
+            probabilities: 概率分布字典
+
+        Returns:
+            格式化的概率字符串
+        """
+        if not probabilities:
+            return ""
+
+        lines = []
+        # 按概率排序，只显示前3个
+        sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
+
+        for trend, prob in sorted_probs[:3]:
+            emoji = TREND_EMOJIS.get(trend, "❓")
+            bar_length = int(prob * 5)
+            bar = "●" * bar_length + "○" * (5 - bar_length)
+            lines.append(f"{emoji} {trend}: `{prob:.0%}` {bar}")
+
+        return "\n".join(lines)
 
     def _format_strength_levels(self, strength_levels: dict[str, float]) -> str:
         """格式化强度等级（嵌入格式）。
@@ -500,14 +599,29 @@ class DiscordNotificationManager:
         Returns:
             是否为贝叶斯分析结果
         """
-        # 简化贝叶斯分析检查 - 只检查最常见的标志性字段
+        # 增强贝叶斯分析检查 - 检查更多标志性字段
         bayesian_indicators = [
             "trend_analysis",
             "probability_distribution",
-            "bayesian_analysis"
+            "bayesian_analysis",
+            "metadata",  # DeepSeek响应通常包含metadata
+            "analysis_type"  # 包含bayesian字段的analysis_type
         ]
 
-        return any(key in analysis_result for key in bayesian_indicators)
+        has_indicator = any(key in analysis_result for key in bayesian_indicators)
+
+        # 进一步检查metadata中是否有response_raw（DeepSeek响应特征）
+        if has_indicator:
+            metadata = analysis_result.get("metadata", {})
+            if metadata.get("response_raw") or metadata.get("model_type") == "bayesian_deepseek":
+                return True
+
+            # 检查analysis_type是否包含bayesian
+            analysis_type = analysis_result.get("analysis_type", "")
+            if "bayesian" in str(analysis_type).lower():
+                return True
+
+        return has_indicator
 
     async def send_error_notification(self, error_message: str, context: str = "") -> bool:
         """发送错误通知。
