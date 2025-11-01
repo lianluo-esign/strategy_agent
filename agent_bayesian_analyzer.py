@@ -17,16 +17,16 @@
 import argparse
 import asyncio
 import logging
-import os
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
 # 添加src到Python路径
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from core.agent_analyzer_optimized.bayesian_optimized_analyzer import BayesianOptimizedAnalyzer
+from core.agent_analyzer_optimized.bayesian_optimized_analyzer import (
+    BayesianOptimizedAnalyzer,
+)
 from core.redis_client import RedisDataStore
 from utils.config import Settings
 
@@ -102,10 +102,9 @@ class BayesianAnalyzerAgent:
         self.is_running = False
         self.shutdown_event = asyncio.Event()
 
-        # 数据驱动模式的状态跟踪
+        # 数据驱动模式的状态跟踪（仅基于trades_window）
         self.last_analysis_timestamp = None
         self.last_trades_window_hash = None
-        self.last_depth_snapshot_hash = None
         self.min_data_points_for_analysis = 60  # 至少需要60个数据点才进行分析
         self.check_interval = 5  # 每5秒检查一次是否有新数据
 
@@ -200,11 +199,12 @@ class BayesianAnalyzerAgent:
             await self._shutdown()
 
     async def _analysis_loop(self) -> None:
-        """数据驱动的贝叶斯分析循环 - 仅在有新数据时触发分析。"""
+        """数据驱动的贝叶斯分析循环 - 仅基于trades_window新数据触发分析。"""
         logger.info(f"🔄 开始贝叶斯数据驱动分析循环: {self.symbol}")
         logger.info(f"📊 最小数据点要求: {self.min_data_points_for_analysis}")
         logger.info(f"🔍 数据检查间隔: {self.check_interval}秒")
-        logger.info(f"🧠 采用贝叶斯思维框架进行概率化分析")
+        logger.info("📋 触发机制: 仅基于trades_window最新数据点更新")
+        logger.info("🧠 采用贝叶斯思维框架进行概率化分析")
 
         while self.is_running:
             try:
@@ -240,33 +240,27 @@ class BayesianAnalyzerAgent:
                 break
 
     async def _check_for_new_data(self) -> bool:
-        """检查是否有新的数据点（静态或动态）。
+        """检查是否有新的trades_window数据点。
 
         Returns:
             bool: 如果有新数据且满足分析条件返回True，否则返回False
         """
         try:
-            # 获取当前数据状态
+            # 获取当前trades_window数据状态
             current_trades_count = self.redis_store.get_trade_window_count()
             latest_trades_timestamp = self.redis_store.get_latest_trade_timestamp()
             current_trades_hash = self.redis_store.get_trades_window_hash()
-            current_depth_hash = self.redis_store.get_depth_snapshot_hash()
 
             logger.debug(
                 f"数据检查: 动态数据数量={current_trades_count}, "
                 f"最新时间={latest_trades_timestamp}, "
-                f"动态哈希={current_trades_hash}, "
-                f"静态哈希={current_depth_hash}"
+                f"动态哈希={current_trades_hash}"
             )
 
-            # 检查是否有足够的数据点
+            # 检查是否有足够的数据点进行分析
             if current_trades_count < self.min_data_points_for_analysis:
                 if current_trades_count > 0:
                     logger.debug(f"动态数据点不足: {current_trades_count}/{self.min_data_points_for_analysis}")
-                # 即使动态数据不足，如果有静态数据也可以进行分析
-                if self.redis_store.depth_snapshot_exists():
-                    logger.info("动态数据不足但有静态数据，将进行分析")
-                    return self._check_static_data_change(current_depth_hash)
                 return False
 
             # 首次运行时，只要有足够数据就分析
@@ -274,56 +268,29 @@ class BayesianAnalyzerAgent:
                 logger.info(f"首次运行，检测到 {current_trades_count} 个动态数据点，将进行贝叶斯分析")
                 self.last_analysis_timestamp = latest_trades_timestamp
                 self.last_trades_window_hash = current_trades_hash
-                self.last_depth_snapshot_hash = current_depth_hash
                 return True
 
-            # 检查动态数据时间戳变化
+            # 仅基于trades_window最新数据点时间戳变化触发分析
             if latest_trades_timestamp and latest_trades_timestamp > self.last_analysis_timestamp:
                 time_diff = latest_trades_timestamp - self.last_analysis_timestamp
-                logger.info(f"检测到新的动态数据点，时间差: {time_diff}")
+                logger.info(f"检测到trades_window新数据点，时间差: {time_diff}秒")
                 self.last_analysis_timestamp = latest_trades_timestamp
                 self.last_trades_window_hash = current_trades_hash
                 return True
 
-            # 检查动态数据内容变化
+            # 检查trades_window内容变化（时间戳没有变化但内容更新了）
             if current_trades_hash and current_trades_hash != self.last_trades_window_hash:
-                logger.info("检测到动态trades_window内容发生变化")
+                logger.info("检测到trades_window内容发生变化")
                 self.last_trades_window_hash = current_trades_hash
                 return True
 
-            # 检查静态数据变化
-            if current_depth_hash and current_depth_hash != self.last_depth_snapshot_hash:
-                logger.info("检测到静态深度快照内容发生变化")
-                self.last_depth_snapshot_hash = current_depth_hash
-                return True
-
-            # 没有检测到新数据
+            # 没有检测到新的trades_window数据
             return False
 
         except Exception as e:
             logger.error(f"检查新数据时出错: {e}")
             return False
 
-    def _check_static_data_change(self, current_depth_hash: Optional[str]) -> bool:
-        """检查静态数据变化。
-
-        Args:
-            current_depth_hash: 当前深度快照哈希
-
-        Returns:
-            bool: 如果有变化返回True
-        """
-        if self.last_depth_snapshot_hash is None:
-            # 首次检测到静态数据
-            self.last_depth_snapshot_hash = current_depth_hash
-            return True
-
-        if current_depth_hash and current_depth_hash != self.last_depth_snapshot_hash:
-            # 静态数据发生变化
-            self.last_depth_snapshot_hash = current_depth_hash
-            return True
-
-        return False
 
     async def _perform_analysis_cycle(self) -> None:
         """执行贝叶斯分析周期。"""
@@ -361,12 +328,12 @@ class BayesianAnalyzerAgent:
         discord_sent = result.get("discord_notification_sent", False)
 
         logger.info(f"=== 📊 {symbol} 贝叶斯分析摘要 ===")
-        logger.info(f"🧠 分析模式: 贝叶斯思维框架的概率化趋势分析")
+        logger.info("🧠 分析模式: 贝叶斯思维框架的概率化趋势分析")
 
         # 显示触发信息
         current_data_points = self.redis_store.get_trade_window_count()
         static_available = self.redis_store.depth_snapshot_exists()
-        logger.info(f"🎯 触发条件: 检测到新数据点")
+        logger.info("🎯 触发条件: trades_window数据更新")
         logger.info(f"📋 数据源状态: 动态数据={current_data_points}点, 静态数据={'可用' if static_available else '不可用'}")
 
         # 贝叶斯分析结果摘要
@@ -398,7 +365,7 @@ class BayesianAnalyzerAgent:
 
         logger.info(f"⏱️ 处理时间: {processing_time:.2f}s")
         logger.info(f"📢 Discord通知: {'已发送' if discord_sent else '未发送'}")
-        logger.info(f"🧠 贝叶斯优势: 概率化预测，量化不确定性，证据权重分析")
+        logger.info("🧠 贝叶斯优势: 概率化预测，量化不确定性，证据权重分析")
         logger.info("=" * 60)
 
     def _log_probability_summary(self, analysis_result: dict) -> None:
@@ -571,11 +538,19 @@ if __name__ == "__main__":
     print("   • 10美元精度聚合的订单簿数据")
     print("   • 贝叶斯思维框架的概率化分析")
     print("   • 动态trades_window数据流分析")
+    print("   • 波动率和成交量统计分析 ⭐")
+    print("   • 量价配合模式识别")
+    print("   • 市场活跃度综合评估")
     print("   • 贝叶斯证据权重和似然计算")
     print("   • AI增强的贝叶斯推理分析")
     print("   • 概率化输出（置信度、不确定性）")
     print("   • 贝叶斯推理链条和证据分析")
     print("   • 集成Discord通知功能")
+    print("")
+    print("📊 触发机制:")
+    print("   • 仅基于trades_window最新数据点更新触发")
+    print("   • 避免depth_snapshot频繁更新导致的过度分析")
+    print("   • 优化分析频率和资源使用")
     print("")
     print("🧠 贝叶斯思维优势:")
     print("   • 概率化预测：避免非黑即白的判断")
@@ -587,6 +562,8 @@ if __name__ == "__main__":
     print("📊 数据源整合:")
     print("   • 静态流动性：深度订单簿的供需结构")
     print("   • 动态成交：历史交易的价格动能")
+    print("   • 波动率分析：多时间周期波动率评估")
+    print("   • 量价关系：价格与成交量的相关性分析")
     print("   • 贝叶斯融合：多源证据的概率综合")
     print("")
     print("📤 输出格式:")

@@ -436,6 +436,7 @@ class DiscordNotificationManager:
             webhook_url: Discord webhook URL
         """
         self.notifier = DiscordNotifier(webhook_url)
+        self.bayesian_formatter = BayesianDiscordFormatter()
 
     async def send_trend_alert(
         self,
@@ -453,16 +454,50 @@ class DiscordNotificationManager:
         Returns:
             发送是否成功
         """
-        # 检查是否为显著趋势
-        trend = analysis_result.get("trend", "")
-        confidence = analysis_result.get("confidence", 0.0)
+        # 检查是否为贝叶斯分析结果
+        if self._is_bayesian_analysis(analysis_result):
+            # 使用贝叶斯格式化器
+            formatted_message = self.bayesian_formatter.format_bayesian_analysis(analysis_result, symbol)
 
-        # 只对高置信度的强趋势发送警报
-        if confidence < 0.7 and trend not in ["强力看涨", "强力看跌"]:
-            logger.info("趋势不够显著，跳过警报发送")
-            return True
+            # 发送到Discord
+            try:
+                success = await self.notifier._send_to_discord(formatted_message)
+                if success:
+                    logger.info(f"贝叶斯趋势警报发送成功: {symbol}")
+                return success
+            except Exception as e:
+                logger.error(f"贝叶斯趋势警报发送失败: {e}")
+                return False
+        else:
+            # 使用传统格式化器（向后兼容）
+            trend = analysis_result.get("trend", "")
+            confidence = analysis_result.get("confidence", 0.0)
 
-        return await self.notifier.send_analysis_result(analysis_result, symbol)
+            # 只对高置信度的强趋势发送警报
+            if confidence < 0.7 and trend not in ["强力看涨", "强力看跌"]:
+                logger.info("趋势不够显著，跳过警报发送")
+                return True
+
+            return await self.notifier.send_analysis_result(analysis_result, symbol)
+
+    def _is_bayesian_analysis(self, analysis_result: dict[str, Any]) -> bool:
+        """检查是否为贝叶斯分析结果。
+
+        Args:
+            analysis_result: 分析结果
+
+        Returns:
+            是否为贝叶斯分析结果
+        """
+        # 检查贝叶斯分析结果的标志性字段
+        bayesian_indicators = [
+            "trend_analysis",
+            "probability_distribution",
+            "bayesian_analysis",
+            "volatility_volume_insights"
+        ]
+
+        return any(key in analysis_result for key in bayesian_indicators)
 
     async def send_error_notification(self, error_message: str, context: str = "") -> bool:
         """发送错误通知。
@@ -517,3 +552,359 @@ class DiscordNotificationManager:
     async def close(self) -> None:
         """关闭资源。"""
         await self.notifier.close()
+
+
+class BayesianDiscordFormatter:
+    """贝叶斯分析结果的Discord格式化器。
+
+    专门用于格式化贝叶斯分析结果，包括：
+    1. 概率化趋势分析结果
+    2. 波动率和成交量分析
+    3. 量价关系和市场活跃度
+    4. 贝叶斯证据权重分析
+    """
+
+    def __init__(self):
+        """初始化贝叶斯Discord格式化器。"""
+        # 贝叶斯趋势表情符号映射
+        self.bayesian_trend_emojis = {
+            "震荡": "⚖️",
+            "微弱看涨": "📈",
+            "看涨": "🚀",
+            "强力看涨": "🔥",
+            "微弱看跌": "📉",
+            "看跌": "⬇️",
+            "强力看跌": "💥"
+        }
+
+        # 置信度等级颜色
+        self.confidence_colors = {
+            "very_low": 0xFF0000,      # 红色
+            "low": 0xFF6B35,           # 橙色
+            "medium": 0xFFD700,        # 金色
+            "high": 0x90EE90,          # 浅绿色
+            "very_high": 0x00FF00      # 绿色
+        }
+
+        # 风险等级颜色
+        self.risk_colors = {
+            "very_high_risk": 0xFF0000,  # 红色
+            "high_risk": 0xFF6B35,       # 橙色
+            "medium_risk": 0xFFD700,     # 金色
+            "low_risk": 0x90EE90,        # 浅绿色
+            "very_low_risk": 0x00FF00    # 绿色
+        }
+
+    def format_bayesian_analysis(self, analysis_data: dict[str, Any], symbol: str = "BTCFDUSD") -> dict[str, Any]:
+        """格式化贝叶斯分析结果为Discord消息。
+
+        Args:
+            analysis_data: 贝叶斯分析结果数据
+            symbol: 交易符号
+
+        Returns:
+            Discord消息载荷
+        """
+        # 提取贝叶斯分析结果
+        trend_analysis = analysis_data.get("trend_analysis", {})
+        probability_distribution = analysis_data.get("probability_distribution", {})
+        bayesian_analysis = analysis_data.get("bayesian_analysis", {})
+
+        # 提取关键信息
+        most_likely_trend = trend_analysis.get("most_likely_trend", "未知")
+        confidence = trend_analysis.get("confidence", 0.0)
+        risk_level = trend_analysis.get("risk_level", "unknown")
+
+        # 获取表情符号和颜色
+        trend_emoji = self.bayesian_trend_emojis.get(most_likely_trend, "❓")
+        embed_color = self._get_bayesian_color(most_likely_trend, confidence, risk_level)
+
+        # 创建嵌入消息
+        embed = {
+            "title": f"🧠 {trend_emoji} {symbol} 贝叶斯趋势分析",
+            "description": f"**最可能趋势**: {most_likely_trend} {trend_emoji}",
+            "color": embed_color,
+            "timestamp": analysis_data.get("timestamp", datetime.now().isoformat()),
+            "thumbnail": {
+                "url": "https://i.imgur.com/7YhD5U7.png"  # 贝叶斯统计图标
+            },
+            "fields": [
+                # 概率化分析结果
+                {
+                    "name": "📊 概率化趋势分析",
+                    "value": self._format_trend_analysis(trend_analysis),
+                    "inline": False
+                },
+
+                # 完整概率分布
+                {
+                    "name": "🎲 概率分布",
+                    "value": self._format_probability_distribution(probability_distribution),
+                    "inline": True
+                },
+
+                # 贝叶斯洞察
+                {
+                    "name": "🧠 贝叶斯洞察",
+                    "value": self._format_bayesian_insights(bayesian_analysis),
+                    "inline": True
+                }
+            ],
+            "footer": {
+                "text": "贝叶斯AI分析 | BTC-FDUSD流动性分析Agent",
+                "icon_url": "https://i.imgur.com/3VWjXhF.png"
+            }
+        }
+
+        # 添加波动率和成交量分析（如果有）
+        volatility_volume_insights = analysis_data.get("volatility_volume_insights", {})
+        if volatility_volume_insights:
+            embed["fields"].append({
+                "name": "📈 波动率与成交量分析",
+                "value": self._format_volatility_volume_insights(volatility_volume_insights),
+                "inline": False
+            })
+
+        return {"embeds": [embed]}
+
+    def _format_trend_analysis(self, trend_analysis: dict[str, Any]) -> str:
+        """格式化趋势分析。
+
+        Args:
+            trend_analysis: 趋势分析数据
+
+        Returns:
+            格式化的趋势分析字符串
+        """
+        most_likely_trend = trend_analysis.get("most_likely_trend", "未知")
+        confidence = trend_analysis.get("confidence", 0.0)
+        uncertainty = trend_analysis.get("uncertainty", 1.0)
+        confidence_level = trend_analysis.get("confidence_level", "unknown")
+        risk_level = trend_analysis.get("risk_level", "unknown")
+
+        # 置信度条
+        confidence_bar = self._create_confidence_bar(confidence)
+
+        # 不确定性条（反向显示）
+        uncertainty_bar = self._create_uncertainty_bar(uncertainty)
+
+        lines = [
+            f"**最可能趋势**: {most_likely_trend}",
+            f"**置信度**: {confidence:.1%} {confidence_bar}",
+            f"**不确定性**: {uncertainty:.1%} {uncertainty_bar}",
+            f"**置信等级**: {self._translate_confidence_level(confidence_level)}",
+            f"**风险等级**: {self._translate_risk_level(risk_level)}"
+        ]
+
+        return "\n".join(lines)
+
+    def _format_probability_distribution(self, prob_dist: dict[str, Any]) -> str:
+        """格式化概率分布。
+
+        Args:
+            prob_dist: 概率分布数据
+
+        Returns:
+            格式化的概率分布字符串
+        """
+        full_dist = prob_dist.get("full_distribution", {})
+        if not full_dist:
+            return "暂无概率分布数据"
+
+        lines = []
+        # 按概率排序
+        sorted_probs = sorted(full_dist.items(), key=lambda x: x[1], reverse=True)
+
+        for trend, probability in sorted_probs[:5]:  # 显示前5个
+            emoji = self.bayesian_trend_emojis.get(trend, "❓")
+            bar_length = int(probability * 10)
+            bar = "█" * bar_length + "░" * (10 - bar_length)
+            lines.append(f"{emoji} {trend}: `{probability:.1%}` {bar}")
+
+        return "\n".join(lines)
+
+    def _format_bayesian_insights(self, bayesian_analysis: dict[str, Any]) -> str:
+        """格式化贝叶斯洞察。
+
+        Args:
+            bayesian_analysis: 贝叶斯分析数据
+
+        Returns:
+            格式化的贝叶斯洞察字符串
+        """
+        if not bayesian_analysis:
+            return "暂无贝叶斯洞察数据"
+
+        lines = []
+
+        # 主要驱动因素
+        primary_driver = bayesian_analysis.get("primary_driver")
+        if primary_driver:
+            lines.append(f"**主要驱动**: {primary_driver}")
+
+        # 证据一致性
+        evidence_consistency = bayesian_analysis.get("evidence_consistency")
+        if evidence_consistency:
+            consistency_emoji = "✅" if "一致" in evidence_consistency else "⚠️"
+            lines.append(f"**证据一致性**: {consistency_emoji} {evidence_consistency}")
+
+        # 支撑因素
+        strength_factors = bayesian_analysis.get("strength_factors", [])
+        if strength_factors:
+            lines.append("**支撑因素**:")
+            for factor in strength_factors[:3]:  # 最多显示3个
+                lines.append(f"• {factor}")
+
+        # 风险因素
+        weakness_factors = bayesian_analysis.get("weakness_factors", [])
+        if weakness_factors:
+            lines.append("**风险因素**:")
+            for factor in weakness_factors[:3]:  # 最多显示3个
+                lines.append(f"⚠️ {factor}")
+
+        return "\n".join(lines) if lines else "暂无贝叶斯洞察"
+
+    def _format_volatility_volume_insights(self, volatility_volume_insights: dict[str, Any]) -> str:
+        """格式化波动率和成交量洞察。
+
+        Args:
+            volatility_volume_insights: 波动率成交量洞察数据
+
+        Returns:
+            格式化的波动率成交量洞察字符串
+        """
+        lines = []
+
+        # 波动率评估
+        volatility_assessment = volatility_volume_insights.get("volatility_assessment", "")
+        if volatility_assessment:
+            lines.append(f"**📊 波动率**: {volatility_assessment}")
+
+        # 成交量趋势分析
+        volume_trend = volatility_volume_insights.get("volume_trend_analysis", "")
+        if volume_trend:
+            lines.append(f"**📈 成交量**: {volume_trend}")
+
+        # 量价配合模式
+        coordination_pattern = volatility_volume_insights.get("coordination_pattern", "")
+        if coordination_pattern:
+            pattern_emoji = "🔄" if "健康" in coordination_pattern else "⚠️"
+            lines.append(f"{pattern_emoji} **量价配合**: {coordination_pattern}")
+
+        # 活跃度影响
+        activity_impact = volatility_volume_insights.get("activity_level_impact", "")
+        if activity_impact:
+            lines.append(f"**⚡ 活跃度**: {activity_impact}")
+
+        return "\n".join(lines) if lines else "暂无波动率成交量洞察"
+
+    def _get_bayesian_color(self, trend: str, confidence: float, risk_level: str) -> int:
+        """获取贝叶斯分析对应的颜色。
+
+        Args:
+            trend: 趋势类型
+            confidence: 置信度
+            risk_level: 风险等级
+
+        Returns:
+            Discord颜色代码
+        """
+        # 基于置信度调整颜色强度
+        if confidence >= 0.8:
+            # 高置信度 - 使用趋势的标准颜色
+            base_colors = {
+                "震荡": 0x808080,      # 灰色
+                "微弱看涨": 0x90EE90,   # 浅绿色
+                "看涨": 0x00FF00,       # 绿色
+                "强力看涨": 0x006400,    # 深绿色
+                "微弱看跌": 0xFFB6C1,   # 浅红色
+                "看跌": 0xFF0000,       # 红色
+                "强力看跌": 0x8B0000     # 深红色
+            }
+        elif confidence >= 0.6:
+            # 中等置信度 - 使用较淡的颜色
+            base_colors = {
+                "震荡": 0xA0A0A0,      # 浅灰色
+                "微弱看涨": 0xB8FFB8,   # 很浅绿色
+                "看涨": 0x90FF90,       # 浅绿色
+                "强力看涨": 0x32CD32,    # 酸橙绿
+                "微弱看跌": 0xFFD0D0,   # 很浅红色
+                "看跌": 0xFF6B6B,       # 浅红色
+                "强力看跌": 0xCD5C5C     # 印度红
+            }
+        else:
+            # 低置信度 - 使用很淡的颜色，表示不确定性
+            base_colors = {
+                "震荡": 0xC0C0C0,      # 很浅灰色
+                "微弱看涨": 0xE0FFE0,   # 极浅绿色
+                "看涨": 0xC8FFC8,       # 极浅绿色
+                "强力看涨": 0x98FB98,    # 淡绿色
+                "微弱看跌": 0xFFE0E0,   # 极浅红色
+                "看跌": 0xFFC0C0,       # 极浅红色
+                "强力看跌": 0xF08080     # 浅珊瑚红
+            }
+
+        return base_colors.get(trend, 0x808080)
+
+    def _create_confidence_bar(self, confidence: float) -> str:
+        """创建置信度条。
+
+        Args:
+            confidence: 置信度值 (0-1)
+
+        Returns:
+            置信度条字符串
+        """
+        filled_bars = int(confidence * 10)
+        empty_bars = 10 - filled_bars
+        color = "🟩" if confidence >= 0.8 else "🟨" if confidence >= 0.6 else "🟥" if confidence >= 0.4 else "🟥"
+        return f"[{color * filled_bars}{'⬜' * empty_bars}]"
+
+    def _create_uncertainty_bar(self, uncertainty: float) -> str:
+        """创建不确定性条。
+
+        Args:
+            uncertainty: 不确定性值 (0-1)
+
+        Returns:
+            不确定性条字符串
+        """
+        filled_bars = int(uncertainty * 10)
+        empty_bars = 10 - filled_bars
+        return f"[{'🟥' * filled_bars}{'⬜' * empty_bars}]"
+
+    def _translate_confidence_level(self, level: str) -> str:
+        """翻译置信度等级。
+
+        Args:
+            level: 置信度等级
+
+        Returns:
+            中文置信度等级
+        """
+        translations = {
+            "very_low": "极低",
+            "low": "低",
+            "medium": "中等",
+            "high": "高",
+            "very_high": "极高"
+        }
+        return translations.get(level, level)
+
+    def _translate_risk_level(self, level: str) -> str:
+        """翻译风险等级。
+
+        Args:
+            level: 风险等级
+
+        Returns:
+            中文风险等级
+        """
+        translations = {
+            "very_high_risk": "极高风险",
+            "high_risk": "高风险",
+            "medium_risk": "中等风险",
+            "low_risk": "低风险",
+            "very_low_risk": "极低风险"
+        }
+        return translations.get(level, level)
