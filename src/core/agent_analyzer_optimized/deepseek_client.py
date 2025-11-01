@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -42,10 +42,10 @@ class TrendAnalysisResult:
         self,
         timestamp: datetime,
         trend: str,
-        strength_levels: Dict[str, float],
+        strength_levels: dict[str, float],
         reason: str,
         confidence: float,
-        analysis_metadata: Optional[Dict[str, Any]] = None
+        analysis_metadata: dict[str, Any] | None = None
     ):
         self.timestamp = timestamp
         self.trend = trend
@@ -74,7 +74,7 @@ class TrendAnalysisResult:
 
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式。"""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -148,7 +148,7 @@ class DeepSeekAnalyzer:
     )
     async def analyze_trend(
         self,
-        aggregated_data: Dict[str, Any],
+        aggregated_data: dict[str, Any],
         symbol: str = "BTCFDUSD"
     ) -> TrendAnalysisResult:
         """分析市场趋势。
@@ -203,7 +203,7 @@ class DeepSeekAnalyzer:
             logger.error(f"趋势分析失败: {e}")
             raise RuntimeError(f"趋势分析失败: {str(e)}") from e
 
-    def _build_analysis_prompt(self, raw_data: Dict[str, Any], symbol: str) -> str:
+    def _build_analysis_prompt(self, raw_data: dict[str, Any], symbol: str) -> str:
         """构建AI分析提示词。
 
         Args:
@@ -216,7 +216,6 @@ class DeepSeekAnalyzer:
         # 提取原始数据
         minute_data_points = raw_data.get("minute_data_points", [])
         data_points_count = raw_data.get("data_points_count", 0)
-        time_range = raw_data.get("time_range", ["", ""])
 
         # 计算基础统计信息
         total_volume = 0
@@ -464,7 +463,7 @@ class DeepSeekAnalyzer:
             (current_avg * (total_requests - 1) + response_time) / total_requests
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息。
 
         Returns:

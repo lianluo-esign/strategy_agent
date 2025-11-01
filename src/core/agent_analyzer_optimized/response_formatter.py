@@ -7,7 +7,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class ResponseFormatter:
 
     def format_analysis_response(
         self,
-        trend_result: Dict[str, Any],
-        aggregated_data: Optional[Dict[str, Any]] = None,
+        trend_result: dict[str, Any],
+        aggregated_data: dict[str, Any] | None = None,
         symbol: str = "BTCFDUSD"
     ) -> str:
         """格式化分析响应为标准JSON格式。
@@ -103,7 +103,7 @@ class ResponseFormatter:
             # 返回错误响应
             return self._format_error_response(str(e), symbol)
 
-    def _extract_timestamp(self, trend_result: Dict[str, Any]) -> str:
+    def _extract_timestamp(self, trend_result: dict[str, Any]) -> str:
         """提取时间戳。
 
         Args:
@@ -144,7 +144,7 @@ class ResponseFormatter:
 
         return trend
 
-    def _validate_strength_levels(self, strength_levels: Dict[str, Any]) -> Dict[str, float]:
+    def _validate_strength_levels(self, strength_levels: dict[str, Any]) -> dict[str, float]:
         """验证强度等级。
 
         Args:
@@ -190,10 +190,10 @@ class ResponseFormatter:
 
     def _build_metadata(
         self,
-        trend_result: Dict[str, Any],
-        aggregated_data: Optional[Dict[str, Any]],
+        trend_result: dict[str, Any],
+        aggregated_data: dict[str, Any] | None,
         symbol: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """构建元数据。
 
         Args:
@@ -271,7 +271,7 @@ class ResponseFormatter:
 
     def format_compact_response(
         self,
-        trend_result: Dict[str, Any],
+        trend_result: dict[str, Any],
         symbol: str = "BTCFDUSD"
     ) -> str:
         """格式化紧凑响应（不包含元数据）。
@@ -395,8 +395,8 @@ class ResponseValidator:
 
     def validate_analysis_quality(
         self,
-        analysis_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        analysis_result: dict[str, Any]
+    ) -> dict[str, Any]:
         """验证分析质量。
 
         Args:

@@ -19,7 +19,7 @@
 """
 
 from .deepseek_client import DeepSeekAnalyzer, TrendAnalysisResult
-from .discord_notifier import DiscordNotifier, DiscordNotificationManager
+from .discord_notifier import DiscordNotificationManager, DiscordNotifier
 from .optimized_analyzer import OptimizedAgentAnalyzer
 from .response_formatter import ResponseFormatter, ResponseValidator
 from .trades_aggregator import RawTradesData, TradesAggregator

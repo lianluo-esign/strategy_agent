@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .deepseek_client import DeepSeekAnalyzer
 from .discord_notifier import DiscordNotificationManager
@@ -40,8 +40,8 @@ class OptimizedAgentAnalyzer:
     def __init__(
         self,
         redis_store: Any,
-        deepseek_config: Dict[str, Any],
-        discord_webhook_url: Optional[str] = None,
+        deepseek_config: dict[str, Any],
+        discord_webhook_url: str | None = None,
         analysis_window_minutes: int = 240
     ):
         """初始化优化版分析器。
@@ -73,7 +73,7 @@ class OptimizedAgentAnalyzer:
         self.response_validator = ResponseValidator(strict_mode=False)
 
         # 初始化Discord通知管理器（如果提供了webhook URL）
-        self.discord_manager: Optional[DiscordNotificationManager] = None
+        self.discord_manager: DiscordNotificationManager | None = None
         if discord_webhook_url:
             try:
                 self.discord_manager = DiscordNotificationManager(discord_webhook_url)
@@ -96,7 +96,7 @@ class OptimizedAgentAnalyzer:
             f"discord_enabled={self.discord_manager is not None}"
         )
 
-    async def analyze_market(self, symbol: str = "BTCFDUSD") -> Dict[str, Any]:
+    async def analyze_market(self, symbol: str = "BTCFDUSD") -> dict[str, Any]:
         """执行完整的市场分析流程。
 
         Args:
@@ -147,7 +147,7 @@ class OptimizedAgentAnalyzer:
         except Exception as e:
             return await self._handle_analysis_error(symbol, e, start_time)
 
-    async def _collect_and_raw_data(self, symbol: str) -> Dict[str, Any]:
+    async def _collect_and_raw_data(self, symbol: str) -> dict[str, Any]:
         """收集原始数据。"""
         # 第一步：从Redis读取trades_window数据
         trades_window_data = self.redis_store.get_recent_trade_data(
@@ -172,7 +172,7 @@ class OptimizedAgentAnalyzer:
 
         return raw_dict
 
-    async def _perform_ai_analysis(self, raw_dict: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+    async def _perform_ai_analysis(self, raw_dict: dict[str, Any], symbol: str) -> dict[str, Any]:
         """执行AI分析。"""
         # 第三步：AI分析
         trend_result_dict = await self.deepseek_analyzer.analyze_trend(
@@ -189,8 +189,8 @@ class OptimizedAgentAnalyzer:
 
     async def _format_analysis_result(
         self,
-        trend_result: Dict[str, Any],
-        raw_dict: Dict[str, Any],
+        trend_result: dict[str, Any],
+        raw_dict: dict[str, Any],
         symbol: str
     ) -> str:
         """格式化分析结果。"""
@@ -207,7 +207,7 @@ class OptimizedAgentAnalyzer:
 
     async def _handle_notifications_and_quality(
         self,
-        trend_result: Dict[str, Any],
+        trend_result: dict[str, Any],
         symbol: str
     ) -> tuple:
         """处理通知和质量检查。"""
@@ -240,11 +240,11 @@ class OptimizedAgentAnalyzer:
         self,
         symbol: str,
         json_response: str,
-        raw_dict: Dict[str, Any],
+        raw_dict: dict[str, Any],
         processing_time: float,
         discord_sent: bool,
-        quality_check: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        quality_check: dict[str, Any]
+    ) -> dict[str, Any]:
         """构建最终结果。"""
         result = {
             "status": "success",
@@ -266,7 +266,7 @@ class OptimizedAgentAnalyzer:
 
         return result
 
-    async def _handle_analysis_error(self, symbol: str, error: Exception, start_time: float) -> Dict[str, Any]:
+    async def _handle_analysis_error(self, symbol: str, error: Exception, start_time: float) -> dict[str, Any]:
         """处理分析错误。"""
         processing_time = asyncio.get_event_loop().time() - start_time
         self._update_stats(processing_time, success=False)
@@ -307,7 +307,7 @@ class OptimizedAgentAnalyzer:
             logger.error(f"单次分析失败: {e}")
             return self.response_formatter._format_error_response(str(e), symbol)
 
-    def _create_error_result(self, symbol: str, error_message: str) -> Dict[str, Any]:
+    def _create_error_result(self, symbol: str, error_message: str) -> dict[str, Any]:
         """创建错误结果。
 
         Args:
@@ -354,7 +354,7 @@ class OptimizedAgentAnalyzer:
             (current_avg * (total_analyses - 1) + processing_time) / total_analyses
         )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取分析器状态。
 
         Returns:
@@ -393,8 +393,8 @@ class OptimizedAgentAnalyzer:
 
         return status
 
-    
-    async def health_check(self) -> Dict[str, Any]:
+
+    async def health_check(self) -> dict[str, Any]:
         """执行健康检查。
 
         Returns:

@@ -6,7 +6,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class RawTradesData:
         self,
         timestamp: datetime,
         symbol: str,
-        minute_data_points: List[Dict[str, Any]],
+        minute_data_points: list[dict[str, Any]],
         data_points_count: int,
         time_range: tuple[str, str]
     ):
@@ -31,7 +31,7 @@ class RawTradesData:
         self.data_points_count = data_points_count
         self.time_range = time_range
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式。"""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -72,7 +72,7 @@ class TradesAggregator:
 
     def collect_raw_trades_data(
         self,
-        trades_window_data: List[Any],
+        trades_window_data: list[Any],
         symbol: str = "BTCFDUSD"
     ) -> RawTradesData:
         """收集trades_window原始数据。
@@ -118,7 +118,7 @@ class TradesAggregator:
 
         return result
 
-    def _convert_to_raw_format(self, trades_window_data: List[Any]) -> List[Dict[str, Any]]:
+    def _convert_to_raw_format(self, trades_window_data: list[Any]) -> list[dict[str, Any]]:
         """将trades_window数据转换为原始格式。
 
         Args:
@@ -242,7 +242,7 @@ class TradesAggregator:
         logger.info(f"原始数据转换完成: {len(raw_data_points)}/{len(trades_window_data)} 数据点有效")
         return raw_data_points
 
-    def get_data_summary(self, raw_data: RawTradesData) -> Dict[str, Any]:
+    def get_data_summary(self, raw_data: RawTradesData) -> dict[str, Any]:
         """生成原始数据摘要。
 
         Args:

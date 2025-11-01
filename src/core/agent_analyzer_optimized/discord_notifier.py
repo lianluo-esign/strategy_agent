@@ -4,11 +4,10 @@
 提供格式化的消息和可靠的通知服务。
 """
 
-import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -92,7 +91,7 @@ class DiscordNotifier:
     )
     async def send_analysis_result(
         self,
-        analysis_result: Dict[str, Any],
+        analysis_result: dict[str, Any],
         symbol: str = "BTCFDUSD"
     ) -> bool:
         """发送分析结果到Discord。
@@ -140,9 +139,9 @@ class DiscordNotifier:
 
     def _format_discord_message(
         self,
-        analysis_result: Dict[str, Any],
+        analysis_result: dict[str, Any],
         symbol: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """格式化Discord消息。
 
         Args:
@@ -213,7 +212,7 @@ class DiscordNotifier:
 
             return {"content": message}
 
-    def _format_strength_levels(self, strength_levels: Dict[str, float]) -> str:
+    def _format_strength_levels(self, strength_levels: dict[str, float]) -> str:
         """格式化强度等级（嵌入格式）。
 
         Args:
@@ -231,7 +230,7 @@ class DiscordNotifier:
 
         return "\n".join(lines) if lines else "暂无强度数据"
 
-    def _format_strength_levels_text(self, strength_levels: Dict[str, float]) -> str:
+    def _format_strength_levels_text(self, strength_levels: dict[str, float]) -> str:
         """格式化强度等级（文本格式）。
 
         Args:
@@ -326,7 +325,7 @@ class DiscordNotifier:
             return text
         return text[:max_length - 3] + "..."
 
-    async def _send_to_discord(self, payload: Dict[str, Any]) -> bool:
+    async def _send_to_discord(self, payload: dict[str, Any]) -> bool:
         """发送消息到Discord。
 
         Args:
@@ -404,7 +403,7 @@ class DiscordNotifier:
             logger.error(f"Discord连接测试失败: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息。
 
         Returns:
@@ -440,7 +439,7 @@ class DiscordNotificationManager:
 
     async def send_trend_alert(
         self,
-        analysis_result: Dict[str, Any],
+        analysis_result: dict[str, Any],
         symbol: str = "BTCFDUSD",
         include_raw_data: bool = False
     ) -> bool:
@@ -476,7 +475,7 @@ class DiscordNotificationManager:
             发送是否成功
         """
         error_payload = {
-            "content": f"🚨 **系统错误通知**",
+            "content": "🚨 **系统错误通知**",
             "embeds": [
                 {
                     "title": "分析系统错误",
