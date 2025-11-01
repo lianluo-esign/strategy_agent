@@ -384,6 +384,22 @@ class RedisDataStore:
             logger.error(f"Failed to get latest trade timestamp: {e}")
             return None
 
+    def get_depth_snapshot_hash(self) -> str | None:
+        """Get a hash of the depth snapshot for change detection."""
+        try:
+            data_str = self.redis.get(REDIS_DEPTH_SNAPSHOT_KEY)
+            if not data_str:
+                return None
+
+            # Create a simple hash from the snapshot data
+            # Use the first 100 characters as a lightweight change detection
+            hash_input = data_str[:100] if len(data_str) > 100 else data_str
+            return str(hash(hash_input))
+
+        except Exception as e:
+            logger.error(f"Failed to create depth snapshot hash: {e}")
+            return None
+
     def get_trades_window_hash(self) -> str | None:
         """Get a hash of the trades window for change detection."""
         try:
