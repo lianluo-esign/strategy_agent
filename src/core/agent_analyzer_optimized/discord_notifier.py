@@ -596,7 +596,7 @@ class BayesianDiscordFormatter:
         }
 
     def format_bayesian_analysis(self, analysis_data: dict[str, Any], symbol: str = "BTCFDUSD") -> dict[str, Any]:
-        """格式化贝叶斯分析结果为Discord消息。
+        """格式化贝叶斯分析结果为Discord消息（简化版）。
 
         Args:
             analysis_data: 贝叶斯分析结果数据
@@ -607,66 +607,38 @@ class BayesianDiscordFormatter:
         """
         # 提取贝叶斯分析结果
         trend_analysis = analysis_data.get("trend_analysis", {})
-        probability_distribution = analysis_data.get("probability_distribution", {})
         bayesian_analysis = analysis_data.get("bayesian_analysis", {})
-
-        # 解析response_raw中的概率分布数据
-        probability_distribution = self._extract_probability_distribution(analysis_data, probability_distribution)
 
         # 提取关键信息
         most_likely_trend = trend_analysis.get("most_likely_trend", "未知")
         confidence = trend_analysis.get("confidence", 0.0)
         risk_level = trend_analysis.get("risk_level", "unknown")
+        timestamp = analysis_data.get("timestamp", datetime.now().isoformat())
+
+        # 获取分析原因
+        analysis_reason = bayesian_analysis.get("analysis_reason", "暂无分析原因")
 
         # 获取表情符号和颜色
         trend_emoji = self.bayesian_trend_emojis.get(most_likely_trend, "❓")
         embed_color = self._get_bayesian_color(most_likely_trend, confidence, risk_level)
 
-        # 创建嵌入消息
+        # 简化的嵌入消息 - 只包含趋势、原因和时间
         embed = {
-            "title": f"🧠 {trend_emoji} {symbol} 贝叶斯趋势分析",
-            "description": f"**最可能趋势**: {most_likely_trend} {trend_emoji}",
+            "title": f"{trend_emoji} {symbol} 趋势分析",
+            "description": f"**趋势**: {most_likely_trend} {trend_emoji}\n**置信度**: {confidence:.1%}",
             "color": embed_color,
-            "timestamp": analysis_data.get("timestamp", datetime.now().isoformat()),
-            "thumbnail": {
-                "url": "https://i.imgur.com/7YhD5U7.png"  # 贝叶斯统计图标
-            },
+            "timestamp": timestamp,
             "fields": [
-                # 概率化分析结果
                 {
-                    "name": "📊 概率化趋势分析",
-                    "value": self._format_trend_analysis(trend_analysis),
+                    "name": "📝 分析原因",
+                    "value": self._truncate_text(analysis_reason, 1000),
                     "inline": False
-                },
-
-                # 完整概率分布
-                {
-                    "name": "🎲 概率分布",
-                    "value": self._format_probability_distribution(probability_distribution),
-                    "inline": True
-                },
-
-                # 贝叶斯洞察
-                {
-                    "name": "🧠 贝叶斯洞察",
-                    "value": self._format_bayesian_insights(bayesian_analysis),
-                    "inline": True
                 }
             ],
             "footer": {
-                "text": "贝叶斯AI分析 | BTC-FDUSD流动性分析Agent",
-                "icon_url": "https://i.imgur.com/3VWjXhF.png"
+                "text": "AI分析 | BTC-FDUSD流动性分析Agent"
             }
         }
-
-        # 添加波动率和成交量分析（如果有）
-        volatility_volume_insights = analysis_data.get("volatility_volume_insights", {})
-        if volatility_volume_insights:
-            embed["fields"].append({
-                "name": "📈 波动率与成交量分析",
-                "value": self._format_volatility_volume_insights(volatility_volume_insights),
-                "inline": False
-            })
 
         return {"embeds": [embed]}
 
@@ -950,6 +922,20 @@ class BayesianDiscordFormatter:
             "very_low_risk": "极低风险"
         }
         return translations.get(level, level)
+
+    def _truncate_text(self, text: str, max_length: int) -> str:
+        """截断文本到指定长度。
+
+        Args:
+            text: 原始文本
+            max_length: 最大长度
+
+        Returns:
+            截断后的文本
+        """
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
 
     def _calculate_entropy(self, probabilities: dict[str, float]) -> float:
         """计算概率分布的熵（用于衡量不确定性）。
