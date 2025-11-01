@@ -772,14 +772,15 @@ class BayesianDeepSeekAnalyzer:
                 if trend not in posterior_probabilities:
                     posterior_probabilities[trend] = 0.0
 
-            # 简化的贝叶斯元数据
+            # 简化的贝叶斯元数据，包含原始响应用于概率分布提取
             bayesian_metadata = {
                 "symbol": symbol,
                 "analysis_method": "simplified_bayesian_analysis",
-                "simplified": True
+                "simplified": True,
+                "response_raw": response[:1000] + "..." if len(response) > 1000 else response
             }
 
-            logger.info(f"解析简化贝叶斯响应成功: {most_likely_trend}, 置信度: {confidence:.2f}")
+            logger.info(f"解析简化贝叶斯响应成功: {most_likely_trend}, 置信度: {confidence:.2f}, 概率分布数量: {len(posterior_probabilities)}")
 
             return BayesianTrendResult(
                 timestamp=datetime.now(),

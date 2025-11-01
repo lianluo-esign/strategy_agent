@@ -467,7 +467,7 @@ class DiscordNotificationManager:
         """
         # 检查是否为贝叶斯分析结果
         if self._is_bayesian_analysis(analysis_result):
-            # 使用贝叶斯格式化器
+            # 使用贝叶斯格式化器，总是发送（不跳过低置信度）
             formatted_message = self.bayesian_formatter.format_bayesian_analysis(analysis_result, symbol)
 
             # 发送到Discord
@@ -484,9 +484,9 @@ class DiscordNotificationManager:
             trend = analysis_result.get("trend", "")
             confidence = analysis_result.get("confidence", 0.0)
 
-            # 只对高置信度的强趋势发送警报
-            if confidence < 0.7 and trend not in ["强力看涨", "强力看跌"]:
-                logger.info("趋势不够显著，跳过警报发送")
+            # 降低阈值，只对极低置信度的结果跳过
+            if confidence < 0.3:
+                logger.info(f"置信度过低({confidence:.1%})，跳过警报发送")
                 return True
 
             return await self.notifier.send_analysis_result(analysis_result, symbol)
