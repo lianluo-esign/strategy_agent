@@ -219,16 +219,63 @@ class ResponseFormatter:
                 "response_truncated": ai_metadata.get("response_truncated", False)
             })
 
-        # 添加聚合数据统计
+        # 从原始数据中提取实际统计信息
         if aggregated_data:
-            metadata["data_statistics"] = {
-                "total_volume": aggregated_data.get("total_volume", 0),
-                "trade_count": aggregated_data.get("trade_count", 0),
-                "price_levels_count": aggregated_data.get("price_levels_count", 0),
-                "price_range": aggregated_data.get("price_range", [0, 0])
-            }
+            data_stats = self._extract_data_statistics(aggregated_data)
+            metadata["data_statistics"] = data_stats
 
         return metadata
+
+    def _extract_data_statistics(self, aggregated_data: dict[str, Any]) -> dict[str, Any]:
+        """从聚合数据中提取统计信息。
+
+        Args:
+            aggregated_data: 聚合数据字典
+
+        Returns:
+            数据统计字典
+        """
+        try:
+            minute_data_points = aggregated_data.get("minute_data_points", [])
+
+            # 计算总成交量和交易数量
+            total_volume: float = 0
+            trade_count: int = 0
+            all_prices: set[float] = set()
+
+            for point in minute_data_points:
+                price_levels = point.get("price_levels", {})
+                for price_str, level_data in price_levels.items():
+                    try:
+                        volume = float(level_data.get("total_volume", 0))
+                        if volume > 0:
+                            total_volume += volume
+                            trade_count += 1
+                            all_prices.add(float(price_str))
+                    except (ValueError, TypeError, AttributeError):
+                        continue
+
+            # 计算价格范围
+            if all_prices:
+                price_range = [min(all_prices), max(all_prices)]
+            else:
+                price_range = [0, 0]
+
+            return {
+                "total_volume": total_volume,
+                "trade_count": trade_count,
+                "price_levels_count": len(all_prices),
+                "price_range": price_range
+            }
+
+        except Exception as e:
+            logger.warning(f"提取数据统计信息失败: {e}")
+            return {
+                "total_volume": 0,
+                "trade_count": 0,
+                "price_levels_count": 0,
+                "price_range": [0, 0]
+            }
 
     def _format_error_response(self, error_message: str, symbol: str) -> str:
         """格式化错误响应。
@@ -405,7 +452,7 @@ class ResponseValidator:
         Returns:
             验证结果字典
         """
-        validation_result = {
+        validation_result: dict[str, Any] = {
             "is_valid": True,
             "warnings": [],
             "errors": []

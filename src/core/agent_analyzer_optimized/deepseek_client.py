@@ -220,10 +220,9 @@ class DeepSeekAnalyzer:
 
         # 计算基础统计信息
         total_volume = 0
-        all_price_levels = {}
-        first_timestamp = None
-        last_timestamp = None
-        price_changes = []
+        all_price_levels: dict[float, float] = {}
+        first_timestamp: str | None = None
+        price_changes: list[float] = []
 
         for point in minute_data_points:
             timestamp = point.get("timestamp", "")
@@ -232,11 +231,10 @@ class DeepSeekAnalyzer:
             # 记录时间范围
             if first_timestamp is None:
                 first_timestamp = timestamp
-            last_timestamp = timestamp
 
             # 累加成交量统计和价格变化
-            minute_volume = 0
-            minute_prices = []
+            minute_volume: float = 0
+            minute_prices: list[float] = []
             for price_str, level_data in price_levels.items():
                 try:
                     volume = float(level_data.get("total_volume", 0))
@@ -244,7 +242,7 @@ class DeepSeekAnalyzer:
                         total_volume += volume
                         minute_volume += volume
                         price_float = float(price_str)
-                        all_price_levels[price_float] = all_price_levels.get(price_float, 0) + volume
+                        all_price_levels[price_float] = all_price_levels.get(price_float, 0.0) + volume
                         minute_prices.append(price_float)
                 except (ValueError, TypeError, AttributeError):
                     continue
@@ -316,8 +314,6 @@ class DeepSeekAnalyzer:
 - 卖盘总量: {ask_volume:.0f}
 - 买卖比例: {order_book_ratio:.2f}
 - 流动性: {'充裕' if min(bid_volume, ask_volume) > 1000 else '一般' if min(bid_volume, ask_volume) > 100 else '稀薄'}"""
-
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         prompt = f"""基于{symbol}交易数据做趋势分析。
 
@@ -416,7 +412,7 @@ class DeepSeekAnalyzer:
                 raise RuntimeError(f"API调用异常: {str(e)}") from e
 
     def _parse_response(self, response: str, symbol: str) -> TrendAnalysisResult:
-        """解析API响应（简化版）。
+        """解析API响应。
 
         Args:
             response: API响应文本
@@ -445,27 +441,23 @@ class DeepSeekAnalyzer:
             reason = data.get("reason", "暂无分析原因")
             confidence = float(data.get("confidence", 0.5))
 
-            # 简化的强度等级（默认为0）
-            simple_strength_levels = {
-                "strong_support": 0.0,
-                "weak_support": 0.0,
-                "strong_resistance": 0.0,
-                "weak_resistance": 0.0
-            }
+            # 智能生成强度等级（基于趋势类型）
+            strength_levels = self._calculate_strength_levels(trend, confidence)
 
-            # 创建简化的分析元数据
+            # 创建分析元数据
             analysis_metadata = {
                 "symbol": symbol,
-                "analysis_method": "simple_trades_analysis",
-                "simplified": True
+                "analysis_method": "intelligent_trades_analysis",
+                "model": self.model,
+                "response_truncated": False
             }
 
-            logger.info(f"解析简化响应成功: {trend}, 置信度: {confidence:.2f}")
+            logger.info(f"解析响应成功: {trend}, 置信度: {confidence:.2f}")
 
             return TrendAnalysisResult(
                 timestamp=datetime.now(),
                 trend=trend,
-                strength_levels=simple_strength_levels,
+                strength_levels=strength_levels,
                 reason=reason,
                 confidence=confidence,
                 analysis_metadata=analysis_metadata
@@ -477,6 +469,70 @@ class DeepSeekAnalyzer:
         except Exception as e:
             logger.error(f"响应解析失败: {str(e)}")
             raise ValueError(f"响应解析失败: {str(e)}") from e
+
+    def _calculate_strength_levels(self, trend: str, confidence: float) -> dict[str, float]:
+        """根据趋势和置信度智能计算强度等级。
+
+        Args:
+            trend: 趋势类型
+            confidence: 置信度
+
+        Returns:
+            强度等级字典
+        """
+        # 基础强度值基于置信度
+        base_strength = confidence * 0.8  # 保留一些余地
+
+        # 根据趋势类型分配强度
+        if "强力看涨" in trend:
+            return {
+                "strong_support": base_strength * 0.9,
+                "weak_support": base_strength * 0.7,
+                "strong_resistance": base_strength * 0.2,
+                "weak_resistance": base_strength * 0.4
+            }
+        elif "看涨" in trend:
+            return {
+                "strong_support": base_strength * 0.7,
+                "weak_support": base_strength * 0.8,
+                "strong_resistance": base_strength * 0.3,
+                "weak_resistance": base_strength * 0.5
+            }
+        elif "微弱看涨" in trend:
+            return {
+                "strong_support": base_strength * 0.5,
+                "weak_support": base_strength * 0.6,
+                "strong_resistance": base_strength * 0.4,
+                "weak_resistance": base_strength * 0.5
+            }
+        elif "强力看跌" in trend:
+            return {
+                "strong_support": base_strength * 0.2,
+                "weak_support": base_strength * 0.4,
+                "strong_resistance": base_strength * 0.9,
+                "weak_resistance": base_strength * 0.7
+            }
+        elif "看跌" in trend:
+            return {
+                "strong_support": base_strength * 0.3,
+                "weak_support": base_strength * 0.5,
+                "strong_resistance": base_strength * 0.7,
+                "weak_resistance": base_strength * 0.8
+            }
+        elif "微弱看跌" in trend:
+            return {
+                "strong_support": base_strength * 0.4,
+                "weak_support": base_strength * 0.5,
+                "strong_resistance": base_strength * 0.5,
+                "weak_resistance": base_strength * 0.6
+            }
+        else:  # 震荡
+            return {
+                "strong_support": base_strength * 0.5,
+                "weak_support": base_strength * 0.5,
+                "strong_resistance": base_strength * 0.5,
+                "weak_resistance": base_strength * 0.5
+            }
 
     def _update_stats(self, response_time: float, success: bool) -> None:
         """更新统计信息。

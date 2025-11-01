@@ -155,7 +155,8 @@ class TradesAggregator:
                             price_key = float(price_level)
                         else:
                             price_key = float(price_level)
-                        converted_price_levels[str(int(price_key))] = data
+                        # 保持原始精度，转换为字符串键
+                        converted_price_levels[str(price_key)] = data
 
                     # 创建原始数据格式
                     raw_point = {
