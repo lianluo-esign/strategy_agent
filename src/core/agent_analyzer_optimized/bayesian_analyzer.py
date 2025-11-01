@@ -37,7 +37,7 @@ class BayesianAnalyzer:
     输出带有置信度的趋势预测结果。
     """
 
-    def __init__(self, prior_probabilities: dict[str, float] = None):
+    def __init__(self, prior_probabilities: dict[str, float] | None = None):
         """初始化贝叶斯分析器。
 
         Args:
@@ -289,8 +289,8 @@ class BayesianAnalyzer:
             price_levels = point.get("price_levels", {})
             if price_levels:
                 # 使用成交量加权平均价格
-                total_volume = 0
-                weighted_price = 0
+                total_volume = 0.0
+                weighted_price = 0.0
                 for price_str, level_data in price_levels.items():
                     volume = float(level_data.get("total_volume", 0))
                     if volume > 0:
@@ -538,6 +538,20 @@ class BayesianAnalyzer:
         Returns:
             分析结果字典
         """
+        # 检查后验概率是否为空
+        if not posterior_probabilities:
+            logger.warning("后验概率分布为空，返回默认结果")
+            return {
+                "most_likely_trend": "unknown",
+                "probability": 0.0,
+                "confidence": 0.0,
+                "confidence_level": "very_low",
+                "uncertainty": 1.0,
+                "probability_distribution": {},
+                "analysis_reason": "无法计算有效的后验概率分布",
+                "evidence_summary": self._summarize_evidences(evidences)
+            }
+
         # 找出最可能的趋势
         most_likely_trend = max(posterior_probabilities.items(), key=lambda x: x[1])
         trend, probability = most_likely_trend
@@ -576,37 +590,65 @@ class BayesianAnalyzer:
         evidences: dict[str, Any]
     ) -> str:
         """生成分析原因。"""
+        if not posterior_probabilities:
+            return "无法生成分析原因：后验概率分布为空"
+
         most_likely = max(posterior_probabilities.items(), key=lambda x: x[1])
         trend, probability = most_likely
 
         reasons = []
 
-        # 基于证据生成原因
-        if "order_imbalance" in evidences:
-            imbalance = evidences["order_imbalance"]
-            if imbalance["direction"] == "bullish" and "看涨" in trend:
-                reasons.append(f"订单不平衡偏向买方 ({imbalance['bid_percentage']:.1%} vs {imbalance['ask_percentage']:.1%})")
-            elif imbalance["direction"] == "bearish" and "看跌" in trend:
-                reasons.append(f"订单不平衡偏向卖方 ({imbalance['ask_percentage']:.1%} vs {imbalance['bid_percentage']:.1%})")
-
-        if "dynamic_volume" in evidences:
-            volume = evidences["dynamic_volume"]
-            if volume["volume_trend"] == "increasing" and "看涨" in trend:
-                reasons.append("成交量呈现增长趋势")
-            elif volume["volume_trend"] == "decreasing" and "看跌" in trend:
-                reasons.append("成交量呈现下降趋势")
-
-        if "price_momentum" in evidences:
-            momentum = evidences["price_momentum"]
-            if momentum["momentum_direction"] == "bullish" and "看涨" in trend:
-                reasons.append(f"价格动能偏向上涨 ({momentum['price_change']:.2%})")
-            elif momentum["momentum_direction"] == "bearish" and "看跌" in trend:
-                reasons.append(f"价格动能偏向下跌 ({momentum['price_change']:.2%})")
+        # 基于不同证据类型生成原因
+        reasons.extend(self._generate_imbalance_reasons(evidences, trend))
+        reasons.extend(self._generate_volume_reasons(evidences, trend))
+        reasons.extend(self._generate_momentum_reasons(evidences, trend))
 
         if not reasons:
             reasons.append("基于多个证据的综合分析")
 
         return f"贝叶斯分析显示趋势为'{trend}'（概率{probability:.1%}），主要依据：{'; '.join(reasons)}"
+
+    def _generate_imbalance_reasons(self, evidences: dict[str, Any], trend: str) -> list[str]:
+        """生成订单不平衡相关的原因。"""
+        reasons: list[str] = []
+        if "order_imbalance" not in evidences:
+            return reasons
+
+        imbalance = evidences["order_imbalance"]
+        if imbalance["direction"] == "bullish" and "看涨" in trend:
+            reasons.append(f"订单不平衡偏向买方 ({imbalance['bid_percentage']:.1%} vs {imbalance['ask_percentage']:.1%})")
+        elif imbalance["direction"] == "bearish" and "看跌" in trend:
+            reasons.append(f"订单不平衡偏向卖方 ({imbalance['ask_percentage']:.1%} vs {imbalance['bid_percentage']:.1%})")
+
+        return reasons
+
+    def _generate_volume_reasons(self, evidences: dict[str, Any], trend: str) -> list[str]:
+        """生成成交量相关的原因。"""
+        reasons: list[str] = []
+        if "dynamic_volume" not in evidences:
+            return reasons
+
+        volume = evidences["dynamic_volume"]
+        if volume["volume_trend"] == "increasing" and "看涨" in trend:
+            reasons.append("成交量呈现增长趋势")
+        elif volume["volume_trend"] == "decreasing" and "看跌" in trend:
+            reasons.append("成交量呈现下降趋势")
+
+        return reasons
+
+    def _generate_momentum_reasons(self, evidences: dict[str, Any], trend: str) -> list[str]:
+        """生成价格动能相关的原因。"""
+        reasons: list[str] = []
+        if "price_momentum" not in evidences:
+            return reasons
+
+        momentum = evidences["price_momentum"]
+        if momentum["momentum_direction"] == "bullish" and "看涨" in trend:
+            reasons.append(f"价格动能偏向上涨 ({momentum['price_change']:.2%})")
+        elif momentum["momentum_direction"] == "bearish" and "看跌" in trend:
+            reasons.append(f"价格动能偏向下跌 ({momentum['price_change']:.2%})")
+
+        return reasons
 
     def _summarize_evidences(self, evidences: dict[str, Any]) -> dict[str, str]:
         """总结证据。"""

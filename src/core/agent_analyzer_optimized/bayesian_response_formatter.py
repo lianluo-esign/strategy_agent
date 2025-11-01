@@ -157,7 +157,15 @@ class BayesianResponseFormatter:
 
     def _classify_distribution_type(self, probabilities: dict[str, float]) -> str:
         """分类概率分布类型。"""
+        if not probabilities:
+            return "unknown"
+
         max_prob = max(probabilities.values())
+
+        # 处理只有一个或两个元素的情况
+        if len(probabilities) < 2:
+            return "highly_concentrated" if max_prob > 0.5 else "uncertain"
+
         second_max = sorted(probabilities.values())[-2]
 
         if max_prob > 0.7:
@@ -244,6 +252,9 @@ class BayesianResponseFormatter:
 
     def _identify_probability_drivers(self, probabilities: dict[str, float]) -> list[dict[str, Any]]:
         """识别概率驱动因素。"""
+        if not probabilities:
+            return []
+
         sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
 
         drivers = []
