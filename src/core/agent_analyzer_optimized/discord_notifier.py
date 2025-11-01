@@ -610,6 +610,9 @@ class BayesianDiscordFormatter:
         probability_distribution = analysis_data.get("probability_distribution", {})
         bayesian_analysis = analysis_data.get("bayesian_analysis", {})
 
+        # 解析response_raw中的概率分布数据
+        probability_distribution = self._extract_probability_distribution(analysis_data, probability_distribution)
+
         # 提取关键信息
         most_likely_trend = trend_analysis.get("most_likely_trend", "未知")
         confidence = trend_analysis.get("confidence", 0.0)
@@ -666,6 +669,45 @@ class BayesianDiscordFormatter:
             })
 
         return {"embeds": [embed]}
+
+    def _extract_probability_distribution(self, analysis_data: dict[str, Any], prob_dist: dict[str, Any]) -> dict[str, Any]:
+        """从analysis_data中提取概率分布数据。
+
+        Args:
+            analysis_data: 完整的分析数据
+            prob_dist: 现有的概率分布数据
+
+        Returns:
+            包含full_distribution的概率分布数据
+        """
+        # 如果已经有full_distribution，直接返回
+        if prob_dist.get("full_distribution"):
+            return prob_dist
+
+        # 尝试从metadata的response_raw中解析概率分布
+        import json
+        try:
+            metadata = analysis_data.get("metadata", {})
+            response_raw = metadata.get("response_raw", "")
+
+            if response_raw:
+                # 解析JSON字符串
+                raw_data = json.loads(response_raw)
+                posterior_probs = raw_data.get("posterior_probabilities", {})
+
+                if posterior_probs:
+                    # 构造标准格式的概率分布
+                    return {
+                        "full_distribution": posterior_probs,
+                        "entropy": self._calculate_entropy(posterior_probs),
+                        "distribution_type": "bayesian_posterior"
+                    }
+
+        except (json.JSONDecodeError, AttributeError, KeyError) as e:
+            logger.debug(f"解析response_raw失败: {e}")
+
+        # 如果解析失败，返回空的概率分布
+        return {"full_distribution": {}}
 
     def _format_trend_analysis(self, trend_analysis: dict[str, Any]) -> str:
         """格式化趋势分析。
@@ -908,3 +950,24 @@ class BayesianDiscordFormatter:
             "very_low_risk": "极低风险"
         }
         return translations.get(level, level)
+
+    def _calculate_entropy(self, probabilities: dict[str, float]) -> float:
+        """计算概率分布的熵（用于衡量不确定性）。
+
+        Args:
+            probabilities: 概率分布字典
+
+        Returns:
+            熵值（0到log(n)之间）
+        """
+        import math
+
+        if not probabilities:
+            return 0.0
+
+        entropy = 0.0
+        for prob in probabilities.values():
+            if prob > 0:
+                entropy -= prob * math.log2(prob)
+
+        return entropy

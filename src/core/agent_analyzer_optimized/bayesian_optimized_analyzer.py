@@ -395,18 +395,10 @@ class BayesianOptimizedAnalyzer:
         discord_sent = False
         if self.discord_manager:
             try:
-                # 适配现有通知接口
-                trend_data = {
-                    "trend": ai_bayesian_result.get("most_likely_trend", "unknown"),
-                    "confidence": ai_bayesian_result.get("confidence", 0.0),
-                    "reason": ai_bayesian_result.get("analysis_reason", ""),
-                    "probability_distribution": ai_bayesian_result.get(
-                        "probability_distribution", {}
-                    ),
-                }
-
+                # 传递完整的贝叶斯分析结果给Discord通知器
+                # 这样Discord格式化器可以从中提取所有必要的数据
                 discord_sent = await self.discord_manager.send_trend_alert(
-                    trend_data, symbol
+                    ai_bayesian_result, symbol
                 )
                 if discord_sent:
                     self.stats["discord_notifications_sent"] += 1
