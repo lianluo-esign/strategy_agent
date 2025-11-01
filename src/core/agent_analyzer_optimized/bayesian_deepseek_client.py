@@ -218,7 +218,7 @@ class BayesianDeepSeekAnalyzer:
         dynamic_data: dict[str, Any],
         symbol: str
     ) -> str:
-        """构建贝叶斯分析提示词。
+        """构建简化的贝叶斯分析提示词。
 
         Args:
             static_data: 静态订单簿数据
@@ -230,81 +230,24 @@ class BayesianDeepSeekAnalyzer:
         """
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        # 构建静态数据分析部分
-        static_analysis = self._format_static_data_for_prompt(static_data)
+        # 简化的静态数据摘要
+        static_summary = self._get_static_summary(static_data)
 
-        # 构建动态数据分析部分
-        dynamic_analysis = self._format_dynamic_data_for_prompt(dynamic_data)
+        # 简化的动态数据摘要
+        dynamic_summary = self._get_dynamic_summary(dynamic_data)
 
-        # 执行波动率和成交量分析
-        volatility_volume_analysis = self._analyze_volatility_volume_for_prompt(dynamic_data)
-
-        prompt = f"""作为一名专业的量化分析师，请基于贝叶斯思维框架对{symbol}市场进行概率化趋势分析。
+        prompt = f"""基于{symbol}市场数据进行简化贝叶斯趋势分析。
 
 **分析时间**: {current_time}
 
-**第一部分：静态订单簿深度分析 (10美元精度聚合)**
-{static_analysis}
+**市场数据概览**:
+{static_summary}
+{dynamic_summary}
 
-**第二部分：动态成交量历史数据分析**
-{dynamic_analysis}
+**分析要求**:
+基于贝叶斯思维，结合静态订单簿和动态交易数据，给出概率化的趋势判断。
 
-**第三部分：波动率和成交量统计分析**
-{volatility_volume_analysis}
-
-**第四部分：贝叶斯分析要求**
-
-请严格按照贝叶斯思维框架进行分析：
-
-1. **先验概率设定**：
-   基于历史市场统计，各趋势类型的先验概率：
-   - 震荡: 30%
-   - 微弱看涨/微弱看跌: 各12%
-   - 看涨/看跌: 各15%
-   - 强力看涨/强力看跌: 各8%
-
-2. **证据收集与似然计算**：
-
-   **静态流动性证据**：
-   - 订单簿不平衡度对趋势的指示作用
-   - 流动性墙（大订单集中区域）的支撑阻力作用
-   - 买卖盘深度对比反映的市场情绪
-
-   **动态成交量证据**：
-   - 成交量趋势变化反映的市场参与度
-   - 成交量活跃度与趋势强度的关系
-   - 成交量分布特征对趋势可持续性的影响
-
-   **价格波动率证据**：
-   - 价格波动率水平对市场情绪的反映
-   - 波动率变化趋势对趋势强度的指示
-   - 价格范围和趋势强度的量化分析
-
-   **量价关系证据**：
-   - 价格与成交量的相关性分析
-   - 量价配合模式对趋势的确认作用
-   - 主导量价模式对后市走势的指示
-
-   **市场活跃度证据**：
-   - 综合活跃度评分对市场状态的反映
-   - 交易频率和流动性分散度的分析
-   - 市场活跃度与趋势概率的关系
-
-   **价格动能证据**：
-   - 近期价格变化的方向和强度
-   - 价格动能与成交量的共振关系
-   - 动能持续性对趋势概率的影响
-
-3. **贝叶斯更新计算**：
-   对于每个趋势类型T，计算后验概率：
-   P(T|证据) ∝ P(证据|T) × P(T)
-
-   其中P(证据|T)是各证据的加权似然函数。
-
-4. **概率化输出要求**：
-
-   请严格按照以下JSON格式返回贝叶斯分析结果：
-
+**输出格式**:
 {{
   "posterior_probabilities": {{
     "震荡": 0.0-1.0,
@@ -315,46 +258,91 @@ class BayesianDeepSeekAnalyzer:
     "看跌": 0.0-1.0,
     "强力看跌": 0.0-1.0
   }},
-  "most_likely_trend": "概率最高的趋势类型",
+  "most_likely_trend": "最可能的趋势",
   "confidence": 0.0-1.0,
   "uncertainty": 0.0-1.0,
-  "analysis_reason": "详细的贝叶斯分析过程说明，包含关键证据对概率的影响",
-  "evidence_summary": {{
-    "static_liquidity": "静态流动性证据分析",
-    "dynamic_volume": "动态成交量证据分析",
-    "price_volatility": "价格波动率证据分析",
-    "price_volume_relationship": "量价关系证据分析",
-    "market_activity": "市场活跃度证据分析",
-    "price_momentum": "价格动能证据分析"
-  }},
-  "volatility_volume_insights": {{
-    "volatility_assessment": "波动率水平评估和趋势指示",
-    "volume_trend_analysis": "成交量趋势分析和对市场的影响",
-    "coordination_pattern": "量价配合模式及其对趋势的确认",
-    "activity_level_impact": "市场活跃度对趋势概率的影响"
-  }},
-  "bayesian_insights": {{
-    "key_drivers": "驱动概率变化的关键因素",
-    "evidence_consistency": "各证据之间的一致性分析",
-    "risk_factors": "可能影响预测准确性的风险因素"
-  }}
+  "analysis_reason": "50字以内的分析原因，包含关键证据"
 }}
 
-**数值约束**：
-- 所有概率值必须在0.0-1.0之间
-- posterior_probabilities中所有概率之和必须约等于1.0 (误差±0.01)
-- confidence表示最高概率的置信度
-- uncertainty表示预测的不确定性程度
+**数值要求**:
+- 所有概率值0.0-1.0，总和≈1.0
+- confidence: 最高概率的置信度
+- uncertainty: 预测不确定性
+- analysis_reason: 简洁的概率化原因说明
 
-**分析重点**：
-- 重视证据之间的相互验证
-- 识别关键的概率驱动因素
-- 提供清晰的逻辑推理链条
-- 量化分析的不确定性
-
-请确保返回的是有效的JSON格式，并严格遵循贝叶斯概率框架。"""
+只返回JSON，不要其他内容。"""
 
         return prompt
+
+    def _get_static_summary(self, static_data: dict[str, Any]) -> str:
+        """获取静态数据简化摘要。
+
+        Args:
+            static_data: 静态订单簿数据
+
+        Returns:
+            简化的静态数据摘要
+        """
+        if not static_data or static_data.get("status") != "success":
+            return "- 静态数据: 不可用\n"
+
+        liquidity = static_data.get("liquidity_analysis", {})
+        imbalance = static_data.get("imbalance_metrics", {})
+
+        return f"""- 静态订单簿:
+  • 买卖比率: {liquidity.get('bid_ask_ratio', 0):.2f}
+  • 不平衡度: {imbalance.get('imbalance_strength', 0):.3f}
+  • 不平衡方向: {imbalance.get('direction', 'neutral')}
+  • 总流动性: {liquidity.get('total_liquidity', 0):.0f}
+"""
+
+    def _get_dynamic_summary(self, dynamic_data: dict[str, Any]) -> str:
+        """获取动态数据简化摘要。
+
+        Args:
+            dynamic_data: 动态交易数据
+
+        Returns:
+            简化的动态数据摘要
+        """
+        if not dynamic_data or dynamic_data.get("status") != "success":
+            return "- 动态数据: 不可用\n"
+
+        minute_data_points = dynamic_data.get("minute_data_points", [])
+        if not minute_data_points:
+            return "- 动态数据: 无数据点\n"
+
+        # 计算基础统计
+        total_volume = 0
+        price_levels = set()
+
+        for point in minute_data_points[-10:]:  # 最近10个点
+            for price_str, level_data in point.get("price_levels", {}).items():
+                volume = float(level_data.get("total_volume", 0))
+                total_volume += volume
+                price_levels.add(float(price_str))
+
+        # 价格趋势分析
+        prices = []
+        for point in minute_data_points[-5:]:  # 最近5个点
+            vwap = self._calculate_vwap(point.get("price_levels", {}))
+            if vwap > 0:
+                prices.append(vwap)
+
+        price_momentum = "中性"
+        if len(prices) >= 2:
+            change = (prices[-1] - prices[0]) / prices[0]
+            if change > 0.005:
+                price_momentum = "上涨"
+            elif change < -0.005:
+                price_momentum = "下跌"
+
+        return f"""- 动态交易数据:
+  • 数据点: {len(minute_data_points)} 分钟
+  • 成交量: {total_volume:.0f}
+  • 价格水平: {len(price_levels)} 个
+  • 价格动能: {price_momentum}
+"""
 
     def _format_static_data_for_prompt(self, static_data: dict[str, Any]) -> str:
         """格式化静态数据用于提示词。"""
@@ -745,7 +733,7 @@ class BayesianDeepSeekAnalyzer:
                 raise RuntimeError(f"API调用异常: {str(e)}") from e
 
     def _parse_bayesian_response(self, response: str, symbol: str) -> BayesianTrendResult:
-        """解析贝叶斯API响应。
+        """解析简化的贝叶斯API响应。
 
         Args:
             response: API响应文本
@@ -769,14 +757,12 @@ class BayesianDeepSeekAnalyzer:
             # 解析JSON
             data = json.loads(response)
 
-            # 提取贝叶斯分析字段
+            # 提取核心字段
             posterior_probabilities = data.get("posterior_probabilities", {})
             most_likely_trend = data.get("most_likely_trend", "震荡")
             confidence = float(data.get("confidence", 0.5))
             uncertainty = float(data.get("uncertainty", 0.5))
-            analysis_reason = data.get("analysis_reason", "暂无贝叶斯分析原因")
-            evidence_summary = data.get("evidence_summary", {})
-            bayesian_insights = data.get("bayesian_insights", {})
+            analysis_reason = data.get("analysis_reason", "暂无分析原因")
 
             # 验证和修正概率分布
             posterior_probabilities = self._validate_and_normalize_probabilities(posterior_probabilities)
@@ -786,13 +772,14 @@ class BayesianDeepSeekAnalyzer:
                 if trend not in posterior_probabilities:
                     posterior_probabilities[trend] = 0.0
 
-            # 创建贝叶斯元数据
+            # 简化的贝叶斯元数据
             bayesian_metadata = {
                 "symbol": symbol,
-                "analysis_method": "bayesian_deepseek_analysis",
-                "response_raw": response[:500] + "..." if len(response) > 500 else response,
-                "bayesian_insights": bayesian_insights
+                "analysis_method": "simplified_bayesian_analysis",
+                "simplified": True
             }
+
+            logger.info(f"解析简化贝叶斯响应成功: {most_likely_trend}, 置信度: {confidence:.2f}")
 
             return BayesianTrendResult(
                 timestamp=datetime.now(),
@@ -801,13 +788,15 @@ class BayesianDeepSeekAnalyzer:
                 confidence=confidence,
                 uncertainty=uncertainty,
                 analysis_reason=analysis_reason,
-                evidence_summary=evidence_summary,
+                evidence_summary={},  # 简化为空字典
                 bayesian_metadata=bayesian_metadata
             )
 
         except json.JSONDecodeError as e:
+            logger.error(f"贝叶斯JSON解析失败: {response[:100]}...")
             raise ValueError(f"JSON解析失败: {str(e)}") from e
         except Exception as e:
+            logger.error(f"贝叶斯响应解析失败: {str(e)}")
             raise ValueError(f"贝叶斯响应解析失败: {str(e)}") from e
 
     def _update_stats(self, response_time: float, success: bool) -> None:

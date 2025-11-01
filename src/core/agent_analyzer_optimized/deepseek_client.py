@@ -264,54 +264,31 @@ class DeepSeekAnalyzer:
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        prompt = f"""请基于以下{symbol}的原始trades_window数据进行市场趋势分析：
-
-**分析时间**: {current_time}
+        prompt = f"""基于{symbol}交易数据做趋势分析。
 
 **数据概览**:
-- 原始分钟数据点: {data_points_count} 个
-- 时间范围: {first_timestamp} 到 {last_timestamp}
-- 总成交量: {total_volume:.2f}
-- 活跃价格水平: {len(all_price_levels)} 个
+- 数据点: {data_points_count} 个
+- 总成交量: {total_volume:.0f}
 - 价格区间: ${price_min:.2f} - ${price_max:.2f}
 
-**主要成交价格水平 (Top 10)**:
+**主要成交价格**:
 {price_levels_str}
 
-**数据说明**:
-这是未经处理的原始trades_window数据，包含过去4小时内每分钟的价格和成交量信息。
+**要求**:
+基于以上数据分析市场趋势，重点考虑：
+1. 成交量分布特征
+2. 价格活跃度
+3. 买卖力量对比
+4. 市场情绪状态
 
-**分析要求**:
-请基于以上原始交易数据，进行专业的市场趋势分析。重点关注：
-1. 成交量分布和价格活跃度
-2. 买卖压力变化趋势
-3. 关键价格位置的反应
-4. 市场情绪和力量对比
-
-**输出要求**:
-请严格按照以下JSON格式返回分析结果，不要添加任何其他文本：
-
+**输出格式**:
 {{
-  "trend": "趋势分类(选择其一: 震荡, 微弱看涨, 看涨, 强力看涨, 微弱看跌, 看跌, 强力看跌)",
-  "strength_levels": {{
-    "strong_support": 0.0-1.0,
-    "weak_support": 0.0-1.0,
-    "strong_resistance": 0.0-1.0,
-    "weak_resistance": 0.0-1.0
-  }},
-  "reason": "详细的分析原因，解释为什么得出这个趋势判断",
-  "confidence": 0.0-1.0
+  "trend": "震荡/微弱看涨/看涨/强力看涨/微弱看跌/看跌/强力看跌",
+  "confidence": 0.0-1.0,
+  "reason": "50字以内的详细分析原因，包含成交量、价格、市场情绪等关键信息"
 }}
 
-**强度等级说明**:
-- strong_support: 强支撑位强度 (0.0-1.0)
-- weak_support: 弱支撑位强度 (0.0-1.0)
-- strong_resistance: 强阻力位强度 (0.0-1.0)
-- weak_resistance: 弱阻力位强度 (0.0-1.0)
-
-**置信度说明**: 0.0表示最低置信度，1.0表示最高置信度
-
-请确保返回的是有效的JSON格式，数值范围在指定区间内。"""
+只返回JSON，不要其他内容。"""
 
         return prompt
 
@@ -377,7 +354,7 @@ class DeepSeekAnalyzer:
                 raise RuntimeError(f"API调用异常: {str(e)}") from e
 
     def _parse_response(self, response: str, symbol: str) -> TrendAnalysisResult:
-        """解析API响应。
+        """解析API响应（简化版）。
 
         Args:
             response: API响应文本
@@ -401,47 +378,42 @@ class DeepSeekAnalyzer:
             # 解析JSON
             data = json.loads(response)
 
-            # 提取字段
+            # 提取核心字段
             trend = data.get("trend", "震荡")
-            strength_levels = data.get("strength_levels", {})
             reason = data.get("reason", "暂无分析原因")
             confidence = float(data.get("confidence", 0.5))
 
-            # 设置默认强度等级
-            default_strength_levels = {
+            # 简化的强度等级（默认为0）
+            simple_strength_levels = {
                 "strong_support": 0.0,
                 "weak_support": 0.0,
                 "strong_resistance": 0.0,
                 "weak_resistance": 0.0
             }
 
-            # 合并用户提供的强度等级
-            for level, value in strength_levels.items():
-                if level in default_strength_levels:
-                    try:
-                        default_strength_levels[level] = float(value)
-                    except (ValueError, TypeError):
-                        logger.warning(f"无效的强度值: {level}={value}")
-
-            # 创建分析元数据
+            # 创建简化的分析元数据
             analysis_metadata = {
                 "symbol": symbol,
-                "analysis_method": "trades_window_aggregation",
-                "response_raw": response[:500] + "..." if len(response) > 500 else response
+                "analysis_method": "simple_trades_analysis",
+                "simplified": True
             }
+
+            logger.info(f"解析简化响应成功: {trend}, 置信度: {confidence:.2f}")
 
             return TrendAnalysisResult(
                 timestamp=datetime.now(),
                 trend=trend,
-                strength_levels=default_strength_levels,
+                strength_levels=simple_strength_levels,
                 reason=reason,
                 confidence=confidence,
                 analysis_metadata=analysis_metadata
             )
 
         except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败: {response[:100]}...")
             raise ValueError(f"JSON解析失败: {str(e)}") from e
         except Exception as e:
+            logger.error(f"响应解析失败: {str(e)}")
             raise ValueError(f"响应解析失败: {str(e)}") from e
 
     def _update_stats(self, response_time: float, success: bool) -> None:

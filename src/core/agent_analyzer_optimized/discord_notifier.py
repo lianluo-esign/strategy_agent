@@ -500,12 +500,11 @@ class DiscordNotificationManager:
         Returns:
             是否为贝叶斯分析结果
         """
-        # 检查贝叶斯分析结果的标志性字段
+        # 简化贝叶斯分析检查 - 只检查最常见的标志性字段
         bayesian_indicators = [
             "trend_analysis",
             "probability_distribution",
-            "bayesian_analysis",
-            "volatility_volume_insights"
+            "bayesian_analysis"
         ]
 
         return any(key in analysis_result for key in bayesian_indicators)
@@ -607,7 +606,7 @@ class BayesianDiscordFormatter:
         }
 
     def format_bayesian_analysis(self, analysis_data: dict[str, Any], symbol: str = "BTCFDUSD") -> dict[str, Any]:
-        """格式化贝叶斯分析结果为Discord消息（简化版）。
+        """格式化贝叶斯分析结果为Discord消息（极简版）。
 
         Args:
             analysis_data: 贝叶斯分析结果数据
@@ -622,7 +621,6 @@ class BayesianDiscordFormatter:
         # 提取关键信息
         most_likely_trend = core_info.get("trend", "未知")
         confidence = core_info.get("confidence", 0.0)
-        timestamp = core_info.get("timestamp", datetime.now().isoformat())
         analysis_reason = core_info.get("reason", "暂无分析原因")
         probabilities = core_info.get("probabilities", {})
 
@@ -630,24 +628,23 @@ class BayesianDiscordFormatter:
         trend_emoji = self.bayesian_trend_emojis.get(most_likely_trend, "❓")
         embed_color = self._get_bayesian_color(most_likely_trend, confidence, "unknown")
 
-        # 构建概率信息字符串
-        prob_info = self._format_probability_summary(probabilities)
+        # 构建简化的概率信息（只显示前3个）
+        prob_summary = self._format_simple_probability_summary(probabilities)
 
-        # 简化的嵌入消息 - 只包含趋势、原因、时间和概率
+        # 极简嵌入消息 - 只包含最关键的信息
         embed = {
-            "title": f"{trend_emoji} {symbol} 趋势分析",
+            "title": f"{trend_emoji} {symbol} 市场分析",
             "description": f"**趋势**: {most_likely_trend} {trend_emoji}\n**置信度**: {confidence:.1%}",
             "color": embed_color,
-            "timestamp": timestamp,
             "fields": [
                 {
-                    "name": "🎯 概率分布",
-                    "value": prob_info,
-                    "inline": False
+                    "name": "📊 概率分布",
+                    "value": prob_summary,
+                    "inline": True
                 },
                 {
                     "name": "📝 分析原因",
-                    "value": self._truncate_text(analysis_reason, 800),
+                    "value": self._truncate_text(analysis_reason, 300),
                     "inline": False
                 }
             ],
@@ -729,6 +726,31 @@ class BayesianDiscordFormatter:
             logger.error(f"提取贝叶斯核心信息失败: {e}")
 
         return core_info
+
+    def _format_simple_probability_summary(self, probabilities: dict[str, float]) -> str:
+        """格式化简化版概率分布摘要（只显示前3个）。
+
+        Args:
+            probabilities: 概率分布字典
+
+        Returns:
+            格式化的概率字符串
+        """
+        if not probabilities:
+            return "暂无概率数据"
+
+        lines = []
+        # 按概率排序，只显示前3个
+        sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
+
+        for trend, prob in sorted_probs[:3]:
+            emoji = self.bayesian_trend_emojis.get(trend, "❓")
+            # 简化的进度条，使用更简洁的符号
+            bar_length = int(prob * 5)
+            bar = "●" * bar_length + "○" * (5 - bar_length)
+            lines.append(f"{emoji} {trend}: `{prob:.0%}` {bar}")
+
+        return "\n".join(lines)
 
     def _format_probability_summary(self, probabilities: dict[str, float]) -> str:
         """格式化概率分布摘要。
