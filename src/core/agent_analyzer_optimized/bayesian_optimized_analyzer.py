@@ -14,7 +14,6 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from .bayesian_analyzer import BayesianAnalyzer
 from .bayesian_deepseek_client import BayesianDeepSeekAnalyzer
 from .bayesian_response_formatter import BayesianResponseFormatter
 from .discord_notifier import DiscordNotificationManager
@@ -47,7 +46,7 @@ class BayesianOptimizedAnalyzer:
         deepseek_config: dict[str, Any],
         discord_webhook_url: str | None = None,
         analysis_window_minutes: int = 240,
-        orderbook_precision: float = 10.0
+        orderbook_precision: float = 10.0,
     ):
         """初始化贝叶斯优化分析器。
 
@@ -71,16 +70,12 @@ class BayesianOptimizedAnalyzer:
             minutes_to_collect=analysis_window_minutes
         )
 
-        # 初始化贝叶斯分析引擎
-        self.bayesian_analyzer = BayesianAnalyzer()
-
-        # 初始化贝叶斯化Deepseek分析器
+        # 初始化贝叶斯化Deepseek分析器（直接进行贝叶斯分析）
         self.bayesian_deepseek = BayesianDeepSeekAnalyzer(**deepseek_config)
 
         # 初始化贝叶斯响应格式化器
         self.response_formatter = BayesianResponseFormatter(
-            include_metadata=True,
-            pretty_print=False
+            include_metadata=True, pretty_print=False
         )
 
         # 初始化Discord通知管理器（如果提供了webhook URL）
@@ -100,7 +95,7 @@ class BayesianOptimizedAnalyzer:
             "discord_notifications_sent": 0,
             "average_processing_time": 0,
             "static_data_available": 0,
-            "dynamic_data_available": 0
+            "dynamic_data_available": 0,
         }
 
         logger.info(
@@ -111,7 +106,7 @@ class BayesianOptimizedAnalyzer:
         )
 
     async def analyze_market(self, symbol: str = "BTCFDUSD") -> dict[str, Any]:
-        """执行完整的贝叶斯市场分析流程。
+        """执行贝叶斯市场分析流程（直接使用AI进行贝叶斯分析）。
 
         Args:
             symbol: 交易符号
@@ -123,10 +118,9 @@ class BayesianOptimizedAnalyzer:
         1. 从Redis获取静态深度快照数据
         2. 从Redis获取动态trades_window数据
         3. 分别分析静态和动态数据
-        4. 执行贝叶斯概率化分析
-        5. 调用AI进行贝叶斯增强分析
-        6. 格式化概率化结果
-        7. 发送Discord通知（如果启用）
+        4. 直接调用AI进行贝叶斯分析（集成所有证据）
+        5. 格式化贝叶斯结果
+        6. 发送Discord通知（如果启用）
         """
         start_time = asyncio.get_event_loop().time()
         self.stats["total_analyses"] += 1
@@ -140,44 +134,52 @@ class BayesianOptimizedAnalyzer:
             # 第二步：获取动态交易数据
             dynamic_data = await self._collect_dynamic_trades_data(symbol)
 
-            # 第三步：执行本地贝叶斯分析
-            local_bayesian_result = self._perform_local_bayesian_analysis(
-                static_data, dynamic_data, symbol
-            )
-
-            # 第四步：执行AI增强的贝叶斯分析
+            # 第三步：直接执行AI贝叶斯分析（包含所有证据）
             ai_bayesian_result = await self._perform_ai_bayesian_analysis(
                 static_data, dynamic_data, symbol
             )
 
-            # 第五步：融合分析结果
-            fused_result = self._fuse_bayesian_results(
-                local_bayesian_result, ai_bayesian_result
-            )
+            # 如果AI分析失败，返回错误结果
+            if ai_bayesian_result is None:
+                logger.error("AI贝叶斯分析失败，无法继续")
+                return await self._handle_analysis_error(
+                    symbol, Exception("AI分析失败"), start_time
+                )
 
-            # 第六步：格式化响应
+            # 第四步：格式化响应
             json_response = self._format_bayesian_response(
-                fused_result, static_data, dynamic_data, symbol
+                ai_bayesian_result.to_dict(), static_data, dynamic_data, symbol
             )
 
             # 处理通知和质量检查
             quality_check, discord_sent = await self._handle_notifications_and_quality(
-                fused_result, symbol
+                ai_bayesian_result.to_dict(), symbol
             )
 
             # 构建最终结果
             processing_time = asyncio.get_event_loop().time() - start_time
-            self._update_stats(processing_time, success=True, static_data=static_data, dynamic_data=dynamic_data)
+            self._update_stats(
+                processing_time,
+                success=True,
+                static_data=static_data,
+                dynamic_data=dynamic_data,
+            )
 
             result = self._build_final_result(
-                symbol, json_response, static_data, dynamic_data,
-                fused_result, processing_time, discord_sent, quality_check
+                symbol,
+                json_response,
+                static_data,
+                dynamic_data,
+                ai_bayesian_result.to_dict(),
+                processing_time,
+                discord_sent,
+                quality_check,
             )
 
             logger.info(
                 f"贝叶斯市场分析完成: {symbol}, 耗时 {processing_time:.2f}s, "
                 f"Discord通知={'已发送' if discord_sent else '未发送'}, "
-                f"趋势={fused_result.get('most_likely_trend', 'unknown')}"
+                f"趋势={ai_bayesian_result.most_likely_trend}"
             )
 
             return result
@@ -204,13 +206,17 @@ class BayesianOptimizedAnalyzer:
                     "status": "no_data",
                     "error": "No depth snapshot available",
                     "symbol": symbol,
-                    "analysis_type": "static_order_book"
+                    "analysis_type": "static_order_book",
                 }
 
-            logger.info(f"获取到深度快照: {depth_snapshot.symbol} from {depth_snapshot.timestamp}")
+            logger.info(
+                f"获取到深度快照: {depth_snapshot.symbol} from {depth_snapshot.timestamp}"
+            )
 
             # 分析静态订单簿
-            static_analysis = self.static_analyzer.analyze_order_book(depth_snapshot, symbol)
+            static_analysis = self.static_analyzer.analyze_order_book(
+                depth_snapshot, symbol
+            )
 
             if static_analysis.get("status") == "success":
                 logger.info(
@@ -227,7 +233,7 @@ class BayesianOptimizedAnalyzer:
                 "status": "error",
                 "error": str(e),
                 "symbol": symbol,
-                "analysis_type": "static_order_book"
+                "analysis_type": "static_order_book",
             }
 
     async def _collect_dynamic_trades_data(self, symbol: str) -> dict[str, Any]:
@@ -251,7 +257,7 @@ class BayesianOptimizedAnalyzer:
                     "status": "no_data",
                     "error": "No trades window data available",
                     "symbol": symbol,
-                    "analysis_type": "dynamic_trades"
+                    "analysis_type": "dynamic_trades",
                 }
 
             logger.info(f"获取到 {len(trades_window_data)} 分钟的交易数据")
@@ -272,7 +278,7 @@ class BayesianOptimizedAnalyzer:
                 "status": "success",
                 "symbol": symbol,
                 "analysis_type": "dynamic_trades",
-                **dynamic_data
+                **dynamic_data,
             }
 
         except Exception as e:
@@ -281,54 +287,11 @@ class BayesianOptimizedAnalyzer:
                 "status": "error",
                 "error": str(e),
                 "symbol": symbol,
-                "analysis_type": "dynamic_trades"
-            }
-
-    def _perform_local_bayesian_analysis(
-        self,
-        static_data: dict[str, Any],
-        dynamic_data: dict[str, Any],
-        symbol: str
-    ) -> dict[str, Any]:
-        """执行本地贝叶斯分析。
-
-        Args:
-            static_data: 静态订单簿数据
-            dynamic_data: 动态交易数据
-            symbol: 交易符号
-
-        Returns:
-            本地贝叶斯分析结果
-        """
-        try:
-            # 执行贝叶斯分析
-            bayesian_result = self.bayesian_analyzer.analyze_bayesian_trend(
-                static_data, dynamic_data, symbol
-            )
-
-            if bayesian_result.get("status") == "success":
-                logger.info(
-                    f"本地贝叶斯分析完成: "
-                    f"trend={bayesian_result['analysis_result']['most_likely_trend']}, "
-                    f"confidence={bayesian_result['analysis_result']['confidence']:.3f}"
-                )
-
-            return bayesian_result
-
-        except Exception as e:
-            logger.error(f"本地贝叶斯分析失败: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "symbol": symbol,
-                "analysis_type": "local_bayesian"
+                "analysis_type": "dynamic_trades",
             }
 
     async def _perform_ai_bayesian_analysis(
-        self,
-        static_data: dict[str, Any],
-        dynamic_data: dict[str, Any],
-        symbol: str
+        self, static_data: dict[str, Any], dynamic_data: dict[str, Any], symbol: str
     ) -> Any | None:
         """执行AI增强的贝叶斯分析。
 
@@ -359,69 +322,17 @@ class BayesianOptimizedAnalyzer:
             logger.error(f"AI贝叶斯分析失败: {e}")
             return None
 
-    def _fuse_bayesian_results(
-        self,
-        local_result: dict[str, Any],
-        ai_result: Any | None
-    ) -> dict[str, Any]:
-        """融合本地和AI贝叶斯分析结果。
-
-        Args:
-            local_result: 本地贝叶斯分析结果
-            ai_result: AI贝叶斯分析结果
-
-        Returns:
-            融合后的分析结果
-        """
-        # 如果AI分析失败，使用本地结果
-        if ai_result is None:
-            return local_result.get("analysis_result", {})
-
-        # 如果本地分析失败，使用AI结果
-        if local_result.get("status") != "success":
-            return ai_result.to_dict()["analysis_result"]
-
-        # 融合两个分析结果
-        local_analysis = local_result.get("analysis_result", {})
-        ai_analysis = ai_result.to_dict()
-
-        # 简单融合策略：使用AI结果作为主要依据，本地结果作为验证
-        fused_result = ai_analysis.copy()
-
-        # 添加本地分析的验证信息
-        fused_result["local_analysis_validation"] = {
-            "local_trend": local_analysis.get("most_likely_trend"),
-            "local_confidence": local_analysis.get("confidence"),
-            "trend_consistency": (
-                ai_analysis.get("most_likely_trend") == local_analysis.get("most_likely_trend")
-            ),
-            "confidence_gap": abs(
-                ai_analysis.get("confidence", 0) - local_analysis.get("confidence", 0)
-            )
-        }
-
-        # 如果趋势一致，提高置信度
-        if fused_result["local_analysis_validation"]["trend_consistency"]:
-            fused_result["confidence"] = min(
-                fused_result.get("confidence", 0) + 0.1, 1.0
-            )
-            fused_result["validation_status"] = "high_consensus"
-        else:
-            fused_result["validation_status"] = "divergent_views"
-
-        return fused_result
-
     def _format_bayesian_response(
         self,
-        fused_result: dict[str, Any],
+        ai_bayesian_result: dict[str, Any],
         static_data: dict[str, Any],
         dynamic_data: dict[str, Any],
-        symbol: str
+        symbol: str,
     ) -> str:
         """格式化贝叶斯分析响应。
 
         Args:
-            fused_result: 融合后的分析结果
+            ai_bayesian_result: AI贝叶斯分析结果
             static_data: 静态数据
             dynamic_data: 动态数据
             symbol: 交易符号
@@ -429,11 +340,14 @@ class BayesianOptimizedAnalyzer:
         Returns:
             格式化的JSON响应字符串
         """
+
         # 创建一个模拟的BayesianTrendResult对象用于格式化
         class MockBayesianResult:
             def __init__(self, result_dict: dict[str, Any]):
                 self.timestamp = datetime.now()
-                self.posterior_probabilities = result_dict.get("probability_distribution", {}).get("full_distribution", {})
+                self.posterior_probabilities = result_dict.get(
+                    "probability_distribution", {}
+                ).get("full_distribution", {})
                 self.most_likely_trend = result_dict.get("most_likely_trend", "unknown")
                 self.confidence = result_dict.get("confidence", 0.0)
                 self.uncertainty = result_dict.get("uncertainty", 1.0)
@@ -441,7 +355,7 @@ class BayesianOptimizedAnalyzer:
                 self.evidence_summary = result_dict.get("evidence_summary", {})
                 self.bayesian_metadata = result_dict.get("bayesian_metadata", {})
 
-        mock_result = MockBayesianResult(fused_result)
+        mock_result = MockBayesianResult(ai_bayesian_result)
 
         # 使用贝叶斯响应格式化器
         json_response = self.response_formatter.format_bayesian_response(
@@ -455,28 +369,26 @@ class BayesianOptimizedAnalyzer:
         return json_response
 
     async def _handle_notifications_and_quality(
-        self,
-        fused_result: dict[str, Any],
-        symbol: str
+        self, ai_bayesian_result: dict[str, Any], symbol: str
     ) -> tuple:
         """处理通知和质量检查。
 
         Args:
-            fused_result: 融合后的分析结果
+            ai_bayesian_result: AI贝叶斯分析结果
             symbol: 交易符号
 
         Returns:
             (质量检查结果, Discord发送状态)
         """
         # 质量检查
-        quality_check = self._validate_bayesian_analysis_quality(fused_result)
+        quality_check = self._validate_bayesian_analysis_quality(ai_bayesian_result)
 
         if not quality_check["is_valid"]:
             logger.error(f"贝叶斯分析质量验证失败: {quality_check['errors']}")
             if self.discord_manager:
                 await self.discord_manager.send_error_notification(
                     f"贝叶斯分析质量验证失败: {quality_check['errors']}",
-                    f"符号: {symbol}"
+                    f"符号: {symbol}",
                 )
 
         # Discord通知
@@ -485,10 +397,12 @@ class BayesianOptimizedAnalyzer:
             try:
                 # 适配现有通知接口
                 trend_data = {
-                    "trend": fused_result.get("most_likely_trend", "unknown"),
-                    "confidence": fused_result.get("confidence", 0.0),
-                    "reason": fused_result.get("analysis_reason", ""),
-                    "probability_distribution": fused_result.get("probability_distribution", {})
+                    "trend": ai_bayesian_result.get("most_likely_trend", "unknown"),
+                    "confidence": ai_bayesian_result.get("confidence", 0.0),
+                    "reason": ai_bayesian_result.get("analysis_reason", ""),
+                    "probability_distribution": ai_bayesian_result.get(
+                        "probability_distribution", {}
+                    ),
                 }
 
                 discord_sent = await self.discord_manager.send_trend_alert(
@@ -502,42 +416,40 @@ class BayesianOptimizedAnalyzer:
 
         return quality_check, discord_sent
 
-    def _validate_bayesian_analysis_quality(self, fused_result: dict[str, Any]) -> dict[str, Any]:
+    def _validate_bayesian_analysis_quality(
+        self, ai_bayesian_result: dict[str, Any]
+    ) -> dict[str, Any]:
         """验证贝叶斯分析质量。
 
         Args:
-            fused_result: 融合后的分析结果
+            ai_bayesian_result: AI贝叶斯分析结果
 
         Returns:
             质量检查结果
         """
-        quality_check = {
-            "is_valid": True,
-            "errors": [],
-            "warnings": []
-        }
+        quality_check = {"is_valid": True, "errors": [], "warnings": []}
 
         # 检查必要字段
         required_fields = ["most_likely_trend", "confidence", "uncertainty"]
         for field in required_fields:
-            if field not in fused_result:
+            if field not in ai_bayesian_result:
                 quality_check["errors"].append(f"缺少必要字段: {field}")
                 quality_check["is_valid"] = False
 
         # 检查置信度范围
-        confidence = fused_result.get("confidence", 0)
+        confidence = ai_bayesian_result.get("confidence", 0)
         if not 0 <= confidence <= 1:
             quality_check["errors"].append(f"置信度超出范围: {confidence}")
             quality_check["is_valid"] = False
 
         # 检查不确定性范围
-        uncertainty = fused_result.get("uncertainty", 0)
+        uncertainty = ai_bayesian_result.get("uncertainty", 0)
         if not 0 <= uncertainty <= 1:
             quality_check["errors"].append(f"不确定性超出范围: {uncertainty}")
             quality_check["is_valid"] = False
 
         # 检查概率分布
-        prob_dist = fused_result.get("probability_distribution", {})
+        prob_dist = ai_bayesian_result.get("probability_distribution", {})
         full_dist = prob_dist.get("full_distribution", {})
         if full_dist:
             total_prob = sum(full_dist.values())
@@ -560,10 +472,10 @@ class BayesianOptimizedAnalyzer:
         json_response: str,
         static_data: dict[str, Any],
         dynamic_data: dict[str, Any],
-        fused_result: dict[str, Any],
+        ai_bayesian_result: dict[str, Any],
         processing_time: float,
         discord_sent: bool,
-        quality_check: dict[str, Any]
+        quality_check: dict[str, Any],
     ) -> dict[str, Any]:
         """构建最终结果。
 
@@ -572,7 +484,7 @@ class BayesianOptimizedAnalyzer:
             json_response: JSON格式化响应
             static_data: 静态数据
             dynamic_data: 动态数据
-            fused_result: 融合结果
+            ai_bayesian_result: AI贝叶斯分析结果
             processing_time: 处理时间
             discord_sent: Discord发送状态
             quality_check: 质量检查结果
@@ -588,18 +500,17 @@ class BayesianOptimizedAnalyzer:
             "analysis_result": json.loads(json_response),
             "static_data": static_data,
             "dynamic_data": dynamic_data,
-            "fused_bayesian_result": fused_result,
+            "ai_bayesian_result": ai_bayesian_result,
             "processing_time": processing_time,
             "discord_notification_sent": discord_sent,
-            "quality_check": quality_check
+            "quality_check": quality_check,
         }
 
         # 添加性能统计
         result["performance_stats"] = {
-            "data_collection_time": processing_time * 0.25,  # 估算
-            "bayesian_analysis_time": processing_time * 0.35,  # 估算
-            "ai_analysis_time": processing_time * 0.30,  # 估算
-            "formatting_time": processing_time * 0.1        # 估算
+            "data_collection_time": processing_time * 0.4,  # 估算
+            "ai_bayesian_analysis_time": processing_time * 0.4,  # 估算
+            "formatting_time": processing_time * 0.2,  # 估算
         }
 
         # 添加数据源统计
@@ -607,16 +518,13 @@ class BayesianOptimizedAnalyzer:
             "static_data_available": static_data.get("status") == "success",
             "dynamic_data_available": dynamic_data.get("status") == "success",
             "static_data_quality": static_data.get("status"),
-            "dynamic_data_points": dynamic_data.get("data_points_count", 0)
+            "dynamic_data_points": dynamic_data.get("data_points_count", 0),
         }
 
         return result
 
     async def _handle_analysis_error(
-        self,
-        symbol: str,
-        error: Exception,
-        start_time: float
+        self, symbol: str, error: Exception, start_time: float
     ) -> dict[str, Any]:
         """处理分析错误。
 
@@ -641,7 +549,14 @@ class BayesianOptimizedAnalyzer:
             except Exception as discord_error:
                 logger.error(f"错误通知发送失败: {discord_error}")
 
-        return self._create_error_result(symbol, str(error))
+        return {
+            "status": "error",
+            "symbol": symbol,
+            "timestamp": datetime.now().isoformat(),
+            "analysis_type": "bayesian_optimized_analysis",
+            "error": str(error),
+            "processing_time": processing_time,
+        }
 
     async def analyze_single_cycle(self, symbol: str = "BTCFDUSD") -> str:
         """执行单次分析并返回JSON响应。
@@ -688,13 +603,13 @@ class BayesianOptimizedAnalyzer:
                 "confidence": 0.0,
                 "uncertainty": 1.0,
                 "confidence_level": "very_low",
-                "risk_level": "very_high_risk"
+                "risk_level": "very_high_risk",
             },
             "probability_distribution": {
                 "full_distribution": {},
                 "entropy": 0.0,
-                "distribution_type": "error"
-            }
+                "distribution_type": "error",
+            },
         }
 
         return json.dumps(error_response, ensure_ascii=False)
@@ -704,7 +619,7 @@ class BayesianOptimizedAnalyzer:
         processing_time: float,
         success: bool,
         static_data: dict[str, Any] | None = None,
-        dynamic_data: dict[str, Any] | None = None
+        dynamic_data: dict[str, Any] | None = None,
     ) -> None:
         """更新统计信息。
 
@@ -730,8 +645,8 @@ class BayesianOptimizedAnalyzer:
         total_analyses = self.stats["total_analyses"]
         current_avg = self.stats["average_processing_time"]
         self.stats["average_processing_time"] = (
-            (current_avg * (total_analyses - 1) + processing_time) / total_analyses
-        )
+            current_avg * (total_analyses - 1) + processing_time
+        ) / total_analyses
 
     def get_status(self) -> dict[str, Any]:
         """获取分析器状态。
@@ -748,34 +663,38 @@ class BayesianOptimizedAnalyzer:
             "components": {
                 "static_analyzer": {
                     "enabled": True,
-                    "precision": float(self.static_analyzer.aggregation_precision)
+                    "precision": float(self.static_analyzer.aggregation_precision),
                 },
                 "trades_aggregator": {
                     "enabled": True,
-                    "minutes_to_collect": self.trades_aggregator.minutes_to_collect
-                },
-                "bayesian_analyzer": {
-                    "enabled": True,
-                    "evidence_weights": self.bayesian_analyzer.evidence_weights
+                    "minutes_to_collect": self.trades_aggregator.minutes_to_collect,
                 },
                 "bayesian_deepseek": self.bayesian_deepseek.get_stats(),
                 "response_formatter": {
                     "enabled": True,
-                    "include_metadata": self.response_formatter.include_metadata
+                    "include_metadata": self.response_formatter.include_metadata,
                 },
                 "discord_manager": {
                     "enabled": self.discord_manager is not None,
-                    "stats": self.discord_manager.get_notifier().get_stats() if self.discord_manager else None
-                }
-            }
+                    "stats": self.discord_manager.get_notifier().get_stats()
+                    if self.discord_manager
+                    else None,
+                },
+            },
         }
 
         # 计算成功率
         total = self.stats["total_analyses"]
         if total > 0:
-            status["statistics"]["success_rate"] = self.stats["successful_analyses"] / total
-            status["statistics"]["static_data_availability_rate"] = self.stats["static_data_available"] / total
-            status["statistics"]["dynamic_data_availability_rate"] = self.stats["dynamic_data_available"] / total
+            status["statistics"]["success_rate"] = (
+                self.stats["successful_analyses"] / total
+            )
+            status["statistics"]["static_data_availability_rate"] = (
+                self.stats["static_data_available"] / total
+            )
+            status["statistics"]["dynamic_data_availability_rate"] = (
+                self.stats["dynamic_data_available"] / total
+            )
         else:
             status["statistics"]["success_rate"] = 0.0
             status["statistics"]["static_data_availability_rate"] = 0.0
@@ -792,7 +711,7 @@ class BayesianOptimizedAnalyzer:
         health_status = {
             "overall_status": "healthy",
             "checks": {},
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         # Redis连接检查
@@ -800,12 +719,12 @@ class BayesianOptimizedAnalyzer:
             redis_ok = self.redis_store.test_connection()
             health_status["checks"]["redis_connection"] = {
                 "status": "pass" if redis_ok else "fail",
-                "message": "Redis连接正常" if redis_ok else "Redis连接失败"
+                "message": "Redis连接正常" if redis_ok else "Redis连接失败",
             }
         except Exception as e:
             health_status["checks"]["redis_connection"] = {
                 "status": "fail",
-                "message": f"Redis检查异常: {str(e)}"
+                "message": f"Redis检查异常: {str(e)}",
             }
 
         # 数据可用性检查
@@ -816,36 +735,37 @@ class BayesianOptimizedAnalyzer:
             data_ok = trades_count > 0 or depth_available
             health_status["checks"]["data_availability"] = {
                 "status": "pass" if data_ok else "fail",
-                "message": f"动态数据: {trades_count} 分钟, 静态数据: {'可用' if depth_available else '不可用'}"
+                "message": f"动态数据: {trades_count} 分钟, 静态数据: {'可用' if depth_available else '不可用'}",
             }
         except Exception as e:
             health_status["checks"]["data_availability"] = {
                 "status": "fail",
-                "message": f"数据检查异常: {str(e)}"
+                "message": f"数据检查异常: {str(e)}",
             }
 
         # 贝叶斯分析器检查
         try:
             health_status["checks"]["bayesian_analyzer"] = {
                 "status": "pass",
-                "message": "贝叶斯分析器正常"
+                "message": "贝叶斯分析器正常",
             }
         except Exception as e:
             health_status["checks"]["bayesian_analyzer"] = {
                 "status": "fail",
-                "message": f"贝叶斯分析器异常: {str(e)}"
+                "message": f"贝叶斯分析器异常: {str(e)}",
             }
 
         # Discord功能检查（如果启用）
         if self.discord_manager:
             health_status["checks"]["discord_service"] = {
                 "status": "pass",
-                "message": "Discord通知服务已启用，将在分析完成后发送结果"
+                "message": "Discord通知服务已启用，将在分析完成后发送结果",
             }
 
         # 确定整体状态
         failed_checks = [
-            name for name, check in health_status["checks"].items()
+            name
+            for name, check in health_status["checks"].items()
             if check["status"] == "fail"
         ]
 
