@@ -16,6 +16,8 @@ from typing import Any
 import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .volatility_volume_analyzer import VolatilityVolumeAnalyzer
+
 logger = logging.getLogger(__name__)
 
 # API配置常量
@@ -129,12 +131,15 @@ class BayesianDeepSeekAnalyzer:
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.max_retries = max_retries
 
+        # 初始化波动率成交量分析器
+        self.volatility_volume_analyzer = VolatilityVolumeAnalyzer()
+
         # 统计信息
         self.stats = {
             "total_requests": 0,
             "successful_requests": 0,
             "failed_requests": 0,
-            "average_response_time": 0
+            "average_response_time": 0.0
         }
 
         logger.info(
@@ -231,6 +236,9 @@ class BayesianDeepSeekAnalyzer:
         # 构建动态数据分析部分
         dynamic_analysis = self._format_dynamic_data_for_prompt(dynamic_data)
 
+        # 执行波动率和成交量分析
+        volatility_volume_analysis = self._analyze_volatility_volume_for_prompt(dynamic_data)
+
         prompt = f"""作为一名专业的量化分析师，请基于贝叶斯思维框架对{symbol}市场进行概率化趋势分析。
 
 **分析时间**: {current_time}
@@ -241,7 +249,10 @@ class BayesianDeepSeekAnalyzer:
 **第二部分：动态成交量历史数据分析**
 {dynamic_analysis}
 
-**第三部分：贝叶斯分析要求**
+**第三部分：波动率和成交量统计分析**
+{volatility_volume_analysis}
+
+**第四部分：贝叶斯分析要求**
 
 请严格按照贝叶斯思维框架进行分析：
 
@@ -263,6 +274,21 @@ class BayesianDeepSeekAnalyzer:
    - 成交量趋势变化反映的市场参与度
    - 成交量活跃度与趋势强度的关系
    - 成交量分布特征对趋势可持续性的影响
+
+   **价格波动率证据**：
+   - 价格波动率水平对市场情绪的反映
+   - 波动率变化趋势对趋势强度的指示
+   - 价格范围和趋势强度的量化分析
+
+   **量价关系证据**：
+   - 价格与成交量的相关性分析
+   - 量价配合模式对趋势的确认作用
+   - 主导量价模式对后市走势的指示
+
+   **市场活跃度证据**：
+   - 综合活跃度评分对市场状态的反映
+   - 交易频率和流动性分散度的分析
+   - 市场活跃度与趋势概率的关系
 
    **价格动能证据**：
    - 近期价格变化的方向和强度
@@ -296,7 +322,16 @@ class BayesianDeepSeekAnalyzer:
   "evidence_summary": {{
     "static_liquidity": "静态流动性证据分析",
     "dynamic_volume": "动态成交量证据分析",
+    "price_volatility": "价格波动率证据分析",
+    "price_volume_relationship": "量价关系证据分析",
+    "market_activity": "市场活跃度证据分析",
     "price_momentum": "价格动能证据分析"
+  }},
+  "volatility_volume_insights": {{
+    "volatility_assessment": "波动率水平评估和趋势指示",
+    "volume_trend_analysis": "成交量趋势分析和对市场的影响",
+    "coordination_pattern": "量价配合模式及其对趋势的确认",
+    "activity_level_impact": "市场活跃度对趋势概率的影响"
   }},
   "bayesian_insights": {{
     "key_drivers": "驱动概率变化的关键因素",
@@ -355,19 +390,48 @@ class BayesianDeepSeekAnalyzer:
             return "动态交易数据不可用"
 
         minute_data_points = dynamic_data.get("minute_data_points", [])
-        data_points_count = dynamic_data.get("data_points_count", 0)
-
         if not minute_data_points:
             return "动态交易数据为空"
 
-        # 计算成交量统计
-        total_volume = 0
-        volume_trend = []
+        data_points_count = dynamic_data.get("data_points_count", 0)
+
+        # 计算基础统计数据
+        volume_stats = self._calculate_volume_stats(minute_data_points)
+        price_analysis = self._analyze_price_momentum(minute_data_points)
+
+        return f"""
+**动态数据概况**：
+- 数据时间跨度: {data_points_count} 分钟
+- 总成交量: {volume_stats['total_volume']:.2f}
+- 活跃价格水平: {volume_stats['price_levels_count']} 个
+- 最近20分钟成交量: {volume_stats['recent_volume']:.2f}
+
+**成交量特征**：
+- 成交量趋势: {volume_stats['trend_direction']}
+- 平均每分钟成交量: {volume_stats['avg_volume']:.2f}
+- 成交量活跃度: {volume_stats['activity_level']}
+
+**价格动能**：
+- 价格动量方向: {price_analysis['momentum']}
+- 分析价格点数: {len(price_analysis['prices'])}
+- 市场活跃度评估: {price_analysis['market_activity']}"""
+
+    def _calculate_volume_stats(self, minute_data_points: list[dict[str, Any]]) -> dict[str, Any]:
+        """计算成交量统计数据。
+
+        Args:
+            minute_data_points: 分钟数据点
+
+        Returns:
+            成交量统计数据
+        """
+        total_volume: float = 0
+        volume_trend: list[float] = []
         price_levels_count = set()
 
         for point in minute_data_points[-20:]:  # 最近20个数据点
             price_levels = point.get("price_levels", {})
-            point_volume = 0
+            point_volume: float = 0
 
             for price_str, level_data in price_levels.items():
                 volume = float(level_data.get("total_volume", 0))
@@ -378,55 +442,246 @@ class BayesianDeepSeekAnalyzer:
             volume_trend.append(point_volume)
 
         # 成交量趋势分析
+        trend_direction = self._determine_volume_trend(volume_trend)
+        avg_volume = sum(volume_trend) / len(volume_trend)
+        activity_level = self._assess_volume_activity(total_volume)
+
+        return {
+            "total_volume": total_volume,
+            "recent_volume": sum(volume_trend),
+            "avg_volume": avg_volume,
+            "trend_direction": trend_direction,
+            "activity_level": activity_level,
+            "price_levels_count": len(price_levels_count)
+        }
+
+    def _determine_volume_trend(self, volume_trend: list[float]) -> str:
+        """确定成交量趋势方向。
+
+        Args:
+            volume_trend: 成交量趋势数据
+
+        Returns:
+            趋势方向字符串
+        """
         if len(volume_trend) >= 10:
             recent_avg = sum(volume_trend[-5:]) / 5
             earlier_avg = sum(volume_trend[-10:-5]) / 5
-            trend_direction = "上升" if recent_avg > earlier_avg * 1.2 else "下降" if recent_avg < earlier_avg * 0.8 else "稳定"
-        else:
-            trend_direction = "无法判断"
+            if recent_avg > earlier_avg * 1.2:
+                return "上升"
+            elif recent_avg < earlier_avg * 0.8:
+                return "下降"
+            else:
+                return "稳定"
+        return "无法判断"
 
-        # 价格分析
+    def _assess_volume_activity(self, total_volume: float) -> str:
+        """评估成交量活跃度。
+
+        Args:
+            total_volume: 总成交量
+
+        Returns:
+            活跃度评估字符串
+        """
+        if total_volume > 500:
+            return "高"
+        elif total_volume > 100:
+            return "中"
+        else:
+            return "低"
+
+    def _analyze_price_momentum(self, minute_data_points: list[dict[str, Any]]) -> dict[str, Any]:
+        """分析价格动能。
+
+        Args:
+            minute_data_points: 分钟数据点
+
+        Returns:
+            价格动能分析结果
+        """
         prices = []
         for point in minute_data_points[-10:]:
             price_levels = point.get("price_levels", {})
             if price_levels:
-                # 使用成交量加权平均价格
-                total_weight = 0
-                weighted_sum = 0
-                for price_str, level_data in price_levels.items():
-                    volume = float(level_data.get("total_volume", 0))
-                    if volume > 0:
-                        price = float(price_str)
-                        weighted_sum += price * volume
-                        total_weight += volume
+                vwap = self._calculate_vwap(price_levels)
+                if vwap > 0:
+                    prices.append(vwap)
 
-                if total_weight > 0:
-                    prices.append(weighted_sum / total_weight)
+        momentum = self._calculate_momentum(prices)
+        market_activity = self._assess_market_activity_level(prices, minute_data_points)
 
-        price_momentum = "中性"
-        if len(prices) >= 3:
-            price_change = (prices[-1] - prices[0]) / prices[0] if prices[0] > 0 else 0
+        return {
+            "prices": prices,
+            "momentum": momentum,
+            "market_activity": market_activity
+        }
+
+    def _calculate_vwap(self, price_levels: dict[str, Any]) -> float:
+        """计算成交量加权平均价格。
+
+        Args:
+            price_levels: 价格水平数据
+
+        Returns:
+            VWAP价格
+        """
+        total_weight: float = 0
+        weighted_sum: float = 0
+
+        for price_str, level_data in price_levels.items():
+            volume = float(level_data.get("total_volume", 0))
+            if volume > 0:
+                price = float(price_str)
+                weighted_sum += price * volume
+                total_weight += volume
+
+        return weighted_sum / total_weight if total_weight > 0 else 0
+
+    def _calculate_momentum(self, prices: list[float]) -> str:
+        """计算价格动能。
+
+        Args:
+            prices: 价格序列
+
+        Returns:
+            价格动能字符串
+        """
+        if len(prices) >= 3 and prices[0] > 0:
+            price_change = (prices[-1] - prices[0]) / prices[0]
             if price_change > 0.002:
-                price_momentum = f"上涨({price_change:.2%})"
+                return f"上涨({price_change:.2%})"
             elif price_change < -0.002:
-                price_momentum = f"下跌({price_change:.2%})"
+                return f"下跌({price_change:.2%})"
+        return "中性"
 
-        return f"""
-**动态数据概况**：
-- 数据时间跨度: {data_points_count} 分钟
-- 总成交量: {total_volume:.2f}
-- 活跃价格水平: {len(price_levels_count)} 个
-- 最近20分钟成交量: {sum(volume_trend):.2f}
+    def _assess_market_activity_level(self, prices: list[float], minute_data_points: list[dict[str, Any]]) -> str:
+        """评估市场活跃度水平。
 
-**成交量特征**：
-- 成交量趋势: {trend_direction}
-- 平均每分钟成交量: {sum(volume_trend) / len(volume_trend):.2f}
-- 成交量活跃度: {'高' if total_volume > 500 else '中' if total_volume > 100 else '低'}
+        Args:
+            prices: 价格序列
+            minute_data_points: 分钟数据点
 
-**价格动能**：
-- 价格动量方向: {price_momentum}
-- 分析价格点数: {len(prices)}
-- 市场活跃度评估: {'活跃' if total_volume > 200 and len(price_levels_count) > 50 else '一般' if total_volume > 50 else '低迷'}"""
+        Returns:
+            市场活跃度评估字符串
+        """
+        if len(minute_data_points) == 0:
+            return "低迷"
+
+        # 计算总成交量和价格水平数量
+        total_volume: float = 0
+        price_levels_count = set()
+
+        for point in minute_data_points[-20:]:
+            price_levels = point.get("price_levels", {})
+            for price_str, level_data in price_levels.items():
+                volume = float(level_data.get("total_volume", 0))
+                total_volume += volume
+                price_levels_count.add(price_str)
+
+        if total_volume > 200 and len(price_levels_count) > 50:
+            return "活跃"
+        elif total_volume > 50:
+            return "一般"
+        else:
+            return "低迷"
+
+    def _analyze_volatility_volume_for_prompt(self, dynamic_data: dict[str, Any]) -> str:
+        """分析波动率和成交量数据并格式化为提示词。
+
+        Args:
+            dynamic_data: 动态交易数据
+
+        Returns:
+            格式化的波动率和成交量分析字符串
+        """
+        if not dynamic_data or dynamic_data.get("status") != "success":
+            return "波动率和成交量分析数据不可用"
+
+        # 执行波动率和成交量分析
+        analysis_result = self.volatility_volume_analyzer.analyze_volatility_volume(dynamic_data)
+
+        if analysis_result.get("status") != "success":
+            return f"波动率和成交量分析失败: {analysis_result.get('error', '未知错误')}"
+
+        # 提取分析结果
+        volatility_analysis = analysis_result.get("volatility_analysis", {})
+        volume_analysis = analysis_result.get("volume_analysis", {})
+        price_volume_relation = analysis_result.get("price_volume_relationship", {})
+        market_activity = analysis_result.get("market_activity_assessment", {})
+        summary = analysis_result.get("analysis_summary", {})
+
+        # 格式化波动率分析
+        vol_metrics = volatility_analysis.get("volatility_metrics", {})
+        price_range = volatility_analysis.get("price_range_analysis", {})
+        trend_analysis = volatility_analysis.get("trend_analysis", {})
+
+        volatility_section = f"""
+**价格波动率分析**：
+- 当前波动率水平: {vol_metrics.get('volatility_level', '未知')}
+- 实际波动率值: {vol_metrics.get('current_volatility', 0):.4f}
+- 5分钟波动率: {vol_metrics.get('volatility_5min', 0):.4f}
+- 15分钟波动率: {vol_metrics.get('volatility_15min', 0):.4f}
+- 价格范围: ${price_range.get('lowest_price', 0):.2f} - ${price_range.get('highest_price', 0):.2f}
+- 价格范围百分比: {price_range.get('price_range_percentage', 0):.2f}%
+- 价格趋势方向: {trend_analysis.get('trend_direction', '未知')}
+- 趋势强度: {trend_analysis.get('trend_strength_level', '未知')} ({trend_analysis.get('trend_strength_percent', 0):.3f}%)"""
+
+        # 格式化成交量分析
+        volume_basic = volume_analysis.get("basic_statistics", {})
+        volume_trend = volume_analysis.get("trend_analysis", {})
+        volume_activity = volume_analysis.get("activity_assessment", {})
+
+        volume_section = f"""
+**成交量特征分析**：
+- 总成交量: {volume_basic.get('total_volume', 0):.2f}
+- 平均每分钟成交量: {volume_basic.get('average_volume', 0):.2f}
+- 成交量中位数: {volume_basic.get('median_volume', 0):.2f}
+- 成交量标准差: {volume_basic.get('std_volume', 0):.2f}
+- 成交量趋势方向: {volume_trend.get('trend_direction', '未知')} ({volume_trend.get('volume_trend_percent', 0):.1f}%)
+- 成交量活跃度: {volume_activity.get('activity_level', '未知')}
+- 成交量突增次数: {volume_activity.get('spike_count', 0)} 次"""
+
+        # 格式化量价关系分析
+        correlation = price_volume_relation.get("correlation_analysis", {})
+        coordination = price_volume_relation.get("coordination_patterns", {})
+        relationship = price_volume_relation.get("relationship_assessment", {})
+
+        price_volume_section = f"""
+**量价关系分析**：
+- 价格-成交量相关系数: {correlation.get('correlation_coefficient', 0):.3f}
+- 相关性强度: {correlation.get('correlation_strength', '未知')}
+- 相关性方向: {correlation.get('correlation_direction', '未知')}
+- 主导量价模式: {coordination.get('dominant_pattern', '无明显模式')}
+- 健康上涨模式占比: {relationship.get('healthy_uptrend', 0):.1%}
+- 抛售压力模式占比: {relationship.get('selling_pressure', 0):.1%}
+- 上涨乏力模式占比: {relationship.get('weak_uptrend', 0):.1%}
+- 止跌迹象模式占比: {relationship.get('stabilization', 0):.1%}"""
+
+        # 格式化市场活跃度分析
+        activity_scoring = market_activity.get("activity_scoring", {})
+        activity_assessment = market_activity.get("activity_assessment", {})
+
+        market_activity_section = f"""
+**市场活跃度评估**：
+- 综合活跃度评分: {activity_scoring.get('total_score', 0):.1f} / 100
+- 活跃度等级: {activity_assessment.get('activity_level', '未知')}
+- 市场状态: {activity_assessment.get('market_state', '未知')}
+- 成交量评分: {activity_scoring.get('volume_score', 0):.1f}
+- 波动率评分: {activity_scoring.get('volatility_score', 0):.1f}
+- 价格多样性评分: {activity_scoring.get('diversity_score', 0):.1f}
+- 交易频率评分: {activity_scoring.get('trades_score', 0):.1f}"""
+
+        # 格式化关键洞察
+        key_insights = summary.get("key_insights", [])
+
+        insights_section = ""
+        if key_insights:
+            insights_section = "\n**关键洞察摘要**：\n"
+            for insight in key_insights:
+                insights_section += f"- {insight}\n"
+
+        return volatility_section + volume_section + price_volume_section + market_activity_section + insights_section
 
     async def _call_deepseek_api(self, prompt: str) -> str:
         """调用Deepseek API。
@@ -482,7 +737,7 @@ class BayesianDeepSeekAnalyzer:
                     if "content" not in message:
                         raise RuntimeError("API响应格式错误：缺少content字段")
 
-                    return message["content"]
+                    return str(message["content"])
 
             except aiohttp.ClientError as e:
                 raise RuntimeError(f"网络请求失败: {str(e)}") from e
@@ -569,8 +824,8 @@ class BayesianDeepSeekAnalyzer:
 
         # 更新平均响应时间
         total_requests = self.stats["total_requests"]
-        current_avg = self.stats["average_response_time"]
-        self.stats["average_response_time"] = (
+        current_avg: float = self.stats["average_response_time"]
+        self.stats["average_response_time"] = float(
             (current_avg * (total_requests - 1) + response_time) / total_requests
         )
 
