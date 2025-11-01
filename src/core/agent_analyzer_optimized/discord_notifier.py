@@ -581,7 +581,7 @@ class DiscordNotifier:
                     }
 
             # 从分钟数据分析成交量热点和支撑阻力
-            all_volumes = {}
+            all_volumes: dict[float, float] = {}
             for point in minute_data_points:
                 price_levels = point.get("price_levels", {})
                 for price_str, level_data in price_levels.items():
@@ -589,8 +589,9 @@ class DiscordNotifier:
                         price = float(price_str)
                         volume = float(level_data.get("total_volume", 0))
                         if volume > 0:
-                            all_volumes[price] = all_volumes.get(price, 0) + volume
-                    except (ValueError, TypeError):
+                            all_volumes[price] = all_volumes.get(price, 0.0) + volume
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Invalid price/volume data: {price_str}={level_data.get('total_volume')}")
                         continue
 
             if all_volumes and price_analysis["current_price"] > 0:
@@ -794,18 +795,50 @@ class DiscordNotifier:
             格式化的价格分析字符串
         """
         try:
+            # 验证输入数据
+            if not analysis_result or not isinstance(analysis_result, dict):
+                logger.warning("Invalid analysis_result provided")
+                return "数据格式异常"
+
             # 尝试从metadata中提取data_statistics
             metadata = analysis_result.get("metadata", {})
-            data_stats = metadata.get("data_statistics", {})
+            if not isinstance(metadata, dict):
+                logger.warning("Invalid metadata structure")
+                return "数据格式异常"
 
+            data_stats = metadata.get("data_statistics", {})
             if not data_stats:
                 return "暂无统计数据"
 
-            # 提取各项统计数据
-            total_volume = data_stats.get("total_volume", 0)
-            trade_count = data_stats.get("trade_count", 0)
-            price_levels_count = data_stats.get("price_levels_count", 0)
+            # 验证data_statistics结构
+            if not isinstance(data_stats, dict):
+                logger.warning("Invalid data_statistics structure")
+                return "数据格式异常"
+
+            # 提取并验证各项统计数据
+            try:
+                total_volume = float(data_stats.get("total_volume", 0))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid total_volume: {data_stats.get('total_volume')}")
+                total_volume = 0.0
+
+            try:
+                trade_count = int(data_stats.get("trade_count", 0))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid trade_count: {data_stats.get('trade_count')}")
+                trade_count = 0
+
+            try:
+                price_levels_count = int(data_stats.get("price_levels_count", 0))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid price_levels_count: {data_stats.get('price_levels_count')}")
+                price_levels_count = 0
+
+            # 验证价格范围
             price_range = data_stats.get("price_range", [0, 0])
+            if not isinstance(price_range, list) or len(price_range) != 2:
+                logger.warning(f"Invalid price_range: {price_range}")
+                price_range = [0, 0]
 
             # 格式化显示
             lines = []
@@ -1111,7 +1144,7 @@ class BayesianDiscordFormatter:
 
         # 提取价格位置信息
         price_analysis = self._extract_price_positions(analysis_data)
-        price_positions = self._format_price_positions_for_bayesian(price_analysis)
+        # 注意：price_positions变量未被使用，保留以备将来扩展
 
         # 构建字段列表
         fields = [
@@ -1693,7 +1726,7 @@ class BayesianDiscordFormatter:
                     }
 
             # 从分钟数据分析成交量热点和支撑阻力
-            all_volumes = {}
+            all_volumes: dict[float, float] = {}
             for point in minute_data_points:
                 price_levels = point.get("price_levels", {})
                 for price_str, level_data in price_levels.items():
@@ -1701,8 +1734,9 @@ class BayesianDiscordFormatter:
                         price = float(price_str)
                         volume = float(level_data.get("total_volume", 0))
                         if volume > 0:
-                            all_volumes[price] = all_volumes.get(price, 0) + volume
-                    except (ValueError, TypeError):
+                            all_volumes[price] = all_volumes.get(price, 0.0) + volume
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Invalid price/volume data: {price_str}={level_data.get('total_volume')}")
                         continue
 
             if all_volumes and price_analysis["current_price"] > 0:
