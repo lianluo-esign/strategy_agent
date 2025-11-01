@@ -202,13 +202,13 @@ class DiscordNotifier:
                 }
             ]
 
-            # 添加关键价格位置分析
-            if price_analysis:
-                fields.append({
-                    "name": "🎯 关键价格位置",
-                    "value": self._format_price_positions(price_analysis),
-                    "inline": True
-                })
+            # 添加价格分析
+            price_analysis_text = self._format_data_statistics_for_discord(analysis_result)
+            fields.append({
+                "name": "📊 价格分析",
+                "value": price_analysis_text,
+                "inline": True
+            })
 
             # 如果有概率分布信息，添加概率字段
             if probability_summary:
@@ -247,8 +247,8 @@ class DiscordNotifier:
 **📊 趋势判断**: {trend}
 **🎯 置信度**: {confidence:.1%} {confidence_bar}
 
-**🎯 关键价格位置**:
-{self._format_price_positions_text(price_analysis)}
+**📊 价格分析**:
+{self._format_data_statistics_text(analysis_result)}
 
 **📝 详细分析**:
 {self._truncate_text(self._enhance_analysis_reason(reason, price_analysis, depth_snapshot), 1000)}
@@ -784,6 +784,122 @@ class DiscordNotifier:
         enhanced_text = " | ".join(enhanced_parts)
         return self._truncate_text(enhanced_text, 500)
 
+    def _format_data_statistics_for_discord(self, analysis_result: dict[str, Any]) -> str:
+        """格式化数据统计信息为Discord消息（嵌入格式）。
+
+        Args:
+            analysis_result: 分析结果字典
+
+        Returns:
+            格式化的价格分析字符串
+        """
+        try:
+            # 尝试从metadata中提取data_statistics
+            metadata = analysis_result.get("metadata", {})
+            data_stats = metadata.get("data_statistics", {})
+
+            if not data_stats:
+                return "暂无统计数据"
+
+            # 提取各项统计数据
+            total_volume = data_stats.get("total_volume", 0)
+            trade_count = data_stats.get("trade_count", 0)
+            price_levels_count = data_stats.get("price_levels_count", 0)
+            price_range = data_stats.get("price_range", [0, 0])
+
+            # 格式化显示
+            lines = []
+
+            # 总成交量（处理BTC单位显示）
+            if total_volume > 0:
+                if total_volume >= 1000:
+                    volume_display = f"{total_volume/1000:.2f}K BTC"
+                else:
+                    volume_display = f"{total_volume:.4f} BTC"
+                lines.append(f"• 总成交量: {volume_display}")
+            else:
+                lines.append("• 总成交量: 0 BTC")
+
+            # 交易数量
+            lines.append(f"• 交易数量: {trade_count:,} 笔")
+
+            # 价格档位数量
+            lines.append(f"• 价格档位: {price_levels_count:,} 个")
+
+            # 价格区间
+            if isinstance(price_range, list) and len(price_range) == 2:
+                min_price, max_price = price_range
+                if min_price > 0 and max_price > 0:
+                    lines.append(f"• 价格区间: ${min_price:,.0f} - ${max_price:,.0f}")
+                else:
+                    lines.append("• 价格区间: 数据异常")
+            else:
+                lines.append("• 价格区间: 不可用")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.debug(f"格式化数据统计信息失败: {e}")
+            return "统计数据格式异常"
+
+    def _format_data_statistics_text(self, analysis_result: dict[str, Any]) -> str:
+        """格式化数据统计信息为文本格式。
+
+        Args:
+            analysis_result: 分析结果字典
+
+        Returns:
+            格式化的价格分析字符串
+        """
+        try:
+            # 尝试从metadata中提取data_statistics
+            metadata = analysis_result.get("metadata", {})
+            data_stats = metadata.get("data_statistics", {})
+
+            if not data_stats:
+                return "  暂无统计数据"
+
+            # 提取各项统计数据
+            total_volume = data_stats.get("total_volume", 0)
+            trade_count = data_stats.get("trade_count", 0)
+            price_levels_count = data_stats.get("price_levels_count", 0)
+            price_range = data_stats.get("price_range", [0, 0])
+
+            # 格式化显示
+            lines = []
+
+            # 总成交量
+            if total_volume > 0:
+                if total_volume >= 1000:
+                    volume_display = f"{total_volume/1000:.2f}K BTC"
+                else:
+                    volume_display = f"{total_volume:.4f} BTC"
+                lines.append(f"  • 总成交量: {volume_display}")
+            else:
+                lines.append("  • 总成交量: 0 BTC")
+
+            # 交易数量
+            lines.append(f"  • 交易数量: {trade_count:,} 笔")
+
+            # 价格档位数量
+            lines.append(f"  • 价格档位: {price_levels_count:,} 个")
+
+            # 价格区间
+            if isinstance(price_range, list) and len(price_range) == 2:
+                min_price, max_price = price_range
+                if min_price > 0 and max_price > 0:
+                    lines.append(f"  • 价格区间: ${min_price:,.0f} - ${max_price:,.0f}")
+                else:
+                    lines.append("  • 价格区间: 数据异常")
+            else:
+                lines.append("  • 价格区间: 不可用")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.debug(f"格式化数据统计信息失败: {e}")
+            return "  统计数据格式异常"
+
 
 class DiscordNotificationManager:
     """Discord通知管理器，提供高级通知功能。"""
@@ -1006,13 +1122,13 @@ class BayesianDiscordFormatter:
             }
         ]
 
-        # 添加关键价格位置分析
-        if price_positions:
-            fields.append({
-                "name": "🎯 关键价格位置",
-                "value": price_positions,
-                "inline": True
-            })
+        # 添加价格分析
+        price_analysis_text = self._format_data_statistics_for_bayesian(analysis_data)
+        fields.append({
+            "name": "📊 价格分析",
+            "value": price_analysis_text,
+            "inline": True
+        })
 
         # 添加详细分析原因
         fields.append({
@@ -1669,3 +1785,61 @@ class BayesianDiscordFormatter:
                 lines.append(f"  买卖比: {ratio:.2f}")
 
         return "\n".join(lines) if lines else "暂无价格位置数据"
+
+    def _format_data_statistics_for_bayesian(self, analysis_data: dict[str, Any]) -> str:
+        """为贝叶斯分析格式化数据统计信息。
+
+        Args:
+            analysis_data: 分析数据
+
+        Returns:
+            格式化的数据统计字符串
+        """
+        try:
+            # 尝试从metadata中提取data_statistics
+            metadata = analysis_data.get("metadata", {})
+            data_stats = metadata.get("data_statistics", {})
+
+            if not data_stats:
+                return "暂无统计数据"
+
+            # 提取各项统计数据
+            total_volume = data_stats.get("total_volume", 0)
+            trade_count = data_stats.get("trade_count", 0)
+            price_levels_count = data_stats.get("price_levels_count", 0)
+            price_range = data_stats.get("price_range", [0, 0])
+
+            # 格式化显示
+            lines = []
+
+            # 总成交量（简化显示，适合贝叶斯格式）
+            if total_volume > 0:
+                if total_volume >= 1000:
+                    volume_display = f"{total_volume/1000:.1f}K"
+                else:
+                    volume_display = f"{total_volume:.2f}"
+                lines.append(f"**成交量**: {volume_display} BTC")
+            else:
+                lines.append("**成交量**: 0 BTC")
+
+            # 交易数量
+            lines.append(f"**交易数**: {trade_count:,}")
+
+            # 价格档位数量
+            lines.append(f"**档位数**: {price_levels_count:,}")
+
+            # 价格区间
+            if isinstance(price_range, list) and len(price_range) == 2:
+                min_price, max_price = price_range
+                if min_price > 0 and max_price > 0:
+                    lines.append(f"**区间**: ${min_price:,.0f}-${max_price:,.0f}")
+                else:
+                    lines.append("**区间**: 数据异常")
+            else:
+                lines.append("**区间**: 不可用")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.debug(f"贝叶斯格式化器数据统计失败: {e}")
+            return "统计数据异常"
