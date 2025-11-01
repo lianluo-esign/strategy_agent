@@ -109,14 +109,14 @@ class StaticOrderBookAnalyzer:
 
     def _aggregate_order_book_depth(
         self,
-        raw_bids: list[tuple[str, str]],
-        raw_asks: list[tuple[str, str]]
+        raw_bids: list[Any],
+        raw_asks: list[Any]
     ) -> tuple[dict[str, Decimal], dict[str, Decimal]]:
         """聚合订单簿深度数据。
 
         Args:
-            raw_bids: 原始买单数据 [(price, quantity), ...]
-            raw_asks: 原始卖单数据 [(price, quantity), ...]
+            raw_bids: 原始买单数据 (DepthLevel对象列表)
+            raw_asks: 原始卖单数据 (DepthLevel对象列表)
 
         Returns:
             聚合后的买单和卖单字典
@@ -125,10 +125,17 @@ class StaticOrderBookAnalyzer:
         aggregated_asks: defaultdict[Decimal, Decimal] = defaultdict(Decimal)
 
         # 聚合买单
-        for price_str, quantity_str in raw_bids:
+        for bid_level in raw_bids:
             try:
-                price = Decimal(str(price_str))
-                quantity = Decimal(str(quantity_str))
+                # 处理DepthLevel对象
+                if hasattr(bid_level, 'price') and hasattr(bid_level, 'quantity'):
+                    price = bid_level.price
+                    quantity = bid_level.quantity
+                else:
+                    # 处理元组格式 [(price, quantity), ...]
+                    price_str, quantity_str = bid_level
+                    price = Decimal(str(price_str))
+                    quantity = Decimal(str(quantity_str))
 
                 if quantity > 0:
                     # 按10美元精度对齐价格
@@ -139,10 +146,17 @@ class StaticOrderBookAnalyzer:
                 continue
 
         # 聚合卖单
-        for price_str, quantity_str in raw_asks:
+        for ask_level in raw_asks:
             try:
-                price = Decimal(str(price_str))
-                quantity = Decimal(str(quantity_str))
+                # 处理DepthLevel对象
+                if hasattr(ask_level, 'price') and hasattr(ask_level, 'quantity'):
+                    price = ask_level.price
+                    quantity = ask_level.quantity
+                else:
+                    # 处理元组格式 [(price, quantity), ...]
+                    price_str, quantity_str = ask_level
+                    price = Decimal(str(price_str))
+                    quantity = Decimal(str(quantity_str))
 
                 if quantity > 0:
                     # 按10美元精度对齐价格
