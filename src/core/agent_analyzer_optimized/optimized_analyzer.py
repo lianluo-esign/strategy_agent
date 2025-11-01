@@ -159,15 +159,45 @@ class OptimizedAgentAnalyzer:
 
         logger.info(f"读取到 {len(trades_window_data)} 分钟的交易数据")
 
-        # 第二步：收集原始数据
+        # 第二步：从Redis读取深度快照数据
+        depth_snapshot = self.redis_store.get_latest_depth_snapshot()
+        if depth_snapshot:
+            logger.info(f"读取到深度快照数据: {len(depth_snapshot.bids)} 买单, {len(depth_snapshot.asks)} 卖单")
+        else:
+            logger.warning("未找到深度快照数据，将仅基于交易数据进行分析")
+
+        # 第三步：收集原始数据
         raw_data = self.trades_aggregator.collect_raw_trades_data(
             trades_window_data, symbol
         )
         raw_dict = raw_data.to_dict()
 
+        # 添加深度快照数据到原始数据中
+        if depth_snapshot:
+            raw_dict["depth_snapshot"] = {
+                "symbol": depth_snapshot.symbol,
+                "timestamp": depth_snapshot.timestamp.isoformat(),
+                "bids": [
+                    {"price": float(level.price), "quantity": float(level.quantity)}
+                    for level in depth_snapshot.bids[:20]  # 只取前20档
+                ],
+                "asks": [
+                    {"price": float(level.price), "quantity": float(level.quantity)}
+                    for level in depth_snapshot.asks[:20]  # 只取前20档
+                ],
+                "bid_volume": sum(float(level.quantity) for level in depth_snapshot.bids[:20]),
+                "ask_volume": sum(float(level.quantity) for level in depth_snapshot.asks[:20]),
+                "spread": float(depth_snapshot.asks[0].price - depth_snapshot.bids[0].price) if depth_snapshot.asks and depth_snapshot.bids else 0.0,
+                "mid_price": float((depth_snapshot.asks[0].price + depth_snapshot.bids[0].price) / 2) if depth_snapshot.asks and depth_snapshot.bids else 0.0
+            }
+            logger.info("深度快照数据已添加到分析数据中")
+        else:
+            raw_dict["depth_snapshot"] = None
+
         logger.info(
             f"原始数据收集完成: {raw_data.data_points_count} 个分钟数据点, "
-            f"时间跨度 {len(raw_data.minute_data_points)} 分钟"
+            f"时间跨度 {len(raw_data.minute_data_points)} 分钟, "
+            f"深度快照: {'已包含' if depth_snapshot else '未包含'}"
         )
 
         return raw_dict

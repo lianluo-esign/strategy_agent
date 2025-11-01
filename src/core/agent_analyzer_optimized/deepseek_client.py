@@ -216,12 +216,14 @@ class DeepSeekAnalyzer:
         # 提取原始数据
         minute_data_points = raw_data.get("minute_data_points", [])
         data_points_count = raw_data.get("data_points_count", 0)
+        depth_snapshot = raw_data.get("depth_snapshot", {})
 
         # 计算基础统计信息
         total_volume = 0
         all_price_levels = {}
         first_timestamp = None
         last_timestamp = None
+        price_changes = []
 
         for point in minute_data_points:
             timestamp = point.get("timestamp", "")
@@ -232,15 +234,27 @@ class DeepSeekAnalyzer:
                 first_timestamp = timestamp
             last_timestamp = timestamp
 
-            # 累加成交量统计
+            # 累加成交量统计和价格变化
+            minute_volume = 0
+            minute_prices = []
             for price_str, level_data in price_levels.items():
                 try:
                     volume = float(level_data.get("total_volume", 0))
                     if volume > 0:
                         total_volume += volume
-                        all_price_levels[float(price_str)] = all_price_levels.get(float(price_str), 0) + volume
+                        minute_volume += volume
+                        price_float = float(price_str)
+                        all_price_levels[price_float] = all_price_levels.get(price_float, 0) + volume
+                        minute_prices.append(price_float)
                 except (ValueError, TypeError, AttributeError):
                     continue
+
+            # 计算每分钟的价格变化（用于波动率分析）
+            if minute_prices:
+                minute_high = max(minute_prices)
+                minute_low = min(minute_prices)
+                if minute_low > 0:
+                    price_changes.append((minute_high - minute_low) / minute_low)
 
         # 获取成交量最大的前10个价格水平
         top_price_levels = sorted(
@@ -255,12 +269,53 @@ class DeepSeekAnalyzer:
             for price, volume in top_price_levels
         ])
 
-        # 计算价格范围
+        # 计算价格范围和波动率指标
         if all_price_levels:
             price_min = min(all_price_levels.keys())
             price_max = max(all_price_levels.keys())
+            price_range = price_max - price_min
+            avg_price = sum(all_price_levels.keys()) / len(all_price_levels.keys())
+            price_volatility = (price_range / avg_price * 100) if avg_price > 0 else 0
         else:
             price_min = price_max = 0
+            price_volatility = 0
+
+        # 计算时间序列波动率
+        if price_changes:
+            volatility_rate = sum(price_changes) / len(price_changes) * 100
+            volatility_trend = "上升" if len(price_changes) > 1 and price_changes[-1] > price_changes[0] else "下降"
+        else:
+            volatility_rate = 0
+            volatility_trend = "稳定"
+
+        # 计算成交量分布特征
+        if all_price_levels:
+            max_volume = max(all_price_levels.values())
+            concentration_ratio = max_volume / total_volume if total_volume > 0 else 0
+            volume_distribution = "高度集中" if concentration_ratio > 0.5 else "相对分散" if concentration_ratio > 0.2 else "非常分散"
+        else:
+            concentration_ratio = 0
+            volume_distribution = "无数据"
+
+        # 处理深度快照数据
+        depth_info = ""
+        if depth_snapshot:
+            bid_volume = depth_snapshot.get("bid_volume", 0)
+            ask_volume = depth_snapshot.get("ask_volume", 0)
+            spread = depth_snapshot.get("spread", 0)
+            mid_price = depth_snapshot.get("mid_price", 0)
+
+            order_book_ratio = bid_volume / ask_volume if ask_volume > 0 else 1
+            spread_ratio = (spread / mid_price * 100) if mid_price > 0 else 0
+
+            depth_info = f"""
+**深度快照数据**:
+- 中间价: ${mid_price:.2f}
+- 买卖价差: ${spread:.2f} ({spread_ratio:.3f}%)
+- 买盘总量: {bid_volume:.0f}
+- 卖盘总量: {ask_volume:.0f}
+- 买卖比例: {order_book_ratio:.2f}
+- 流动性: {'充裕' if min(bid_volume, ask_volume) > 1000 else '一般' if min(bid_volume, ask_volume) > 100 else '稀薄'}"""
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -270,22 +325,29 @@ class DeepSeekAnalyzer:
 - 数据点: {data_points_count} 个
 - 总成交量: {total_volume:.0f}
 - 价格区间: ${price_min:.2f} - ${price_max:.2f}
+- 价格波动率: {price_volatility:.2f}%
+- 时间序列波动: {volatility_rate:.2f}% ({volatility_trend})
+
+**成交量分析**:
+- 成交量分布: {volume_distribution}
+- 最大单价格占比: {concentration_ratio:.1%}
 
 **主要成交价格**:
 {price_levels_str}
+{depth_info}
 
-**要求**:
-基于以上数据分析市场趋势，重点考虑：
-1. 成交量分布特征
-2. 价格活跃度
-3. 买卖力量对比
-4. 市场情绪状态
+**分析要求**:
+基于以上数据进行综合趋势分析，重点考虑：
+1. **波动率特征**: 价格波动幅度、波动趋势变化
+2. **成交量分析**: 成交量分布、量价关系、买卖力量对比
+3. **深度流动性**: 订单簿买卖盘力量对比、价差分析
+4. **市场情绪**: 结合价格、成交量、深度的综合判断
 
 **输出格式**:
 {{
   "trend": "震荡/微弱看涨/看涨/强力看涨/微弱看跌/看跌/强力看跌",
   "confidence": 0.0-1.0,
-  "reason": "50字以内的详细分析原因，包含成交量、价格、市场情绪等关键信息"
+  "reason": "100字以内的详细分析原因，必须包含波动率、成交量、深度流动性等关键信息"
 }}
 
 只返回JSON，不要其他内容。"""

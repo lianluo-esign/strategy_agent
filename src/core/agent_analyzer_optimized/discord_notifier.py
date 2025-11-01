@@ -137,7 +137,7 @@ class DiscordNotifier:
             logger.error(f"Discord通知发送异常: {e}")
             return False
 
-    def _format_discord_message(
+  def _format_discord_message(
         self,
         analysis_result: dict[str, Any],
         symbol: str
@@ -177,7 +177,13 @@ class DiscordNotifier:
         else:
             reason = analysis_result.get("reason", "暂无分析原因")
 
-        strength_levels = analysis_result.get("strength_levels", {})
+        # 提取原始数据用于价格位置分析
+        raw_data = analysis_result.get("raw_data", {})
+        depth_snapshot = raw_data.get("depth_snapshot", {})
+        minute_data_points = raw_data.get("minute_data_points", [])
+
+        # 计算关键价格位置
+        price_analysis = self._analyze_price_positions(minute_data_points, depth_snapshot)
 
         # 获取表情符号
         trend_emoji = TREND_EMOJIS.get(trend, "❓")
@@ -196,6 +202,14 @@ class DiscordNotifier:
                 }
             ]
 
+            # 添加关键价格位置分析
+            if price_analysis:
+                fields.append({
+                    "name": "🎯 关键价格位置",
+                    "value": self._format_price_positions(price_analysis),
+                    "inline": True
+                })
+
             # 如果有概率分布信息，添加概率字段
             if probability_summary:
                 fields.append({
@@ -204,18 +218,11 @@ class DiscordNotifier:
                     "inline": True
                 })
 
-            # 如果有强度信息，添加强度字段
-            if strength_levels:
-                fields.append({
-                    "name": "💪 支撑/阻力强度",
-                    "value": self._format_strength_levels(strength_levels),
-                    "inline": True
-                })
-
-            # 添加分析原因
+            # 添加详细分析原因
+            detailed_reason = self._enhance_analysis_reason(reason, price_analysis, depth_snapshot)
             fields.append({
-                "name": "📝 分析原因",
-                "value": self._truncate_text(reason, 1024),
+                "name": "📝 详细分析",
+                "value": self._truncate_text(detailed_reason, 1024),
                 "inline": False
             })
 
@@ -240,11 +247,11 @@ class DiscordNotifier:
 **📊 趋势判断**: {trend}
 **🎯 置信度**: {confidence:.1%} {confidence_bar}
 
-**💪 支撑/阻力强度**:
-{self._format_strength_levels_text(strength_levels)}
+**🎯 关键价格位置**:
+{self._format_price_positions_text(price_analysis)}
 
-**📝 分析原因**:
-{self._truncate_text(reason, 1000)}
+**📝 详细分析**:
+{self._truncate_text(self._enhance_analysis_reason(reason, price_analysis, depth_snapshot), 1000)}
 
 ---
 *分析时间: {timestamp}*
@@ -534,6 +541,248 @@ class DiscordNotifier:
     async def close(self) -> None:
         """关闭资源。"""
         logger.info("DiscordNotifier closed")
+
+    def _analyze_price_positions(self, minute_data_points: list[dict], depth_snapshot: dict) -> dict[str, Any]:
+        """分析关键价格位置。
+
+        Args:
+            minute_data_points: 分钟数据点
+            depth_snapshot: 深度快照数据
+
+        Returns:
+            价格位置分析结果
+        """
+        price_analysis = {
+            "support_levels": [],
+            "resistance_levels": [],
+            "current_price": 0.0,
+            "volume_hotspots": [],
+            "order_book_levels": {}
+        }
+
+        try:
+            # 从深度快照获取当前价格信息
+            if depth_snapshot:
+                price_analysis["current_price"] = depth_snapshot.get("mid_price", 0.0)
+                spread = depth_snapshot.get("spread", 0.0)
+                bid_volume = depth_snapshot.get("bid_volume", 0)
+                ask_volume = depth_snapshot.get("ask_volume", 0)
+
+                # 计算订单簿关键位置
+                if depth_snapshot.get("bids") and depth_snapshot.get("asks"):
+                    best_bid = depth_snapshot["bids"][0]["price"] if depth_snapshot["bids"] else 0.0
+                    best_ask = depth_snapshot["asks"][0]["price"] if depth_snapshot["asks"] else 0.0
+
+                    price_analysis["order_book_levels"] = {
+                        "best_bid": best_bid,
+                        "best_ask": best_ask,
+                        "spread": spread,
+                        "bid_ask_ratio": bid_volume / ask_volume if ask_volume > 0 else 1.0
+                    }
+
+            # 从分钟数据分析成交量热点和支撑阻力
+            all_volumes = {}
+            for point in minute_data_points:
+                price_levels = point.get("price_levels", {})
+                for price_str, level_data in price_levels.items():
+                    try:
+                        price = float(price_str)
+                        volume = float(level_data.get("total_volume", 0))
+                        if volume > 0:
+                            all_volumes[price] = all_volumes.get(price, 0) + volume
+                    except (ValueError, TypeError):
+                        continue
+
+            if all_volumes and price_analysis["current_price"] > 0:
+                # 按成交量排序，找出热点价格
+                sorted_volumes = sorted(all_volumes.items(), key=lambda x: x[1], reverse=True)
+                current_price = price_analysis["current_price"]
+
+                # 找出支撑位（当前价格下方的高成交量位置）
+                support_candidates = [(price, vol) for price, vol in sorted_volumes if price < current_price]
+                resistance_candidates = [(price, vol) for price, vol in sorted_volumes if price > current_price]
+
+                # 取前3个支撑位和阻力位
+                price_analysis["support_levels"] = [
+                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100}
+                    for price, volume in support_candidates[:3]
+                ]
+
+                price_analysis["resistance_levels"] = [
+                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100}
+                    for price, volume in resistance_candidates[:3]
+                ]
+
+                # 成交量热点（前5个）
+                price_analysis["volume_hotspots"] = [
+                    {"price": price, "volume": volume}
+                    for price, volume in sorted_volumes[:5]
+                ]
+
+        except Exception as e:
+            logger.debug(f"价格位置分析失败: {e}")
+
+        return price_analysis
+
+    def _format_price_positions(self, price_analysis: dict[str, Any]) -> str:
+        """格式化价格位置信息（嵌入格式）。
+
+        Args:
+            price_analysis: 价格位置分析结果
+
+        Returns:
+            格式化的价格位置字符串
+        """
+        if not price_analysis:
+            return "暂无价格位置数据"
+
+        lines = []
+        current_price = price_analysis.get("current_price", 0.0)
+
+        if current_price > 0:
+            lines.append(f"**当前价格**: ${current_price:.2f}")
+
+        # 支撑位
+        support_levels = price_analysis.get("support_levels", [])
+        if support_levels:
+            lines.append("**🟢 支撑位**:")
+            for i, support in enumerate(support_levels[:3], 1):
+                price = support["price"]
+                distance = support["distance"]
+                volume = support["volume"]
+                lines.append(f"  {i}. ${price:.2f} (距离 {distance:.2f}%) • 量: {volume:.0f}")
+
+        # 阻力位
+        resistance_levels = price_analysis.get("resistance_levels", [])
+        if resistance_levels:
+            lines.append("**🔴 阻力位**:")
+            for i, resistance in enumerate(resistance_levels[:3], 1):
+                price = resistance["price"]
+                distance = resistance["distance"]
+                volume = resistance["volume"]
+                lines.append(f"  {i}. ${price:.2f} (距离 {distance:.2f}%) • 量: {volume:.0f}")
+
+        # 订单簿信息
+        order_book = price_analysis.get("order_book_levels", {})
+        if order_book:
+            best_bid = order_book.get("best_bid", 0.0)
+            best_ask = order_book.get("best_ask", 0.0)
+            spread = order_book.get("spread", 0.0)
+            ratio = order_book.get("bid_ask_ratio", 1.0)
+
+            if best_bid > 0 and best_ask > 0:
+                lines.append("**📊 订单簿**:")
+                lines.append(f"  买一: ${best_bid:.2f} | 卖一: ${best_ask:.2f}")
+                lines.append(f"  价差: ${spread:.4f} | 买卖比: {ratio:.2f}")
+
+        return "\n".join(lines) if lines else "暂无价格位置数据"
+
+    def _format_price_positions_text(self, price_analysis: dict[str, Any]) -> str:
+        """格式化价格位置信息（文本格式）。
+
+        Args:
+            price_analysis: 价格位置分析结果
+
+        Returns:
+            格式化的价格位置字符串
+        """
+        if not price_analysis:
+            return "  暂无价格位置数据"
+
+        lines = []
+        current_price = price_analysis.get("current_price", 0.0)
+
+        if current_price > 0:
+            lines.append(f"  **当前价格**: ${current_price:.2f}")
+
+        # 支撑位
+        support_levels = price_analysis.get("support_levels", [])
+        if support_levels:
+            lines.append("  **🟢 支撑位**:")
+            for i, support in enumerate(support_levels[:3], 1):
+                price = support["price"]
+                distance = support["distance"]
+                lines.append(f"    {i}. ${price:.2f} (距离 {distance:.2f}%)")
+
+        # 阻力位
+        resistance_levels = price_analysis.get("resistance_levels", [])
+        if resistance_levels:
+            lines.append("  **🔴 阻力位**:")
+            for i, resistance in enumerate(resistance_levels[:3], 1):
+                price = resistance["price"]
+                distance = resistance["distance"]
+                lines.append(f"    {i}. ${price:.2f} (距离 {distance:.2f}%)")
+
+        return "\n".join(lines) if lines else "  暂无价格位置数据"
+
+    def _enhance_analysis_reason(self, original_reason: str, price_analysis: dict[str, Any], depth_snapshot: dict) -> str:
+        """增强分析原因，添加更多细节。
+
+        Args:
+            original_reason: 原始分析原因
+            price_analysis: 价格位置分析
+            depth_snapshot: 深度快照数据
+
+        Returns:
+            增强后的分析原因
+        """
+        enhanced_parts = [original_reason]
+
+        try:
+            # 添加深度快照洞察
+            if depth_snapshot:
+                bid_volume = depth_snapshot.get("bid_volume", 0)
+                ask_volume = depth_snapshot.get("ask_volume", 0)
+                spread = depth_snapshot.get("spread", 0)
+                mid_price = depth_snapshot.get("mid_price", 0)
+
+                if bid_volume > 0 and ask_volume > 0:
+                    ratio = bid_volume / ask_volume
+                    if ratio > 1.2:
+                        enhanced_parts.append(f"买盘力量较强(买卖比{ratio:.1f})")
+                    elif ratio < 0.8:
+                        enhanced_parts.append(f"卖盘压力较大(买卖比{ratio:.1f})")
+
+                if mid_price > 0 and spread > 0:
+                    spread_pct = (spread / mid_price * 100)
+                    if spread_pct > 0.01:
+                        enhanced_parts.append(f"价差较宽({spread_pct:.3f}%)，流动性需关注")
+                    else:
+                        enhanced_parts.append(f"价差正常({spread_pct:.3f}%)")
+
+            # 添加价格位置洞察
+            if price_analysis:
+                current_price = price_analysis.get("current_price", 0.0)
+                support_levels = price_analysis.get("support_levels", [])
+                resistance_levels = price_analysis.get("resistance_levels", [])
+
+                if current_price > 0:
+                    # 最近支撑位分析
+                    if support_levels:
+                        nearest_support = support_levels[0]
+                        support_distance = nearest_support["distance"]
+                        if support_distance < 1.0:
+                            enhanced_parts.append(f"接近近期支撑位(${nearest_support['price']:.2f})")
+
+                    # 最近阻力位分析
+                    if resistance_levels:
+                        nearest_resistance = resistance_levels[0]
+                        resistance_distance = nearest_resistance["distance"]
+                        if resistance_distance < 1.0:
+                            enhanced_parts.append(f"接近近期阻力位(${nearest_resistance['price']:.2f})")
+
+                    # 价格位置分析
+                    if support_levels and resistance_levels:
+                        total_levels = len(support_levels) + len(resistance_levels)
+                        if total_levels > 0:
+                            enhanced_parts.append(f"处于密集成交区，共{total_levels}个关键价位")
+
+        except Exception as e:
+            logger.debug(f"增强分析原因失败: {e}")
+
+        # 合并并限制长度
+        enhanced_text = " | ".join(enhanced_parts)
+        return self._truncate_text(enhanced_text, 500)
 
 
 class DiscordNotificationManager:
