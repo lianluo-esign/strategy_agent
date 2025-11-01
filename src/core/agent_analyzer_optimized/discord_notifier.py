@@ -829,7 +829,6 @@ class DiscordNotificationManager:
                 return False
         else:
             # 使用传统格式化器（向后兼容）
-            trend = analysis_result.get("trend", "")
             confidence = analysis_result.get("confidence", 0.0)
 
             # 降低阈值，只对极低置信度的结果跳过
@@ -969,7 +968,7 @@ class BayesianDiscordFormatter:
         }
 
     def format_bayesian_analysis(self, analysis_data: dict[str, Any], symbol: str = "BTCFDUSD") -> dict[str, Any]:
-        """格式化贝叶斯分析结果为Discord消息（极简版）。
+        """格式化贝叶斯分析结果为Discord消息（增强版）。
 
         Args:
             analysis_data: 贝叶斯分析结果数据
@@ -994,23 +993,40 @@ class BayesianDiscordFormatter:
         # 构建简化的概率信息（只显示前3个）
         prob_summary = self._format_simple_probability_summary(probabilities)
 
-        # 极简嵌入消息 - 只包含最关键的信息
+        # 提取价格位置信息
+        price_analysis = self._extract_price_positions(analysis_data)
+        price_positions = self._format_price_positions_for_bayesian(price_analysis)
+
+        # 构建字段列表
+        fields = [
+            {
+                "name": "📊 概率分布",
+                "value": prob_summary,
+                "inline": True
+            }
+        ]
+
+        # 添加关键价格位置分析
+        if price_positions:
+            fields.append({
+                "name": "🎯 关键价格位置",
+                "value": price_positions,
+                "inline": True
+            })
+
+        # 添加详细分析原因
+        fields.append({
+            "name": "📝 分析原因",
+            "value": self._truncate_text(analysis_reason, 400),
+            "inline": False
+        })
+
+        # 增强版嵌入消息 - 包含价格位置信息
         embed = {
             "title": f"{trend_emoji} {symbol} 市场分析",
             "description": f"**趋势**: {most_likely_trend} {trend_emoji}\n**置信度**: {confidence:.1%}",
             "color": embed_color,
-            "fields": [
-                {
-                    "name": "📊 概率分布",
-                    "value": prob_summary,
-                    "inline": True
-                },
-                {
-                    "name": "📝 分析原因",
-                    "value": self._truncate_text(analysis_reason, 300),
-                    "inline": False
-                }
-            ],
+            "fields": fields,
             "footer": {
                 "text": "AI分析 | BTC-FDUSD流动性分析Agent"
             }
@@ -1502,3 +1518,154 @@ class BayesianDiscordFormatter:
                 entropy -= prob * math.log2(prob)
 
         return entropy
+
+    def _extract_price_positions(self, analysis_data: dict[str, Any]) -> dict[str, Any]:
+        """从分析数据中提取价格位置信息。
+
+        Args:
+            analysis_data: 分析数据
+
+        Returns:
+            价格位置分析结果
+        """
+        price_analysis = {
+            "support_levels": [],
+            "resistance_levels": [],
+            "current_price": 0.0,
+            "volume_hotspots": [],
+            "order_book_levels": {}
+        }
+
+        try:
+            # 提取原始数据用于价格位置分析
+            raw_data = analysis_data.get("raw_data", {})
+            if not raw_data:
+                # 如果没有raw_data，尝试从metadata中提取
+                metadata = analysis_data.get("metadata", {})
+                data_statistics = metadata.get("data_statistics", {})
+                if data_statistics:
+                    # 从statistics中提取基本信息
+                    price_range = data_statistics.get("price_range", [0, 0])
+                    if price_range and len(price_range) == 2:
+                        price_analysis["current_price"] = (price_range[0] + price_range[1]) / 2
+                        price_analysis["volume_hotspots"] = [
+                            {"price": price_range[0], "volume": 100.0},
+                            {"price": price_range[1], "volume": 100.0}
+                        ]
+                return price_analysis
+
+            depth_snapshot = raw_data.get("depth_snapshot", {})
+            minute_data_points = raw_data.get("minute_data_points", [])
+
+            # 从深度快照获取当前价格信息
+            if depth_snapshot:
+                price_analysis["current_price"] = depth_snapshot.get("mid_price", 0.0)
+                spread = depth_snapshot.get("spread", 0.0)
+                bid_volume = depth_snapshot.get("bid_volume", 0)
+                ask_volume = depth_snapshot.get("ask_volume", 0)
+
+                # 计算订单簿关键位置
+                if depth_snapshot.get("bids") and depth_snapshot.get("asks"):
+                    best_bid = depth_snapshot["bids"][0]["price"] if depth_snapshot["bids"] else 0.0
+                    best_ask = depth_snapshot["asks"][0]["price"] if depth_snapshot["asks"] else 0.0
+
+                    price_analysis["order_book_levels"] = {
+                        "best_bid": best_bid,
+                        "best_ask": best_ask,
+                        "spread": spread,
+                        "bid_ask_ratio": bid_volume / ask_volume if ask_volume > 0 else 1.0
+                    }
+
+            # 从分钟数据分析成交量热点和支撑阻力
+            all_volumes = {}
+            for point in minute_data_points:
+                price_levels = point.get("price_levels", {})
+                for price_str, level_data in price_levels.items():
+                    try:
+                        price = float(price_str)
+                        volume = float(level_data.get("total_volume", 0))
+                        if volume > 0:
+                            all_volumes[price] = all_volumes.get(price, 0) + volume
+                    except (ValueError, TypeError):
+                        continue
+
+            if all_volumes and price_analysis["current_price"] > 0:
+                # 按成交量排序，找出热点价格
+                sorted_volumes = sorted(all_volumes.items(), key=lambda x: x[1], reverse=True)
+                current_price = price_analysis["current_price"]
+
+                # 找出支撑位（当前价格下方的高成交量位置）
+                support_candidates = [(price, vol) for price, vol in sorted_volumes if price < current_price]
+                resistance_candidates = [(price, vol) for price, vol in sorted_volumes if price > current_price]
+
+                # 取前3个支撑位和阻力位
+                price_analysis["support_levels"] = [
+                    {"price": price, "volume": volume, "distance": (current_price - price) / current_price * 100}
+                    for price, volume in support_candidates[:3]
+                ]
+
+                price_analysis["resistance_levels"] = [
+                    {"price": price, "volume": volume, "distance": (price - current_price) / current_price * 100}
+                    for price, volume in resistance_candidates[:3]
+                ]
+
+                # 成交量热点（前5个）
+                price_analysis["volume_hotspots"] = [
+                    {"price": price, "volume": volume}
+                    for price, volume in sorted_volumes[:5]
+                ]
+
+        except Exception as e:
+            logger.debug(f"贝叶斯格式化器价格位置分析失败: {e}")
+
+        return price_analysis
+
+    def _format_price_positions_for_bayesian(self, price_analysis: dict[str, Any]) -> str:
+        """为贝叶斯分析格式化价格位置信息。
+
+        Args:
+            price_analysis: 价格位置分析结果
+
+        Returns:
+            格式化的价格位置字符串
+        """
+        if not price_analysis:
+            return "暂无价格位置数据"
+
+        lines = []
+        current_price = price_analysis.get("current_price", 0.0)
+
+        if current_price > 0:
+            lines.append(f"**当前价格**: ${current_price:.2f}")
+
+        # 支撑位
+        support_levels = price_analysis.get("support_levels", [])
+        if support_levels:
+            lines.append("**🟢 支撑位**:")
+            for i, support in enumerate(support_levels[:2], 1):  # 只显示前2个
+                price = support["price"]
+                distance = support["distance"]
+                lines.append(f"  {i}. ${price:.2f} (距离 {distance:.2f}%)")
+
+        # 阻力位
+        resistance_levels = price_analysis.get("resistance_levels", [])
+        if resistance_levels:
+            lines.append("**🔴 阻力位**:")
+            for i, resistance in enumerate(resistance_levels[:2], 1):  # 只显示前2个
+                price = resistance["price"]
+                distance = resistance["distance"]
+                lines.append(f"  {i}. ${price:.2f} (距离 {distance:.2f}%)")
+
+        # 订单簿信息
+        order_book = price_analysis.get("order_book_levels", {})
+        if order_book:
+            best_bid = order_book.get("best_bid", 0.0)
+            best_ask = order_book.get("best_ask", 0.0)
+            ratio = order_book.get("bid_ask_ratio", 1.0)
+
+            if best_bid > 0 and best_ask > 0:
+                lines.append("**📊 订单簿**:")
+                lines.append(f"  买一: ${best_bid:.2f} | 卖一: ${best_ask:.2f}")
+                lines.append(f"  买卖比: {ratio:.2f}")
+
+        return "\n".join(lines) if lines else "暂无价格位置数据"
